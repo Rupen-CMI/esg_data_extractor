@@ -1,0 +1,53 @@
+{
+  "_note": "Gold company sets, hand-built from benchmark/snippets.json. Each entity lists acceptable aliases; a prediction matches an entity if its normalized form equals/contains any alias (len>=4) or matches exactly. Aliases like 'Azure'->Microsoft and 'Google Cloud'->Google prevent double counting.",
+  "Lithium Ion Battery Market": [
+    {"canonical": "CATL", "aliases": ["CATL"]},
+    {"canonical": "Panasonic", "aliases": ["Panasonic"]},
+    {"canonical": "Samsung", "aliases": ["Samsung", "Samsung SDI"]},
+    {"canonical": "Toshiba", "aliases": ["Toshiba"]},
+    {"canonical": "Amperex Technology Limited", "aliases": ["Amperex Technology Limited"]},
+    {"canonical": "BAK Group", "aliases": ["BAK Group"]},
+    {"canonical": "Blue Energy", "aliases": ["Blue Energy"]}
+  ],
+  "Paints And Coatings Market": [
+    {"canonical": "PPG Industries", "aliases": ["PPG Industries", "PPG"]},
+    {"canonical": "AkzoNobel", "aliases": ["AkzoNobel", "Akzo Nobel"]},
+    {"canonical": "Nippon Paint", "aliases": ["Nippon Paint"]},
+    {"canonical": "Kansai Paint", "aliases": ["Kansai Paint"]},
+    {"canonical": "RPM International", "aliases": ["RPM International"]},
+    {"canonical": "S.K. Kaken", "aliases": ["S.K. Kaken", "SK Kaken"]},
+    {"canonical": "Tiger Coatings", "aliases": ["Tiger Coatings"]},
+    {"canonical": "Jotun", "aliases": ["Jotun"]},
+    {"canonical": "Sherwin-Williams", "aliases": ["Sherwin-Williams", "Sherwin Williams"]},
+    {"canonical": "Axalta Coating Systems", "aliases": ["Axalta"]},
+    {"canonical": "BASF", "aliases": ["BASF"]},
+    {"canonical": "Henkel", "aliases": ["Henkel"]},
+    {"canonical": "Contego International", "aliases": ["Contego"]}
+  ],
+  "Cloud Computing Market": [
+    {"canonical": "Google", "aliases": ["Google", "Google Cloud"]},
+    {"canonical": "Salesforce", "aliases": ["Salesforce"]},
+    {"canonical": "Microsoft", "aliases": ["Microsoft", "Azure"]},
+    {"canonical": "AWS / Amazon", "aliases": ["AWS", "Amazon", "Amazon.com"]},
+    {"canonical": "Oracle", "aliases": ["Oracle"]},
+    {"canonical": "Adobe", "aliases": ["Adobe"]}
+  ],
+  "Electric Motor Market": [
+    {"canonical": "WorldWide Electric", "aliases": ["WorldWide Electric", "World Wide Electric"]},
+    {"canonical": "ABB", "aliases": ["ABB"]},
+    {"canonical": "Composite Motors", "aliases": ["Composite Motors"]},
+    {"canonical": "Louis Allis", "aliases": ["Louis Allis"]},
+    {"canonical": "Ametek", "aliases": ["Ametek"]},
+    {"canonical": "Johnson Electric", "aliases": ["Johnson Electric"]},
+    {"canonical": "Schneider Electric", "aliases": ["Schneider Electric"]},
+    {"canonical": "Oriental Motor USA", "aliases": ["Oriental Motor"]}
+  ],
+  "Aluminum Market": [
+    {"canonical": "Century Aluminum", "aliases": ["Century Aluminum"]},
+    {"canonical": "Magnitude 7 Metals", "aliases": ["Magnitude 7 Metals"]},
+    {"canonical": "Novelis", "aliases": ["Novelis"]},
+    {"canonical": "Reliance Steel & Aluminum", "aliases": ["Reliance Steel"]},
+    {"canonical": "Alcoa", "aliases": ["Alcoa"]},
+    {"canonical": "Constellium", "aliases": ["Constellium"]}
+  ]
+}

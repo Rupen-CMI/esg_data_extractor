@@ -1,0 +1,31 @@
+name,country,industry,pred_e,pred_s,pred_g,signals_count,metadata_source,resolved_country,ok,error,truth_e,truth_s,truth_g,truth_total
+Pavilion Assets Sdn Bhd,Malaysia,Apparel,65.0,75.0,50.0,6,,Malaysia,True,,28.6,15.6,17.0,101.0
+Thomson & Scott Ltd,United Kingdom,Beverages,45.0,65.0,55.0,5,,United Kingdom,True,,27.2,11.566666666666668,18.1,88.1
+LineSync Architecture,United States,Architecture design & planning,55.0,50.0,50.0,3,,United States,True,,28.9,13.699999999999998,15.7,94.2
+ISDIN,Spain,Personal care products,65.0,30.0,35.0,7,,Spain,True,,15.2,20.133333333333333,18.7,94.6
+Untamed,United Kingdom,Food products,45.0,70.0,65.0,6,,United Kingdom,True,,19.2,16.099999999999998,15.1,88.2
+Oprl Ltd,United Kingdom,Environmental consulting,48.0,45.0,52.0,6,,United Kingdom,True,,34.7,22.53333333333333,21.8,129.0
+Robson Laidler Accountants Limited,United Kingdom,Accounting & auditing,55.0,60.0,55.0,3,,United Kingdom,True,,10.9,20.566666666666666,20.6,95.6
+Kitchen Bath Ventures SL,Spain,Furniture,48.0,32.0,46.0,4,,Spain,True,,22.9,14.566666666666668,17.7,88.7
+Smith Global Ltd T/A Mr & Mrs Smith,United Kingdom,Travel agency & related,65.0,30.0,75.0,5,,United Kingdom,True,,5.7,18.433333333333334,19.2,85.9
+Nkuku Ltd,United Kingdom,General retail via Internet,48.0,45.0,45.0,3,,United Kingdom,True,,21.0,19.3,15.8,96.4
+Proyecto Agua Segura,Argentina,Technology-based support services,45.0,40.0,50.0,5,,Argentina,True,,10.4,18.533333333333335,7.4,80.5
+Solid Collective Ltd,United Kingdom,Spec design (non-building),55.0,48.0,48.0,1,,United Kingdom,True,,11.7,26.349999999999998,22.0,87.4
+Cheeky Baby Products Ltd,United Kingdom,Textiles,45.0,50.0,50.0,6,,United Kingdom,True,,32.6,18.133333333333333,16.7,107.9
+Alpkit,United Kingdom,Sports goods,58.0,30.0,25.0,6,,United Kingdom,True,,23.3,24.566666666666666,19.8,122.6
+Market Harborough Honey Co. Limited,United Kingdom,Food products,55.0,25.0,25.0,3,,United Kingdom,True,,13.0,25.9,18.2,89.4
+Starbuck & Associates Limited,United Kingdom,Management consultant - for-profits,48.0,52.0,50.0,3,,United Kingdom,True,,3.0,27.266666666666666,15.8,104.9
+DES ENJEUX ET DES HOMMES,France,Other education,48.0,50.0,45.0,4,,France,True,,13.1,23.03333333333333,19.6,110.1
+Spotlight,United States,Software publishing and SaaS platforms,0.0,0.0,0.0,9,,United States,True,,3.0,39.45,19.6,108.9
+Cool Ventures Ltd,United Kingdom,Other business support,50.0,65.0,50.0,4,,United Kingdom,True,,10.4,25.766666666666666,16.1,109.5
+CasaCo,Chile,Other business support,45.0,45.0,45.0,4,,Chile,True,,11.3,16.833333333333332,15.6,88.2
+MSM Steuerberatungsgesellschaft mbH,Germany,Accounting & auditing,75.0,75.0,75.0,5,,Germany,True,,5.4,22.3,18.0,97.4
+Plangreen Srl,Italy,Environmental consulting,72.0,45.0,60.0,4,,Italy,True,,4.4,18.099999999999998,20.0,84.8
+Monarc Jewellery Limited,United Kingdom,Jewelry & related articles,55.0,45.0,45.0,2,,United Kingdom,True,,36.9,14.066666666666668,13.8,97.3
+ten23 health,Switzerland,Other manufacturing,82.0,55.0,70.0,3,,Switzerland,True,,16.5,15.966666666666669,9.9,80.8
+Worldcoo,Spain,Web portals,25.0,65.0,30.0,5,,Spain,True,,9.7,25.400000000000002,16.4,108.8
+House of Enlightened Needs,China,Education & training services,48.0,75.0,60.0,4,,China,True,,1.9,24.099999999999998,13.4,94.6
+"OnSite Energy, Inc.",United States,Solar panel installation,58.0,55.0,54.0,6,,United States,True,,32.1,14.633333333333333,15.6,95.5
+Eprcomunicazione S.p.A. Società Benefit,Italy,Other info service activities,45.0,65.0,55.0,3,,Italy,True,,10.8,13.633333333333333,20.7,83.8
+DIALOG,Canada,Architecture design & planning,55.0,52.0,50.0,8,,Canada,True,,24.6,15.366666666666667,9.8,84.2
+Blackmores,Australia,Pharmaceutical products,45.0,55.0,55.0,7,,Australia,True,,18.0,15.766666666666666,15.5,81.0

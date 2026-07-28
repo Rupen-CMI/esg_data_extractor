@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+ddgs
+pydantic
+yfinance
+sqlalchemy
+psycopg2
+wikirate4py
+yfinance
+langgraph

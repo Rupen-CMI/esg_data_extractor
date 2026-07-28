@@ -1,0 +1,30 @@
+# Added by code-review-graph
+.code-review-graph/
+
+# Secrets
+.env
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.pytest_cache/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local MCP config (machine-specific paths)
+.mcp.json
+
+# Large raw/generated data - not source
+raw_esg_data/
+downloaded_reports/
+calibration/cache/

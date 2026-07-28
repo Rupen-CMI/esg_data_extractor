@@ -1,0 +1,4 @@
+name,country,industry,pred_e,pred_s,pred_g,signals_count,metadata_source,resolved_country,ok,error,truth_e,truth_s,truth_g,truth_total
+ENI,ITA,Energy and Environmental,42.0,45.0,48.0,9,wikidata,ITA,True,,-6.79816373620482,2.423297135878245,,8.941050946919178
+Prudential Financial,USA,Insurance,58.0,42.0,52.0,9,wikidata,USA,True,,-0.35437696037466737,1.6839754615278861,,44.689250466791144
+Nvidia,USA,Computer Software,48.0,47.0,48.0,9,wikidata,USA,True,,-1.7825700903619557,1.3427936001531382,,45.41477727393971

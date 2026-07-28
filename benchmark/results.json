@@ -1,0 +1,805 @@
+{
+  "total_gold": 40,
+  "models": [
+    {
+      "model": "deepseek-v4-flash-free",
+      "TP": 34,
+      "FP": 0,
+      "FN": 6,
+      "precision": 1.0,
+      "recall": 0.85,
+      "f1": 0.919,
+      "hallucinations": 0,
+      "json_ok_calls": 5,
+      "errors": 0,
+      "n_calls": 5,
+      "avg_latency_s": 29.77,
+      "total_tokens": 17287,
+      "per_market": {
+        "Lithium Ion Battery Market": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "CATL"
+          ],
+          "raw": "{\"companies\": [\"CATL\"]}",
+          "latency_s": 18.3,
+          "usage": {
+            "prompt_tokens": 352,
+            "completion_tokens": 1675,
+            "total_tokens": 2027,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1666
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 96
+          },
+          "tp": 1,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Paints And Coatings Market": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "AKZO NOBEL N.V",
+            "Axalta Coating Systems",
+            "BASF SE",
+            "Contego International Inc",
+            "Henkel AG & Company, KGaA",
+            "Jotun",
+            "KANSAI PAINT CO., LTD",
+            "NIPPON PAINT HOLDINGS CO., LTD",
+            "PPG INDUSTRIES, INC",
+            "RPM INTERNATIONAL INC",
+            "S.K. KAKEN CO., LTD",
+            "The Sherwin-Williams Company",
+            "TIGER COATINGS GMBH & CO"
+          ],
+          "raw": "{\n  \"companies\": [\n    \"AKZO NOBEL N.V\",\n    \"Axalta Coating Systems\",\n    \"BASF SE\",\n    \"Contego International Inc\",\n    \"Henkel AG & Company, KGaA\",\n    \"Jotun\",\n    \"KANSAI PAINT CO., LTD\",\n    \"NIPPON PAINT HOLDINGS CO., LTD\",\n    \"PPG INDUSTRIES, INC\",\n    \"RPM INTERNATIONAL INC\",\n    \"S.K. KAKEN CO., LTD\",\n    \"The Sherwin-Williams Company\",\n    \"TIGER COATINGS GMBH & CO\"\n  ]\n}",
+          "latency_s": 49.1,
+          "usage": {
+            "prompt_tokens": 464,
+            "completion_tokens": 5502,
+            "total_tokens": 5966,
+            "prompt_tokens_details": {
+              "cached_tokens": 384
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5363
+            },
+            "prompt_cache_hit_tokens": 384,
+            "prompt_cache_miss_tokens": 80
+          },
+          "tp": 13,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Cloud Computing Market": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Adobe Group",
+            "Amazon.com Inc",
+            "Google LLC",
+            "Microsoft Corporation",
+            "Oracle",
+            "Salesforce Inc"
+          ],
+          "raw": "{\"companies\": [\"Adobe Group\", \"Amazon.com Inc\", \"Google LLC\", \"Microsoft Corporation\", \"Oracle\", \"Salesforce Inc\"]}",
+          "latency_s": 42.54,
+          "usage": {
+            "prompt_tokens": 407,
+            "completion_tokens": 4227,
+            "total_tokens": 4634,
+            "prompt_tokens_details": {
+              "cached_tokens": 384
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4197
+            },
+            "prompt_cache_hit_tokens": 384,
+            "prompt_cache_miss_tokens": 23
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Electric Motor Market": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "WorldWide Electric Corporation",
+            "ABB Ltd",
+            "Composite Motors Inc",
+            "Louis Allis Co",
+            "Ametek Inc",
+            "Johnson Electric Holdings Limited",
+            "Schneider Electric",
+            "Oriental Motor USA Corp"
+          ],
+          "raw": "{\"companies\": [\"WorldWide Electric Corporation\", \"ABB Ltd\", \"Composite Motors Inc\", \"Louis Allis Co\", \"Ametek Inc\", \"Johnson Electric Holdings Limited\", \"Schneider Electric\", \"Oriental Motor USA Corp\"]}",
+          "latency_s": 10.83,
+          "usage": {
+            "prompt_tokens": 444,
+            "completion_tokens": 925,
+            "total_tokens": 1369,
+            "prompt_tokens_details": {
+              "cached_tokens": 384
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 873
+            },
+            "prompt_cache_hit_tokens": 384,
+            "prompt_cache_miss_tokens": 60
+          },
+          "tp": 8,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Aluminum Market": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Century Aluminum",
+            "Magnitude 7 Metals",
+            "Novelis Inc",
+            "Reliance Steel & Aluminum Co",
+            "Alcoa Corporation",
+            "Constellium SE",
+            "Alcoa Corp"
+          ],
+          "raw": "{\"companies\": [\"Century Aluminum\", \"Magnitude 7 Metals\", \"Novelis Inc\", \"Reliance Steel & Aluminum Co\", \"Alcoa Corporation\", \"Constellium SE\", \"Alcoa Corp\"]}",
+          "latency_s": 28.06,
+          "usage": {
+            "prompt_tokens": 367,
+            "completion_tokens": 2924,
+            "total_tokens": 3291,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2876
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 111
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "mimo-v2.5-free",
+      "TP": 33,
+      "FP": 1,
+      "FN": 7,
+      "precision": 0.971,
+      "recall": 0.825,
+      "f1": 0.892,
+      "hallucinations": 1,
+      "json_ok_calls": 5,
+      "errors": 0,
+      "n_calls": 5,
+      "avg_latency_s": 31.18,
+      "total_tokens": 17554,
+      "per_market": {
+        "Lithium Ion Battery Market": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "CATL"
+          ],
+          "raw": "{\"companies\": [\"CATL\"]}",
+          "latency_s": 16.09,
+          "usage": {
+            "prompt_tokens": 528,
+            "completion_tokens": 1347,
+            "total_tokens": 1875,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 512,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0003808336,
+              "upstream_inference_prompt_cost": 3.6736e-06,
+              "upstream_inference_completions_cost": 0.00037716
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1337,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 1,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Paints And Coatings Market": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "AkzoNobel",
+            "Axalta Coating Systems",
+            "BASF SE",
+            "Contego International Inc",
+            "Henkel AG & Company, KGaA",
+            "Jotun",
+            "Kansai Paint Co., Ltd",
+            "Nippon Paint Holdings Co., Ltd",
+            "PGG Industries",
+            "RPM International",
+            "S.K. Kaken Co., Ltd",
+            "Tiger Coatings GmbH & Co",
+            "The Sherwin-Williams Company"
+          ],
+          "raw": "{\"companies\": [\"AkzoNobel\", \"Axalta Coating Systems\", \"BASF SE\", \"Contego International Inc\", \"Henkel AG & Company, KGaA\", \"Jotun\", \"Kansai Paint Co., Ltd\", \"Nippon Paint Holdings Co., Ltd\", \"PGG Industries\", \"RPM International\", \"S.K. Kaken Co., Ltd\", \"Tiger Coatings GmbH & Co\", \"The Sherwin-Williams Company\"]}",
+          "latency_s": 46.32,
+          "usage": {
+            "prompt_tokens": 630,
+            "completion_tokens": 4524,
+            "total_tokens": 5154,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 576,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0012758928,
+              "upstream_inference_prompt_cost": 9.1728e-06,
+              "upstream_inference_completions_cost": 0.00126672
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4422,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 12,
+          "fp": 1,
+          "fn": 1,
+          "false_positives": [
+            "PGG Industries"
+          ],
+          "hallucinations": [
+            "PGG Industries"
+          ]
+        },
+        "Cloud Computing Market": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Google LLC",
+            "Salesforce Inc",
+            "Microsoft Corporation",
+            "AWS",
+            "Oracle",
+            "Amazon.com Inc.",
+            "Adobe Group"
+          ],
+          "raw": "{\"companies\": [\"Google LLC\", \"Salesforce Inc\", \"Microsoft Corporation\", \"AWS\", \"Oracle\", \"Amazon.com Inc.\", \"Adobe Group\"]}",
+          "latency_s": 49.88,
+          "usage": {
+            "prompt_tokens": 588,
+            "completion_tokens": 4692,
+            "total_tokens": 5280,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 576,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0013170528,
+              "upstream_inference_prompt_cost": 3.2928e-06,
+              "upstream_inference_completions_cost": 0.00131376
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4658,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Electric Motor Market": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "WorldWide Electric Corporation",
+            "ABB Ltd.",
+            "Composite Motors Inc.",
+            "Louis Allis Co.",
+            "Ametek Inc.",
+            "Johnson Electric Holdings Limited",
+            "Schneider Electric",
+            "Oriental Motor USA Corp."
+          ],
+          "raw": "{\n  \"companies\": [\"WorldWide Electric Corporation\", \"ABB Ltd.\", \"Composite Motors Inc.\", \"Louis Allis Co.\", \"Ametek Inc.\", \"Johnson Electric Holdings Limited\", \"Schneider Electric\", \"Oriental Motor USA Corp.\"]\n}",
+          "latency_s": 22.32,
+          "usage": {
+            "prompt_tokens": 615,
+            "completion_tokens": 2182,
+            "total_tokens": 2797,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 576,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0006180328,
+              "upstream_inference_prompt_cost": 7.0728e-06,
+              "upstream_inference_completions_cost": 0.00061096
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2127,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 8,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Aluminum Market": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Century Aluminum",
+            "Magnitude 7 Metals",
+            "Novelis Inc.",
+            "Reliance Steel & Aluminum Co.",
+            "Alcoa Corporation",
+            "Constellium SE"
+          ],
+          "raw": "{\"companies\": [\"Century Aluminum\", \"Magnitude 7 Metals\", \"Novelis Inc.\", \"Reliance Steel & Aluminum Co.\", \"Alcoa Corporation\", \"Constellium SE\"]}",
+          "latency_s": 21.3,
+          "usage": {
+            "prompt_tokens": 532,
+            "completion_tokens": 1916,
+            "total_tokens": 2448,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 512,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0005407136,
+              "upstream_inference_prompt_cost": 4.2336e-06,
+              "upstream_inference_completions_cost": 0.00053648
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1874,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "nemotron-3-ultra-free",
+      "TP": 1,
+      "FP": 0,
+      "FN": 39,
+      "precision": 1.0,
+      "recall": 0.025,
+      "f1": 0.049,
+      "hallucinations": 0,
+      "json_ok_calls": 1,
+      "errors": 4,
+      "n_calls": 5,
+      "avg_latency_s": 117.0,
+      "total_tokens": 667,
+      "per_market": {
+        "Lithium Ion Battery Market": {
+          "model": "nemotron-3-ultra-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "CATL"
+          ],
+          "raw": "{\"companies\": [\"CATL\"]}",
+          "latency_s": 39.42,
+          "usage": {
+            "prompt_tokens": 312,
+            "completion_tokens": 355,
+            "total_tokens": 667,
+            "cost": 0,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0,
+              "upstream_inference_prompt_cost": 0,
+              "upstream_inference_completions_cost": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 406,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 1,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Paints And Coatings Market": {
+          "model": "nemotron-3-ultra-free",
+          "ok": false,
+          "error": "('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 195.0,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 13,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Cloud Computing Market": {
+          "model": "nemotron-3-ultra-free",
+          "ok": false,
+          "error": "500 Server Error: Internal Server Error for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 149.3,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Electric Motor Market": {
+          "model": "nemotron-3-ultra-free",
+          "ok": false,
+          "error": "('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 155.58,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 8,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Aluminum Market": {
+          "model": "nemotron-3-ultra-free",
+          "ok": false,
+          "error": "('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 45.7,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "qwen3.6-plus-free",
+      "TP": 0,
+      "FP": 0,
+      "FN": 40,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "hallucinations": 0,
+      "json_ok_calls": 0,
+      "errors": 5,
+      "n_calls": 5,
+      "avg_latency_s": 1.12,
+      "total_tokens": 0,
+      "per_market": {
+        "Lithium Ion Battery Market": {
+          "model": "qwen3.6-plus-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 1.12,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 7,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Paints And Coatings Market": {
+          "model": "qwen3.6-plus-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 1.12,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 13,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Cloud Computing Market": {
+          "model": "qwen3.6-plus-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 1.12,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Electric Motor Market": {
+          "model": "qwen3.6-plus-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 1.12,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 8,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Aluminum Market": {
+          "model": "qwen3.6-plus-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 1.12,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "minimax-m3-free",
+      "TP": 0,
+      "FP": 0,
+      "FN": 40,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "hallucinations": 0,
+      "json_ok_calls": 0,
+      "errors": 5,
+      "n_calls": 5,
+      "avg_latency_s": 1.02,
+      "total_tokens": 0,
+      "per_market": {
+        "Lithium Ion Battery Market": {
+          "model": "minimax-m3-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.98,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 7,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Paints And Coatings Market": {
+          "model": "minimax-m3-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 1.33,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 13,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Cloud Computing Market": {
+          "model": "minimax-m3-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.96,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Electric Motor Market": {
+          "model": "minimax-m3-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.96,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 8,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Aluminum Market": {
+          "model": "minimax-m3-free",
+          "ok": false,
+          "error": "401 Client Error: Unauthorized for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.89,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "north-mini-code-free",
+      "TP": 0,
+      "FP": 0,
+      "FN": 40,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "hallucinations": 0,
+      "json_ok_calls": 0,
+      "errors": 5,
+      "n_calls": 5,
+      "avg_latency_s": 0.03,
+      "total_tokens": 0,
+      "per_market": {
+        "Lithium Ion Battery Market": {
+          "model": "north-mini-code-free",
+          "ok": false,
+          "error": "HTTPSConnectionPool(host='opencode.ai', port=443): Max retries exceeded with url: /zen/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='opencode.ai', port=443): Failed to resolve 'opencode.ai' ([Errno 11001] getaddrinfo failed)\"))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.01,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 7,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Paints And Coatings Market": {
+          "model": "north-mini-code-free",
+          "ok": false,
+          "error": "HTTPSConnectionPool(host='opencode.ai', port=443): Max retries exceeded with url: /zen/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='opencode.ai', port=443): Failed to resolve 'opencode.ai' ([Errno 11001] getaddrinfo failed)\"))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.04,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 13,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Cloud Computing Market": {
+          "model": "north-mini-code-free",
+          "ok": false,
+          "error": "HTTPSConnectionPool(host='opencode.ai', port=443): Max retries exceeded with url: /zen/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='opencode.ai', port=443): Failed to resolve 'opencode.ai' ([Errno 11001] getaddrinfo failed)\"))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.04,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Electric Motor Market": {
+          "model": "north-mini-code-free",
+          "ok": false,
+          "error": "HTTPSConnectionPool(host='opencode.ai', port=443): Max retries exceeded with url: /zen/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='opencode.ai', port=443): Failed to resolve 'opencode.ai' ([Errno 11001] getaddrinfo failed)\"))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.04,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 8,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Aluminum Market": {
+          "model": "north-mini-code-free",
+          "ok": false,
+          "error": "HTTPSConnectionPool(host='opencode.ai', port=443): Max retries exceeded with url: /zen/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='opencode.ai', port=443): Failed to resolve 'opencode.ai' ([Errno 11001] getaddrinfo failed)\"))",
+          "companies": [],
+          "raw": "",
+          "latency_s": 0.0,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    }
+  ]
+}

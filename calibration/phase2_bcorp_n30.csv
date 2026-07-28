@@ -1,0 +1,31 @@
+name,country,industry,pred_e,pred_s,pred_g,signals_count,metadata_source,resolved_country,ok,error,truth_e,truth_s,truth_g,truth_total
+Thomson & Scott Ltd,United Kingdom,Beverages,71.67,78.37,69.69999999999999,7,,United Kingdom,True,,27.2,11.566666666666668,18.1,88.1
+Pavilion Assets Sdn Bhd,Malaysia,Apparel,68.89,71.63,54.99,6,name_inference,Malaysia,True,,28.6,15.6,17.0,101.0
+LineSync Architecture,United States,Architecture design & planning,65.76,74.57,66.52,5,,United States,True,,28.9,13.699999999999998,15.7,94.2
+Untamed,United Kingdom,Food products,71.67,78.37,64.02,7,gleif,United Kingdom,True,,19.2,16.099999999999998,15.1,88.2
+ISDIN,Spain,Personal care products,79.27000000000001,78.28,58.97,8,gleif,Spain,True,,15.2,20.133333333333333,18.7,94.6
+Oprl Ltd,United Kingdom,Environmental consulting,71.67,78.37,67.17,9,,United Kingdom,True,,34.7,22.53333333333333,21.8,129.0
+Robson Laidler Accountants Limited,United Kingdom,Accounting & auditing,74.19,78.37,64.02,5,,United Kingdom,True,,10.9,20.566666666666666,20.6,95.6
+Kitchen Bath Ventures SL,Spain,Furniture,74.95,78.28,62.57,7,,Spain,True,,22.9,14.566666666666668,17.7,88.7
+Smith Global Ltd T/A Mr & Mrs Smith,United Kingdom,Travel agency & related,74.07000000000001,78.37,67.61999999999999,6,,United Kingdom,True,,5.7,18.433333333333334,19.2,85.9
+Nkuku Ltd,United Kingdom,General retail via Internet,71.67,78.37,66.72,5,gleif,United Kingdom,True,,21.0,19.3,15.8,96.4
+Proyecto Agua Segura,Argentina,Technology-based support services,71.01,67.04,47.66,6,,Argentina,True,,10.4,18.533333333333335,7.4,80.5
+Solid Collective Ltd,United Kingdom,Spec design (non-building),71.67,78.37,66.89999999999999,5,,United Kingdom,True,,11.7,26.349999999999998,22.0,87.4
+Cheeky Baby Products Ltd,United Kingdom,Textiles,71.67,78.37,70.42,8,,United Kingdom,True,,32.6,18.133333333333333,16.7,107.9
+Alpkit,United Kingdom,Sports goods,93.27000000000001,78.37,67.61999999999999,7,gleif,United Kingdom,True,,23.3,24.566666666666666,19.8,122.6
+Market Harborough Honey Co. Limited,United Kingdom,Food products,73.83,78.37,66.53999999999999,6,,United Kingdom,True,,13.0,25.9,18.2,89.4
+Starbuck & Associates Limited,United Kingdom,Management consultant - for-profits,71.67,78.37,64.02,6,,United Kingdom,True,,3.0,27.266666666666666,15.8,104.9
+DES ENJEUX ET DES HOMMES,France,Other education,75.05,80.76,59.11,7,,France,True,,13.1,23.03333333333333,19.6,110.1
+Spotlight,United States,Software publishing and SaaS platforms,65.76,74.57,66.52,13,gleif,United States,True,,3.0,39.45,19.6,108.9
+Cool Ventures Ltd,United Kingdom,Other business support,71.67,78.37,64.02,7,,United Kingdom,True,,10.4,25.766666666666666,16.1,109.5
+CasaCo,Chile,Other business support,73.97,73.15,55.22,8,gleif,Chile,True,,11.3,16.833333333333332,15.6,88.2
+MSM Steuerberatungsgesellschaft mbH,Germany,Accounting & auditing,72.77,81.88,66.55,8,,Germany,True,,5.4,22.3,18.0,97.4
+Plangreen Srl,Italy,Environmental consulting,74.24,77.16,59.97,8,,Italy,True,,4.4,18.099999999999998,20.0,84.8
+Monarc Jewellery Limited,United Kingdom,Jewelry & related articles,71.67,78.37,64.02,5,,United Kingdom,True,,36.9,14.066666666666668,13.8,97.3
+ten23 health,Switzerland,Other manufacturing,79.97,82.24,84.24000000000001,9,,Switzerland,True,,16.5,15.966666666666669,9.9,80.8
+House of Enlightened Needs,China,Education & training services,59.57,75.33,59.5,7,,China,True,,1.9,24.099999999999998,13.4,94.6
+Worldcoo,Spain,Web portals,74.95,78.28,61.67,10,,Spain,True,,9.7,25.400000000000002,16.4,108.8
+"OnSite Energy, Inc.",United States,Solar panel installation,65.76,74.57,66.52,9,gleif,United States,True,,32.1,14.633333333333333,15.6,95.5
+DIALOG,Canada,Architecture design & planning,75.19999999999999,78.55,57.63,11,gleif,Canada,True,,24.6,15.366666666666667,9.8,84.2
+Eprcomunicazione S.p.A. Società Benefit,Italy,Other info service activities,76.94,77.16,61.53,6,,Italy,True,,10.8,13.633333333333333,20.7,83.8
+Blackmores,Australia,Pharmaceutical products,72.53999999999999,78.9,56.919999999999995,11,wikidata,Australia,True,,18.0,15.766666666666666,15.5,81.0

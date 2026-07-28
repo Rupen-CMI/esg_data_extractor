@@ -1,0 +1,10 @@
+{
+  "countries": ["United States", "Germany", "India", "Japan"],
+  "industries": [
+    "Pharmaceutical Market",
+    "Automotive Tire Market",
+    "Solar Panel Market",
+    "Steel Market",
+    "Semiconductor Market"
+  ]
+}

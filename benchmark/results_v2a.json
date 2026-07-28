@@ -1,0 +1,698 @@
+{
+  "model": "deepseek-v4-flash-free",
+  "TP": 114,
+  "FP": 9,
+  "FN": 7,
+  "precision": 0.927,
+  "recall": 0.942,
+  "f1": 0.934,
+  "hallucinations": 0,
+  "errors": 0,
+  "avg_latency_s": 34.99,
+  "total_tokens": 76897,
+  "per_market": {
+    "Pharmaceutical Market @ United States": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Abbott Laboratories",
+        "AbbVie",
+        "Bristol-Myers Squibb",
+        "Eli Lilly and Company",
+        "Johnson & Johnson",
+        "Merck & Co.",
+        "Pfizer"
+      ],
+      "raw": "{\"companies\": [\"Abbott Laboratories\", \"AbbVie\", \"Bristol-Myers Squibb\", \"Eli Lilly and Company\", \"Johnson & Johnson\", \"Merck & Co.\", \"Pfizer\"]}",
+      "latency_s": 8.96,
+      "usage": {
+        "prompt_tokens": 364,
+        "completion_tokens": 799,
+        "total_tokens": 1163,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 754
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 108
+      },
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Automotive Tire Market @ United States": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Goodyear Tire & Rubber Company",
+        "Michelin North America",
+        "Bridgestone Americas",
+        "Cooper Tire",
+        "Continental AG",
+        "Pirelli"
+      ],
+      "raw": "{\"companies\": [\"Goodyear Tire & Rubber Company\", \"Michelin North America\", \"Bridgestone Americas\", \"Cooper Tire\", \"Continental AG\", \"Pirelli\"]}",
+      "latency_s": 44.98,
+      "usage": {
+        "prompt_tokens": 356,
+        "completion_tokens": 4419,
+        "total_tokens": 4775,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4379
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 100
+      },
+      "tp": 5,
+      "fp": 1,
+      "fn": 0,
+      "false_positives": [
+        "Cooper Tire"
+      ],
+      "hallucinations": []
+    },
+    "Solar Panel Market @ United States": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Canadian Solar",
+        "Enphase Energy",
+        "First Solar Inc.",
+        "SunPower Corporation",
+        "Sunrun Inc.",
+        "Tesla Energy",
+        "Vivint Solar"
+      ],
+      "raw": "{\"companies\": [\"Canadian Solar\", \"Enphase Energy\", \"First Solar Inc.\", \"SunPower Corporation\", \"Sunrun Inc.\", \"Tesla Energy\", \"Vivint Solar\"]}",
+      "latency_s": 15.68,
+      "usage": {
+        "prompt_tokens": 347,
+        "completion_tokens": 1436,
+        "total_tokens": 1783,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1396
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 91
+      },
+      "tp": 6,
+      "fp": 1,
+      "fn": 0,
+      "false_positives": [
+        "Vivint Solar"
+      ],
+      "hallucinations": []
+    },
+    "Steel Market @ United States": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Nucor Corporation",
+        "Steel Dynamics Inc",
+        "U.S. Steel Corporation",
+        "Commercial Metals Company",
+        "Cleveland-Cliffs Inc"
+      ],
+      "raw": "{\"companies\": [\"Nucor Corporation\", \"Steel Dynamics Inc\", \"U.S. Steel Corporation\", \"Commercial Metals Company\", \"Cleveland-Cliffs Inc\"]}",
+      "latency_s": 11.6,
+      "usage": {
+        "prompt_tokens": 364,
+        "completion_tokens": 1337,
+        "total_tokens": 1701,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1300
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 108
+      },
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Semiconductor Market @ United States": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Intel Corporation",
+        "Nvidia",
+        "Qualcomm",
+        "AMD",
+        "Texas Instruments",
+        "Broadcom",
+        "Applied Materials",
+        "TSMC"
+      ],
+      "raw": "{\"companies\": [\"Intel Corporation\", \"Nvidia\", \"Qualcomm\", \"AMD\", \"Texas Instruments\", \"Broadcom\", \"Applied Materials\", \"TSMC\"]}",
+      "latency_s": 20.25,
+      "usage": {
+        "prompt_tokens": 337,
+        "completion_tokens": 1983,
+        "total_tokens": 2320,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1947
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 81
+      },
+      "tp": 7,
+      "fp": 1,
+      "fn": 0,
+      "false_positives": [
+        "TSMC"
+      ],
+      "hallucinations": []
+    },
+    "Pharmaceutical Market @ Germany": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Bayer AG",
+        "Boehringer Ingelheim GmbH",
+        "Merck KGaA",
+        "Fresenius SE",
+        "Stada Arzneimittel",
+        "B. Braun Melsungen"
+      ],
+      "raw": "{\"companies\": [\"Bayer AG\", \"Boehringer Ingelheim GmbH\", \"Merck KGaA\", \"Fresenius SE\", \"Stada Arzneimittel\", \"B. Braun Melsungen\"]}",
+      "latency_s": 20.08,
+      "usage": {
+        "prompt_tokens": 374,
+        "completion_tokens": 2305,
+        "total_tokens": 2679,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2255
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 118
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Automotive Tire Market @ Germany": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Continental AG",
+        "Goodyear Dunlop Tires Germany GmbH",
+        "Michelin Reifenwerke",
+        "Bridgestone Deutschland GmbH",
+        "Hankook Tire Germany",
+        "Pirelli Deutschland"
+      ],
+      "raw": "{\"companies\": [\"Continental AG\", \"Goodyear Dunlop Tires Germany GmbH\", \"Michelin Reifenwerke\", \"Bridgestone Deutschland GmbH\", \"Hankook Tire Germany\", \"Pirelli Deutschland\"]}",
+      "latency_s": 43.04,
+      "usage": {
+        "prompt_tokens": 358,
+        "completion_tokens": 4489,
+        "total_tokens": 4847,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4440
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 102
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Solar Panel Market @ Germany": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Solarwatt GmbH",
+        "SMA Solar Technology AG",
+        "Enphase Energy Germany",
+        "Viessmann Climate Solutions",
+        "BayWa r.e.",
+        "Meyer Burger Technology",
+        "Energetica"
+      ],
+      "raw": "{\"companies\": [\"Solarwatt GmbH\", \"SMA Solar Technology AG\", \"Enphase Energy Germany\", \"Viessmann Climate Solutions\", \"BayWa r.e.\", \"Meyer Burger Technology\", \"Energetica\"]}",
+      "latency_s": 19.21,
+      "usage": {
+        "prompt_tokens": 350,
+        "completion_tokens": 1882,
+        "total_tokens": 2232,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1833
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 94
+      },
+      "tp": 6,
+      "fp": 1,
+      "fn": 0,
+      "false_positives": [
+        "Enphase Energy Germany"
+      ],
+      "hallucinations": []
+    },
+    "Steel Market @ Germany": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "ThyssenKrupp Steel Europe",
+        "Salzgitter AG",
+        "ArcelorMittal Germany",
+        "Voestalpine",
+        "Klöckner & Co.",
+        "ThyssenKrupp AG",
+        "ArcelorMittal Deutschland",
+        "Klöckner & Co. SE",
+        "Georgsmarienhütte",
+        "Dillinger Hütte"
+      ],
+      "raw": "{\"companies\": [\"ThyssenKrupp Steel Europe\", \"Salzgitter AG\", \"ArcelorMittal Germany\", \"Voestalpine\", \"Klöckner & Co.\", \"ThyssenKrupp AG\", \"ArcelorMittal Deutschland\", \"Klöckner & Co. SE\", \"Georgsmarienhütte\", \"Dillinger Hütte\"]}",
+      "latency_s": 46.77,
+      "usage": {
+        "prompt_tokens": 374,
+        "completion_tokens": 4850,
+        "total_tokens": 5224,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4764
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 118
+      },
+      "tp": 5,
+      "fp": 2,
+      "fn": 0,
+      "false_positives": [
+        "Voestalpine",
+        "Georgsmarienhütte"
+      ],
+      "hallucinations": []
+    },
+    "Semiconductor Market @ Germany": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Infineon Technologies AG",
+        "ams-OSRAM",
+        "Siltronic AG",
+        "Elmos Semiconductor",
+        "Robert Bosch GmbH",
+        "X-FAB Silicon Foundries"
+      ],
+      "raw": "{\"companies\": [\"Infineon Technologies AG\", \"ams-OSRAM\", \"Siltronic AG\", \"Elmos Semiconductor\", \"Robert Bosch GmbH\", \"X-FAB Silicon Foundries\"]}",
+      "latency_s": 35.03,
+      "usage": {
+        "prompt_tokens": 358,
+        "completion_tokens": 3634,
+        "total_tokens": 3992,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3592
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 102
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Pharmaceutical Market @ India": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Sun Pharmaceutical Industries",
+        "Cipla",
+        "Dr. Reddy's Laboratories",
+        "Lupin",
+        "Aurobindo Pharma",
+        "Zydus Lifesciences"
+      ],
+      "raw": "{\"companies\": [\"Sun Pharmaceutical Industries\", \"Cipla\", \"Dr. Reddy's Laboratories\", \"Lupin\", \"Aurobindo Pharma\", \"Zydus Lifesciences\"]}",
+      "latency_s": 16.68,
+      "usage": {
+        "prompt_tokens": 350,
+        "completion_tokens": 802,
+        "total_tokens": 1152,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 760
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 94
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Automotive Tire Market @ India": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Apollo Tyres Ltd",
+        "MRF Limited",
+        "Ceat Ltd",
+        "JK Tyre & Industries Ltd",
+        "TVS Srichakra Ltd",
+        "Bridgestone India",
+        "Balkrishna Industries"
+      ],
+      "raw": "{\"companies\": [\"Apollo Tyres Ltd\", \"MRF Limited\", \"Ceat Ltd\", \"JK Tyre & Industries Ltd\", \"TVS Srichakra Ltd\", \"Bridgestone India\", \"Balkrishna Industries\"]}",
+      "latency_s": 38.72,
+      "usage": {
+        "prompt_tokens": 347,
+        "completion_tokens": 3675,
+        "total_tokens": 4022,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3623
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 91
+      },
+      "tp": 6,
+      "fp": 1,
+      "fn": 0,
+      "false_positives": [
+        "Bridgestone India"
+      ],
+      "hallucinations": []
+    },
+    "Solar Panel Market @ India": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Adani Solar",
+        "Adani Green Energy",
+        "Tata Power Solar",
+        "Waaree Energies",
+        "Vikram Solar",
+        "Premier Energies",
+        "Goldi Solar",
+        "ReNew Power"
+      ],
+      "raw": "{\"companies\": [\"Adani Solar\", \"Adani Green Energy\", \"Tata Power Solar\", \"Waaree Energies\", \"Vikram Solar\", \"Premier Energies\", \"Goldi Solar\", \"ReNew Power\"]}",
+      "latency_s": 63.34,
+      "usage": {
+        "prompt_tokens": 356,
+        "completion_tokens": 6121,
+        "total_tokens": 6477,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 6070
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 100
+      },
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Steel Market @ India": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Tata Steel",
+        "JSW Steel",
+        "Steel Authority of India Limited (SAIL)",
+        "Jindal Steel & Power",
+        "ArcelorMittal Nippon Steel India",
+        "Rashtriya Ispat Nigam Ltd. (Vizag Steel)"
+      ],
+      "raw": "{\"companies\": [\"Tata Steel\", \"JSW Steel\", \"Steel Authority of India Limited (SAIL)\", \"Jindal Steel & Power\", \"ArcelorMittal Nippon Steel India\", \"Rashtriya Ispat Nigam Ltd. (Vizag Steel)\"]}",
+      "latency_s": 63.65,
+      "usage": {
+        "prompt_tokens": 382,
+        "completion_tokens": 6486,
+        "total_tokens": 6868,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 6421
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 126
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Semiconductor Market @ India": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "CG Power & Industrial Solutions",
+        "Kaynes Semiconductor",
+        "Kaynes Technology India",
+        "Micron Technology",
+        "SPEL Semiconductor",
+        "Tata Electronics",
+        "Vedanta"
+      ],
+      "raw": "{\"companies\": [\"CG Power & Industrial Solutions\", \"Kaynes Semiconductor\", \"Kaynes Technology India\", \"Micron Technology\", \"SPEL Semiconductor\", \"Tata Electronics\", \"Vedanta\"]}",
+      "latency_s": 78.65,
+      "usage": {
+        "prompt_tokens": 359,
+        "completion_tokens": 7857,
+        "total_tokens": 8216,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 7814
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 103
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Pharmaceutical Market @ Japan": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Takeda Pharmaceutical Co",
+        "Astellas Pharma Inc",
+        "Daiichi Sankyo Co",
+        "Otsuka Holdings",
+        "Eisai Co",
+        "Chugai Pharmaceutical",
+        "Sumitomo Pharma"
+      ],
+      "raw": "{\"companies\": [\"Takeda Pharmaceutical Co\", \"Astellas Pharma Inc\", \"Daiichi Sankyo Co\", \"Otsuka Holdings\", \"Eisai Co\", \"Chugai Pharmaceutical\", \"Sumitomo Pharma\"]}",
+      "latency_s": 27.04,
+      "usage": {
+        "prompt_tokens": 360,
+        "completion_tokens": 2770,
+        "total_tokens": 3130,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2719
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 104
+      },
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Automotive Tire Market @ Japan": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Bridgestone Corporation",
+        "Sumitomo Rubber Industries Ltd.",
+        "Yokohama Rubber Co.",
+        "Toyo Tire Corporation",
+        "Falken Tire",
+        "Nitto Tire"
+      ],
+      "raw": "{\n  \"companies\": [\n    \"Bridgestone Corporation\",\n    \"Sumitomo Rubber Industries Ltd.\",\n    \"Yokohama Rubber Co.\",\n    \"Toyo Tire Corporation\",\n    \"Falken Tire\",\n    \"Nitto Tire\"\n  ]\n}",
+      "latency_s": 26.42,
+      "usage": {
+        "prompt_tokens": 371,
+        "completion_tokens": 2727,
+        "total_tokens": 3098,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2671
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 115
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 1,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Solar Panel Market @ Japan": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [],
+      "raw": "",
+      "latency_s": 77.53,
+      "usage": {
+        "prompt_tokens": 351,
+        "completion_tokens": 8000,
+        "total_tokens": 8351,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 8000
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 95
+      },
+      "tp": 0,
+      "fp": 0,
+      "fn": 6,
+      "false_positives": [],
+      "hallucinations": []
+    },
+    "Steel Market @ Japan": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Nippon Steel Corporation",
+        "JFE Steel Corporation",
+        "Kobe Steel Ltd.",
+        "Sumitomo Metal Industries",
+        "Tokyo Steel Manufacturing Co.",
+        "Nisshin Steel",
+        "Daido Steel"
+      ],
+      "raw": "{\"companies\": [\"Nippon Steel Corporation\", \"JFE Steel Corporation\", \"Kobe Steel Ltd.\", \"Sumitomo Metal Industries\", \"Tokyo Steel Manufacturing Co.\", \"Nisshin Steel\", \"Daido Steel\"]}",
+      "latency_s": 19.88,
+      "usage": {
+        "prompt_tokens": 371,
+        "completion_tokens": 2013,
+        "total_tokens": 2384,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1965
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 115
+      },
+      "tp": 5,
+      "fp": 2,
+      "fn": 0,
+      "false_positives": [
+        "Sumitomo Metal Industries",
+        "Nisshin Steel"
+      ],
+      "hallucinations": []
+    },
+    "Semiconductor Market @ Japan": {
+      "model": "deepseek-v4-flash-free",
+      "ok": true,
+      "error": null,
+      "companies": [
+        "Renesas Electronics",
+        "Kioxia",
+        "Sony Semiconductor Solutions",
+        "Rohm Semiconductor",
+        "Murata Manufacturing",
+        "Shin-Etsu Chemical"
+      ],
+      "raw": "{\"companies\": [\"Renesas Electronics\", \"Kioxia\", \"Sony Semiconductor Solutions\", \"Rohm Semiconductor\", \"Murata Manufacturing\", \"Shin-Etsu Chemical\"]}",
+      "latency_s": 22.35,
+      "usage": {
+        "prompt_tokens": 348,
+        "completion_tokens": 2135,
+        "total_tokens": 2483,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2095
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 92
+      },
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "false_positives": [],
+      "hallucinations": []
+    }
+  }
+}

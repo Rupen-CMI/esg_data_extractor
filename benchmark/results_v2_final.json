@@ -1,0 +1,2066 @@
+{
+  "total_gold": 121,
+  "n_markets": 20,
+  "models": [
+    {
+      "model": "deepseek-v4-flash-free",
+      "TP": 114,
+      "FP": 9,
+      "FN": 7,
+      "precision": 0.927,
+      "recall": 0.942,
+      "f1": 0.934,
+      "hallucinations": 0,
+      "errors": 0,
+      "avg_latency_s": 34.99,
+      "total_tokens": 76897,
+      "per_market": {
+        "Pharmaceutical Market @ United States": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Abbott Laboratories",
+            "AbbVie",
+            "Bristol-Myers Squibb",
+            "Eli Lilly and Company",
+            "Johnson & Johnson",
+            "Merck & Co.",
+            "Pfizer"
+          ],
+          "raw": "{\"companies\": [\"Abbott Laboratories\", \"AbbVie\", \"Bristol-Myers Squibb\", \"Eli Lilly and Company\", \"Johnson & Johnson\", \"Merck & Co.\", \"Pfizer\"]}",
+          "latency_s": 8.96,
+          "usage": {
+            "prompt_tokens": 364,
+            "completion_tokens": 799,
+            "total_tokens": 1163,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 754
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 108
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ United States": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Goodyear Tire & Rubber Company",
+            "Michelin North America",
+            "Bridgestone Americas",
+            "Cooper Tire",
+            "Continental AG",
+            "Pirelli"
+          ],
+          "raw": "{\"companies\": [\"Goodyear Tire & Rubber Company\", \"Michelin North America\", \"Bridgestone Americas\", \"Cooper Tire\", \"Continental AG\", \"Pirelli\"]}",
+          "latency_s": 44.98,
+          "usage": {
+            "prompt_tokens": 356,
+            "completion_tokens": 4419,
+            "total_tokens": 4775,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4379
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 100
+          },
+          "tp": 5,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Cooper Tire"
+          ],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ United States": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Canadian Solar",
+            "Enphase Energy",
+            "First Solar Inc.",
+            "SunPower Corporation",
+            "Sunrun Inc.",
+            "Tesla Energy",
+            "Vivint Solar"
+          ],
+          "raw": "{\"companies\": [\"Canadian Solar\", \"Enphase Energy\", \"First Solar Inc.\", \"SunPower Corporation\", \"Sunrun Inc.\", \"Tesla Energy\", \"Vivint Solar\"]}",
+          "latency_s": 15.68,
+          "usage": {
+            "prompt_tokens": 347,
+            "completion_tokens": 1436,
+            "total_tokens": 1783,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1396
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 91
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Vivint Solar"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ United States": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Nucor Corporation",
+            "Steel Dynamics Inc",
+            "U.S. Steel Corporation",
+            "Commercial Metals Company",
+            "Cleveland-Cliffs Inc"
+          ],
+          "raw": "{\"companies\": [\"Nucor Corporation\", \"Steel Dynamics Inc\", \"U.S. Steel Corporation\", \"Commercial Metals Company\", \"Cleveland-Cliffs Inc\"]}",
+          "latency_s": 11.6,
+          "usage": {
+            "prompt_tokens": 364,
+            "completion_tokens": 1337,
+            "total_tokens": 1701,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1300
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 108
+          },
+          "tp": 5,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ United States": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Intel Corporation",
+            "Nvidia",
+            "Qualcomm",
+            "AMD",
+            "Texas Instruments",
+            "Broadcom",
+            "Applied Materials",
+            "TSMC"
+          ],
+          "raw": "{\"companies\": [\"Intel Corporation\", \"Nvidia\", \"Qualcomm\", \"AMD\", \"Texas Instruments\", \"Broadcom\", \"Applied Materials\", \"TSMC\"]}",
+          "latency_s": 20.25,
+          "usage": {
+            "prompt_tokens": 337,
+            "completion_tokens": 1983,
+            "total_tokens": 2320,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1947
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 81
+          },
+          "tp": 7,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "TSMC"
+          ],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ Germany": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Bayer AG",
+            "Boehringer Ingelheim GmbH",
+            "Merck KGaA",
+            "Fresenius SE",
+            "Stada Arzneimittel",
+            "B. Braun Melsungen"
+          ],
+          "raw": "{\"companies\": [\"Bayer AG\", \"Boehringer Ingelheim GmbH\", \"Merck KGaA\", \"Fresenius SE\", \"Stada Arzneimittel\", \"B. Braun Melsungen\"]}",
+          "latency_s": 20.08,
+          "usage": {
+            "prompt_tokens": 374,
+            "completion_tokens": 2305,
+            "total_tokens": 2679,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2255
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 118
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ Germany": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Continental AG",
+            "Goodyear Dunlop Tires Germany GmbH",
+            "Michelin Reifenwerke",
+            "Bridgestone Deutschland GmbH",
+            "Hankook Tire Germany",
+            "Pirelli Deutschland"
+          ],
+          "raw": "{\"companies\": [\"Continental AG\", \"Goodyear Dunlop Tires Germany GmbH\", \"Michelin Reifenwerke\", \"Bridgestone Deutschland GmbH\", \"Hankook Tire Germany\", \"Pirelli Deutschland\"]}",
+          "latency_s": 43.04,
+          "usage": {
+            "prompt_tokens": 358,
+            "completion_tokens": 4489,
+            "total_tokens": 4847,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4440
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 102
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ Germany": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Solarwatt GmbH",
+            "SMA Solar Technology AG",
+            "Enphase Energy Germany",
+            "Viessmann Climate Solutions",
+            "BayWa r.e.",
+            "Meyer Burger Technology",
+            "Energetica"
+          ],
+          "raw": "{\"companies\": [\"Solarwatt GmbH\", \"SMA Solar Technology AG\", \"Enphase Energy Germany\", \"Viessmann Climate Solutions\", \"BayWa r.e.\", \"Meyer Burger Technology\", \"Energetica\"]}",
+          "latency_s": 19.21,
+          "usage": {
+            "prompt_tokens": 350,
+            "completion_tokens": 1882,
+            "total_tokens": 2232,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1833
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 94
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Enphase Energy Germany"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ Germany": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "ThyssenKrupp Steel Europe",
+            "Salzgitter AG",
+            "ArcelorMittal Germany",
+            "Voestalpine",
+            "Klöckner & Co.",
+            "ThyssenKrupp AG",
+            "ArcelorMittal Deutschland",
+            "Klöckner & Co. SE",
+            "Georgsmarienhütte",
+            "Dillinger Hütte"
+          ],
+          "raw": "{\"companies\": [\"ThyssenKrupp Steel Europe\", \"Salzgitter AG\", \"ArcelorMittal Germany\", \"Voestalpine\", \"Klöckner & Co.\", \"ThyssenKrupp AG\", \"ArcelorMittal Deutschland\", \"Klöckner & Co. SE\", \"Georgsmarienhütte\", \"Dillinger Hütte\"]}",
+          "latency_s": 46.77,
+          "usage": {
+            "prompt_tokens": 374,
+            "completion_tokens": 4850,
+            "total_tokens": 5224,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4764
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 118
+          },
+          "tp": 5,
+          "fp": 2,
+          "fn": 0,
+          "false_positives": [
+            "Voestalpine",
+            "Georgsmarienhütte"
+          ],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ Germany": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Infineon Technologies AG",
+            "ams-OSRAM",
+            "Siltronic AG",
+            "Elmos Semiconductor",
+            "Robert Bosch GmbH",
+            "X-FAB Silicon Foundries"
+          ],
+          "raw": "{\"companies\": [\"Infineon Technologies AG\", \"ams-OSRAM\", \"Siltronic AG\", \"Elmos Semiconductor\", \"Robert Bosch GmbH\", \"X-FAB Silicon Foundries\"]}",
+          "latency_s": 35.03,
+          "usage": {
+            "prompt_tokens": 358,
+            "completion_tokens": 3634,
+            "total_tokens": 3992,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3592
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 102
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ India": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Sun Pharmaceutical Industries",
+            "Cipla",
+            "Dr. Reddy's Laboratories",
+            "Lupin",
+            "Aurobindo Pharma",
+            "Zydus Lifesciences"
+          ],
+          "raw": "{\"companies\": [\"Sun Pharmaceutical Industries\", \"Cipla\", \"Dr. Reddy's Laboratories\", \"Lupin\", \"Aurobindo Pharma\", \"Zydus Lifesciences\"]}",
+          "latency_s": 16.68,
+          "usage": {
+            "prompt_tokens": 350,
+            "completion_tokens": 802,
+            "total_tokens": 1152,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 760
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 94
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ India": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Apollo Tyres Ltd",
+            "MRF Limited",
+            "Ceat Ltd",
+            "JK Tyre & Industries Ltd",
+            "TVS Srichakra Ltd",
+            "Bridgestone India",
+            "Balkrishna Industries"
+          ],
+          "raw": "{\"companies\": [\"Apollo Tyres Ltd\", \"MRF Limited\", \"Ceat Ltd\", \"JK Tyre & Industries Ltd\", \"TVS Srichakra Ltd\", \"Bridgestone India\", \"Balkrishna Industries\"]}",
+          "latency_s": 38.72,
+          "usage": {
+            "prompt_tokens": 347,
+            "completion_tokens": 3675,
+            "total_tokens": 4022,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3623
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 91
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Bridgestone India"
+          ],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ India": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Adani Solar",
+            "Adani Green Energy",
+            "Tata Power Solar",
+            "Waaree Energies",
+            "Vikram Solar",
+            "Premier Energies",
+            "Goldi Solar",
+            "ReNew Power"
+          ],
+          "raw": "{\"companies\": [\"Adani Solar\", \"Adani Green Energy\", \"Tata Power Solar\", \"Waaree Energies\", \"Vikram Solar\", \"Premier Energies\", \"Goldi Solar\", \"ReNew Power\"]}",
+          "latency_s": 63.34,
+          "usage": {
+            "prompt_tokens": 356,
+            "completion_tokens": 6121,
+            "total_tokens": 6477,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6070
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 100
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Steel Market @ India": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Tata Steel",
+            "JSW Steel",
+            "Steel Authority of India Limited (SAIL)",
+            "Jindal Steel & Power",
+            "ArcelorMittal Nippon Steel India",
+            "Rashtriya Ispat Nigam Ltd. (Vizag Steel)"
+          ],
+          "raw": "{\"companies\": [\"Tata Steel\", \"JSW Steel\", \"Steel Authority of India Limited (SAIL)\", \"Jindal Steel & Power\", \"ArcelorMittal Nippon Steel India\", \"Rashtriya Ispat Nigam Ltd. (Vizag Steel)\"]}",
+          "latency_s": 63.65,
+          "usage": {
+            "prompt_tokens": 382,
+            "completion_tokens": 6486,
+            "total_tokens": 6868,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6421
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 126
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ India": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "CG Power & Industrial Solutions",
+            "Kaynes Semiconductor",
+            "Kaynes Technology India",
+            "Micron Technology",
+            "SPEL Semiconductor",
+            "Tata Electronics",
+            "Vedanta"
+          ],
+          "raw": "{\"companies\": [\"CG Power & Industrial Solutions\", \"Kaynes Semiconductor\", \"Kaynes Technology India\", \"Micron Technology\", \"SPEL Semiconductor\", \"Tata Electronics\", \"Vedanta\"]}",
+          "latency_s": 78.65,
+          "usage": {
+            "prompt_tokens": 359,
+            "completion_tokens": 7857,
+            "total_tokens": 8216,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 7814
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 103
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ Japan": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Takeda Pharmaceutical Co",
+            "Astellas Pharma Inc",
+            "Daiichi Sankyo Co",
+            "Otsuka Holdings",
+            "Eisai Co",
+            "Chugai Pharmaceutical",
+            "Sumitomo Pharma"
+          ],
+          "raw": "{\"companies\": [\"Takeda Pharmaceutical Co\", \"Astellas Pharma Inc\", \"Daiichi Sankyo Co\", \"Otsuka Holdings\", \"Eisai Co\", \"Chugai Pharmaceutical\", \"Sumitomo Pharma\"]}",
+          "latency_s": 27.04,
+          "usage": {
+            "prompt_tokens": 360,
+            "completion_tokens": 2770,
+            "total_tokens": 3130,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2719
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 104
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ Japan": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Bridgestone Corporation",
+            "Sumitomo Rubber Industries Ltd.",
+            "Yokohama Rubber Co.",
+            "Toyo Tire Corporation",
+            "Falken Tire",
+            "Nitto Tire"
+          ],
+          "raw": "{\n  \"companies\": [\n    \"Bridgestone Corporation\",\n    \"Sumitomo Rubber Industries Ltd.\",\n    \"Yokohama Rubber Co.\",\n    \"Toyo Tire Corporation\",\n    \"Falken Tire\",\n    \"Nitto Tire\"\n  ]\n}",
+          "latency_s": 26.42,
+          "usage": {
+            "prompt_tokens": 371,
+            "completion_tokens": 2727,
+            "total_tokens": 3098,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2671
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 115
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 1,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ Japan": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [],
+          "raw": "",
+          "latency_s": 77.53,
+          "usage": {
+            "prompt_tokens": 351,
+            "completion_tokens": 8000,
+            "total_tokens": 8351,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 8000
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 95
+          },
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Steel Market @ Japan": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Nippon Steel Corporation",
+            "JFE Steel Corporation",
+            "Kobe Steel Ltd.",
+            "Sumitomo Metal Industries",
+            "Tokyo Steel Manufacturing Co.",
+            "Nisshin Steel",
+            "Daido Steel"
+          ],
+          "raw": "{\"companies\": [\"Nippon Steel Corporation\", \"JFE Steel Corporation\", \"Kobe Steel Ltd.\", \"Sumitomo Metal Industries\", \"Tokyo Steel Manufacturing Co.\", \"Nisshin Steel\", \"Daido Steel\"]}",
+          "latency_s": 19.88,
+          "usage": {
+            "prompt_tokens": 371,
+            "completion_tokens": 2013,
+            "total_tokens": 2384,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1965
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 115
+          },
+          "tp": 5,
+          "fp": 2,
+          "fn": 0,
+          "false_positives": [
+            "Sumitomo Metal Industries",
+            "Nisshin Steel"
+          ],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ Japan": {
+          "model": "deepseek-v4-flash-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Renesas Electronics",
+            "Kioxia",
+            "Sony Semiconductor Solutions",
+            "Rohm Semiconductor",
+            "Murata Manufacturing",
+            "Shin-Etsu Chemical"
+          ],
+          "raw": "{\"companies\": [\"Renesas Electronics\", \"Kioxia\", \"Sony Semiconductor Solutions\", \"Rohm Semiconductor\", \"Murata Manufacturing\", \"Shin-Etsu Chemical\"]}",
+          "latency_s": 22.35,
+          "usage": {
+            "prompt_tokens": 348,
+            "completion_tokens": 2135,
+            "total_tokens": 2483,
+            "prompt_tokens_details": {
+              "cached_tokens": 256
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2095
+            },
+            "prompt_cache_hit_tokens": 256,
+            "prompt_cache_miss_tokens": 92
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "north-mini-code-free",
+      "TP": 108,
+      "FP": 12,
+      "FN": 13,
+      "precision": 0.9,
+      "recall": 0.893,
+      "f1": 0.896,
+      "hallucinations": 2,
+      "errors": 0,
+      "avg_latency_s": 21.2,
+      "total_tokens": 64075,
+      "per_market": {
+        "Pharmaceutical Market @ United States": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Johnson & Johnson",
+            "Pfizer",
+            "AbbVie",
+            "Merck & Co",
+            "Bristol-Myers Squibb",
+            "Eli Lilly and Company",
+            "Abbott Laboratories"
+          ],
+          "raw": "{\"companies\": [\"Johnson & Johnson\", \"Pfizer\", \"AbbVie\", \"Merck & Co\", \"Bristol-Myers Squibb\", \"Eli Lilly and Company\", \"Abbott Laboratories\"]}",
+          "latency_s": 13.64,
+          "usage": {
+            "prompt_tokens": 272,
+            "completion_tokens": 1155,
+            "total_tokens": 1427,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1115,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ United States": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Goodyear Tire & Rubber Company",
+            "Michelin North America",
+            "Bridgestone Americas",
+            "Cooper Tire",
+            "Continental AG",
+            "Pirelli"
+          ],
+          "raw": "{\"companies\": [\"Goodyear Tire & Rubber Company\", \"Michelin North America\", \"Bridgestone Americas\", \"Cooper Tire\", \"Continental AG\", \"Pirelli\"]}",
+          "latency_s": 44.57,
+          "usage": {
+            "prompt_tokens": 257,
+            "completion_tokens": 5449,
+            "total_tokens": 5706,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5413,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Cooper Tire"
+          ],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ United States": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "First Solar",
+            "Sunrun",
+            "SunPower",
+            "Enphase Energy",
+            "Tesla Energy",
+            "Canadian Solar",
+            "Vivint Solar"
+          ],
+          "raw": "{\"companies\": [\"First Solar\", \"Sunrun\", \"SunPower\", \"Enphase Energy\", \"Tesla Energy\", \"Canadian Solar\", \"Vivint Solar\"]}",
+          "latency_s": 7.29,
+          "usage": {
+            "prompt_tokens": 258,
+            "completion_tokens": 757,
+            "total_tokens": 1015,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 724,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Vivint Solar"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ United States": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Nucor Corporation",
+            "Steel Dynamics",
+            "U.S. Steel Corporation",
+            "Commercial Metals Company",
+            "Cleveland-Cliffs"
+          ],
+          "raw": "{\"companies\": [\"Nucor Corporation\", \"Steel Dynamics\", \"U.S. Steel Corporation\", \"Commercial Metals Company\", \"Cleveland-Cliffs\"]}",
+          "latency_s": 9.33,
+          "usage": {
+            "prompt_tokens": 275,
+            "completion_tokens": 1460,
+            "total_tokens": 1735,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1430,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ United States": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Intel Corporation",
+            "Nvidia",
+            "Qualcomm",
+            "AMD",
+            "Texas Instruments",
+            "Broadcom",
+            "Applied Materials",
+            "TSMC"
+          ],
+          "raw": "{\"companies\": [\"Intel Corporation\", \"Nvidia\", \"Qualcomm\", \"AMD\", \"Texas Instruments\", \"Broadcom\", \"Applied Materials\", \"TSMC\"]}",
+          "latency_s": 8.32,
+          "usage": {
+            "prompt_tokens": 242,
+            "completion_tokens": 1635,
+            "total_tokens": 1877,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1601,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 7,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "TSMC"
+          ],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ Germany": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Bayer AG",
+            "Boehringer Ingelheim",
+            "Merck KGaA",
+            "Fresenius",
+            "Stada Arzneimittel",
+            "B. Braun Melsungen",
+            "Fresenius SE",
+            "Boehringer Ingelheim GmbH"
+          ],
+          "raw": "{\"companies\": [\"Bayer AG\", \"Boehringer Ingelheim\", \"Merck KGaA\", \"Fresenius\", \"Stada Arzneimittel\", \"B. Braun Melsungen\", \"Fresenius SE\", \"Boehringer Ingelheim GmbH\"]}",
+          "latency_s": 6.98,
+          "usage": {
+            "prompt_tokens": 274,
+            "completion_tokens": 1498,
+            "total_tokens": 1772,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1441,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ Germany": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Continental AG",
+            "Michelin Germany",
+            "Bridgestone Germany",
+            "Goodyear Dunlop Tires Germany",
+            "Pirelli Deutschland",
+            "Michelin",
+            "Bridgestone",
+            "Goodyear",
+            "Pirelli",
+            "Goodyear Dunlop Tires Germany GmbH",
+            "Michelin Reifenwerke",
+            "Bridgestone Deutschland GmbH",
+            "Hankook Tire Germany"
+          ],
+          "raw": "{\"companies\": [\"Continental AG\", \"Michelin Germany\", \"Bridgestone Germany\", \"Goodyear Dunlop Tires Germany\", \"Pirelli Deutschland\", \"Michelin\", \"Bridgestone\", \"Goodyear\", \"Pirelli\", \"Goodyear Dunlop Tires Germany GmbH\", \"Michelin Reifenwerke\", \"Bridgestone Deutschland GmbH\", \"Hankook Tire Germany\"]}",
+          "latency_s": 11.18,
+          "usage": {
+            "prompt_tokens": 254,
+            "completion_tokens": 1509,
+            "total_tokens": 1763,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1429,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ Germany": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Solarwatt",
+            "SMA Solar Technology",
+            "Enphase Energy Germany",
+            "Viessmann",
+            "BayWa r.e",
+            "Meyer Burger Technology",
+            "Energetica"
+          ],
+          "raw": "{\"companies\": [\"Solarwatt\", \"SMA Solar Technology\", \"Enphase Energy Germany\", \"Viessmann\", \"BayWa r.e\", \"Meyer Burger Technology\", \"Energetica\"]}",
+          "latency_s": 8.62,
+          "usage": {
+            "prompt_tokens": 262,
+            "completion_tokens": 1200,
+            "total_tokens": 1462,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1159,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Enphase Energy Germany"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ Germany": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "ThyssenKrupp Steel Europe",
+            "Salzgitter AG",
+            "ArcelorMittal Germany",
+            "Voestalpine (with German operations)",
+            "Klöckner & Co",
+            "ThyssenKrupp AG",
+            "ArcelorMittal Deutschland",
+            "Klöckner & Co. SE",
+            "Georgsmarienhütte",
+            "Dillinger Hütte"
+          ],
+          "raw": "{\"companies\": [\"ThyssenKrupp Steel Europe\", \"Salzgitter AG\", \"ArcelorMittal Germany\", \"Voestalpine (with German operations)\", \"Klöckner & Co\", \"ThyssenKrupp AG\", \"ArcelorMittal Deutschland\", \"Klöckner & Co. SE\", \"Georgsmarienhütte\", \"Dillinger Hütte\"]}",
+          "latency_s": 11.29,
+          "usage": {
+            "prompt_tokens": 273,
+            "completion_tokens": 2684,
+            "total_tokens": 2957,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2605,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 2,
+          "fn": 0,
+          "false_positives": [
+            "Voestalpine (with German operations)",
+            "Georgsmarienhütte"
+          ],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ Germany": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Name A",
+            "Name B"
+          ],
+          "raw": "We need to extract only the names of companies/organizations explicitly named as key players, manufacturers, or competitors in the market. The search text includes several names. We must not include market-research firms, report publishers, generic phrases, or ticker symbols. We need to output JSON with \"companies\": [list].\n\nWe need to parse the text:\n\nText:\n\n\"\"\"\nGermany's semiconductor landscape features Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, and Elmos Semiconductor as domestic leaders.\nInfineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, and Robert Bosch GmbH's semiconductor division are the key players in the German chip market.\nTop semiconductor companies in Germany include Infineon Technologies, Siltronic (a Wacker Chemie subsidiary), ams-OSRAM, Elmos Semiconductor, and X-FAB Silicon Foundries, which operates German wafer fabs.\n\"\"\"\n\nWe need to extract companies that are explicitly named as key players, manufacturers, or competitors. The text mentions:\n\n- Infineon Technologies\n- Robert Bosch Semiconductor\n- Osram (now part of ams-OSRAM) – but Osram is a brand; the parent is ams-OSRAM. The text says \"Osram (now part of ams-OSRAM)\". So Osram is a company, but it's part of ams-OSRAM. Should we include both? The instruction: \"explicitly named as key players, manufacturers, or competitors in the market.\" The phrase \"Osram (now part of ams-OSRAM)\" indicates Osram is a company, but it's part of ams-OSRAM. However, the key players list includes \"ams-OSRAM\". So we should include ams-OSRAM. Should we include Osram? The phrase \"Osram (now part of ams-OSRAM)\" is a mention of Osram as a company, but it's not explicitly named as a key player; it's part of the domestic leaders list. The question: \"From the search-result text below, extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors in the market.\" So we need to focus on \"key players\" and \"manufacturers\" or \"competitors\". The text includes:\n\n- \"Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, and Robert Bosch GmbH's semiconductor division are the key players in the German chip market.\"\n\nThus key players: Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, Robert Bosch GmbH's semiconductor division.\n\n- \"Top semiconductor companies in Germany include Infineon Technologies, Siltronic (a Wacker Chemie subsidiary), ams-OSRAM, Elmos Semiconductor, and X-FAB Silicon Foundries, which operates German wafer fabs.\"\n\nThus top semiconductor companies: Infineon Technologies, Siltronic, ams-OSRAM, Elmos Semiconductor, X-FAB Silicon Foundries.\n\nAlso earlier: \"Germany's semiconductor landscape features Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, and Elmos Semiconductor as domestic leaders.\"\n\nThus domestic leaders: Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, Elmos Semiconductor.\n\nWe need to extract only the names of companies/organizations that are explicitly named as key players, manufacturers, or competitors. So we should include all companies that appear in any of those categories. The categories are overlapping. So we need to list each distinct company name as it appears (full canonical name, keep as written but drop trailing punctuation). So we need to decide which names to include.\n\nList of distinct company names mentioned:\n\n- Infineon Technologies (also appears as \"Infineon Technologies AG\" and \"Infineon Technologies\")\n- Robert Bosch Semiconductor (appears as \"Robert Bosch Semiconductor\")\n- Osram (now part of ams-OSRAM) – Osram is a company, but it's part of ams-OSRAM. Should we include \"Osram\"? The phrase \"Osram (now part of ams-OSRAM)\" indicates Osram is a brand/company. It's listed as a domestic leader. So it's a company. So include \"Osram\".\n- ams-OSRAM (also appears as \"ams-OSRAM\")\n- Siltronic AG (also appears as \"Siltronic\")\n- Elmos Semiconductor (also appears as \"Elmos Semiconductor\")\n- Robert Bosch GmbH's semiconductor division – this is a division, not a separate company. The instruction says \"names of companies / organizations\". A division is part of a company, but it's not a separate company. Should we include \"Robert Bosch GmbH\"? The phrase \"Robert Bosch GmbH's semiconductor division\" is a division, not a company. The company is Robert Bosch GmbH. However, the text also mentions \"Robert Bosch Semiconductor\" earlier. So we have \"Robert Bosch Semiconductor\" as a separate entity (maybe a division). But \"Robert Bosch GmbH's semiconductor division\" is also a division. Should we include \"Robert Bosch GmbH\"? The instruction says \"explicitly named as key players, manufacturers, or competitors\". The key players list includes \"Robert Bosch GmbH's semiconductor division\". That is a division, but it's part of Robert Bosch GmbH. Should we include \"Robert Bosch GmbH\"? The phrase \"Robert Bosch GmbH's semiconductor division\" is not a company name, but it's a division. The instruction says \"names of companies / organizations\". A division is an organization, but it's not a separate company. However, it's still an organization. The phrase \"Robert Bosch GmbH's semiconductor division\" includes the parent company name. Should we include \"Robert Bosch GmbH\"? The text also mentions \"Robert Bosch Semiconductor\". That is likely a division or brand. So we have two references: \"Robert Bosch Semiconductor\" and \"Robert Bosch GmbH's semiconductor division\". Both refer to the same entity. So we should include \"Robert Bosch GmbH\"? Or \"Robert Bosch Semiconductor\"? The instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written. The name \"Robert Bosch Semiconductor\" is a company name (maybe a division). \"Robert Bosch GmbH's semiconductor division\" includes \"Robert Bosch GmbH\". Should we include \"Robert Bosch GmbH\"? The phrase \"Robert Bosch GmbH's semiconductor division\" is not a company name, but it's a division. The instruction says \"names of companies / organizations\". A division is an organization, but it's not a separate company. However, it's still an organization. The phrase \"Robert Bosch GmbH's semiconductor division\" includes the parent company name, but it's not a separate company. The instruction says \"explicitly named as key players, manufacturers, or competitors\". The key players list includes \"Robert Bosch GmbH's semiconductor division\". So that is a key player. So we should include \"Robert Bosch GmbH's semiconductor division\"? But the instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written, but drop trailing punctuation. So \"Robert Bosch GmbH's semiconductor division\" includes an apostrophe s. Should we keep that? The instruction says \"drop trailing punctuation\". That likely means punctuation at the end of the name, not internal punctuation. So we can keep \"Robert Bosch GmbH's semiconductor division\". However, the instruction also says \"Do NOT include market-research firms, report publishers, generic phrases, or ticker symbols.\" So we need to avoid generic phrases. \"Robert Bosch GmbH's semiconductor division\" is a specific organization. So we could include it. But the instruction says \"names of companies / organizations\". A division is an organization. So it's okay.\n\nBut we need to decide which names to include. The simplest approach: include all distinct company names that appear in the text, as they are explicitly mentioned as key players, manufacturers, or competitors. That includes:\n\n- Infineon Technologies\n- Robert Bosch Semiconductor\n- Osram\n- ams-OSRAM\n- Siltronic AG (or Siltronic)\n- Elmos Semiconductor\n- Robert Bosch GmbH's semiconductor division (maybe we can include \"Robert Bosch GmbH\")\n- X-FAB Silicon Foundries\n\nBut we need to avoid duplication. For example, \"Infineon Technologies\" appears as \"Infineon Technologies\" and \"Infineon Technologies AG\". Should we include both? The instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written. So we could include \"Infineon Technologies\" and \"Infineon Technologies AG\"? But they refer to the same company. The instruction says \"Do NOT invent companies that are not present in the text.\" It doesn't say we must deduplicate. But typical extraction would deduplicate. However, the instruction doesn't explicitly require deduplication. It says \"extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors in the market.\" It doesn't say to deduplicate, but it's implied that we should list each company once. Usually, we would deduplicate. So we should list each distinct company only once.\n\nThus we need to decide which forms to include. The canonical name could be the most complete form. For example, \"Infineon Technologies AG\" is the full legal name. \"Infineon Technologies\" is also used. Which one to include? The instruction says \"keep the name as written but drop trailing punctuation\". So we could include both forms? But that would be redundant. Usually, we would include the name as it appears in the text, but we could choose the most complete form. However, the instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" This is ambiguous: It says \"full, canonical company name\" but then says \"e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written\". So we should keep the name as written, not modify it to include legal suffix. So we should keep the name exactly as it appears (except dropping trailing punctuation). So we could include \"Infineon Technologies AG\" as it appears. But also \"Infineon Technologies\" appears. Should we include both? The instruction says \"extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors\". Both \"Infineon Technologies\" and \"Infineon Technologies AG\" are explicitly named. But they refer to the same company. The instruction doesn't say to deduplicate, but it's typical to deduplicate. However, we need to decide.\n\nLet's examine the text for each company:\n\n1. \"Infineon Technologies\" appears in first sentence: \"Germany's semiconductor landscape features Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, and Elmos Semiconductor as domestic leaders.\"\n\n2. \"Robert Bosch Semiconductor\" appears there.\n\n3. \"Osram (now part of ams-OSRAM)\" appears.\n\n4. \"Siltronic AG\" appears.\n\n5. \"Elmos Semiconductor\" appears.\n\nSecond sentence: \"Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, and Robert Bosch GmbH's semiconductor division are the key players in the German chip market.\"\n\nThus we have \"Infineon Technologies AG\" (different from \"Infineon Technologies\"? Might be same company but with suffix). \"ams-OSRAM\" appears. \"Siltronic AG\" appears again. \"Elmos Semiconductor\" appears again. \"Robert Bosch GmbH's semiconductor division\" appears.\n\nThird sentence: \"Top semiconductor companies in Germany include Infineon Technologies, Siltronic (a Wacker Chemie subsidiary), ams-OSRAM, Elmos Semiconductor, and X-FAB Silicon Foundries, which operates German wafer fabs.\"\n\nThus \"Infineon Technologies\" appears again. \"Siltronic\" appears (without AG). \"ams-OSRAM\" appears again. \"Elmos Semiconductor\" appears again. \"X-FAB Silicon Foundries\" appears.\n\nThus distinct company names (as written) are:\n\n- Infineon Technologies\n- Robert Bosch Semiconductor\n- Osram\n- ams-OSRAM\n- Siltronic AG\n- Elmos Semiconductor\n- Infineon Technologies AG\n- Robert Bosch GmbH's semiconductor division\n- Siltronic (maybe same as Siltronic AG)\n- X-FAB Silicon Foundries\n\nAlso \"Robert Bosch GmbH's semiconductor division\" includes \"Robert Bosch GmbH\". Should we include \"Robert Bosch GmbH\"? The phrase \"Robert Bosch GmbH's semiconductor division\" is a division, but the parent company is \"Robert Bosch GmbH\". The text also mentions \"Robert Bosch Semiconductor\". That might be a division or brand. So we have two references: \"Robert Bosch Semiconductor\" and \"Robert Bosch GmbH's semiconductor division\". Both refer to the same entity. So we should include \"Robert Bosch GmbH\"? Or \"Robert Bosch Semiconductor\"? The instruction says \"explicitly named as key players, manufacturers, or competitors\". The key players list includes \"Robert Bosch GmbH's semiconductor division\". So that is a key player. So we should include \"Robert Bosch GmbH's semiconductor division\"? But the instruction says \"names of companies / organizations\". A division is an organization. So we could include \"Robert Bosch GmbH's semiconductor division\". However, the instruction also says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written. So we could include \"Robert Bosch GmbH's semiconductor division\". But that includes an apostrophe s and \"semiconductor division\". That is not a company name but a division. The instruction says \"names of companies / organizations\". A division is an organization. So it's okay.\n\nBut we need to decide whether to include \"Robert Bosch GmbH's semiconductor division\" or \"Robert Bosch Semiconductor\". The text includes both. The key players list includes \"Robert Bosch GmbH's semiconductor division\". The domestic leaders list includes \"Robert Bosch Semiconductor\". So both are present. Should we include both? They refer to the same entity, but they are different names. The instruction says \"extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors\". Both are explicitly named. So we could include both. However, that would be redundant. Usually, we would deduplicate. But the instruction doesn't explicitly say to deduplicate. However, typical extraction tasks expect deduplication. The phrase \"names of companies / organizations\" suggests each company should be listed once. So we should deduplicate.\n\nThus we need to decide which name to include for that entity. The more complete name is \"Robert Bosch GmbH\". But the text never uses \"Robert Bosch GmbH\" alone; it's always \"Robert Bosch GmbH's semiconductor division\". So we could include \"Robert Bosch GmbH's semiconductor division\". But that includes \"division\". The instruction says \"names of companies / organizations\". A division is an organization. So it's okay. But we might want to include \"Robert Bosch GmbH\" as the company name. However, the text doesn't have \"Robert Bosch GmbH\" alone. It has \"Robert Bosch GmbH's semiconductor division\". So we could include \"Robert Bosch GmbH's semiconductor division\". But that includes \"division\". The instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written. So we could include \"Robert Bosch GmbH's semiconductor division\". But that includes an apostrophe s and \"division\". It's not a company name, but it's an organization. The instruction says \"names of companies / organizations\". So it's okay.\n\nBut we need to consider the instruction \"Do NOT include market-research firms, report publishers, generic phrases, or ticker symbols.\" So we need to avoid generic phrases. \"Robert Bosch GmbH's semiconductor division\" is not generic. It's specific.\n\nNow, \"Siltronic (a Wacker Chemie subsidiary)\" includes \"Siltronic\". That's the same as \"Siltronic AG\". So we should include \"Siltronic AG\" (or \"Siltronic\"?). The text includes \"Siltronic AG\" and \"Siltronic\". Should we include both? Probably deduplicate. So we can include \"Siltronic AG\". That is the full name with suffix. The instruction says keep the name as written. So we could include \"Siltronic AG\". That appears in the text. So we can include \"Siltronic AG\". Also \"Siltronic\" appears, but we can deduplicate.\n\nNow, \"Osram (now part of ams-OSRAM)\" includes \"Osram\". Should we include \"Osram\"? It's a company. It's listed as a domestic leader. So we should include \"Osram\". However, note that \"Osram\" is now part of ams-OSRAM. But it's still a brand. The text includes \"Osram (now part of ams-OSRAM)\". So we can include \"Osram\". Also \"ams-OSRAM\" is included. So we have both.\n\nNow, \"X-FAB Silicon Foundries\" appears. So include that.\n\nNow, \"Robert Bosch GmbH's semiconductor division\" appears. Should we include \"Robert Bosch GmbH\"? The text also includes \"Robert Bosch Semiconductor\". So we have two names for the same entity. Which one to include? The instruction says \"explicitly named as key players, manufacturers, or competitors\". Both are explicitly named. So we could include both. But we might deduplicate. The instruction doesn't explicitly say to deduplicate, but it's typical. However, we need to decide.\n\nLet's examine the instruction more carefully:\n\n\"You are a precise information extraction engine.\nFrom the search-result text below, extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors in the market.\nRules:\n- Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\n- Do NOT invent companies that are not present in the text.\n- Do NOT include market-research firms, report publishers, generic phrases, or ticker symbols.\n- Return STRICT JSON only, no prose, in this exact shape:\n  {\"companies\": [\"Name A\", \"Name B\"]}\"\n\nThus we need to output a JSON with a list of company names. The list should contain the names of companies/organizations that are explicitly named as key players, manufacturers, or competitors. The text includes many names. We need to decide which ones are \"key players, manufacturers, or competitors\". The text includes:\n\n- \"Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, and Robert Bosch GmbH's semiconductor division are the key players in the German chip market.\"\n\nThus key players: Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, Robert Bosch GmbH's semiconductor division.\n\n- \"Top semiconductor companies in Germany include Infineon Technologies, Siltronic (a Wacker Chemie subsidiary), ams-OSRAM, Elmos Semiconductor, and X-FAB Silicon Foundries, which operates German wafer fabs.\"\n\nThus top semiconductor companies: Infineon Technologies, Siltronic, ams-OSRAM, Elmos Semiconductor, X-FAB Silicon Foundries.\n\n- \"Germany's semiconductor landscape features Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, and Elmos Semiconductor as domestic leaders.\"\n\nThus domestic leaders: Infineon Technologies, Robert Bosch Semiconductor, Osram, Siltronic AG, Elmos Semiconductor.\n\nThus the union of all these names (distinct) includes:\n\n- Infineon Technologies (or Infineon Technologies AG)\n- Robert Bosch Semiconductor\n- Osram\n- ams-OSRAM\n- Siltronic AG (or Siltronic)\n- Elmos Semiconductor\n- Robert Bosch GmbH's semiconductor division (maybe same as Robert Bosch Semiconductor)\n- X-FAB Silicon Foundries\n\nNow, we need to decide which forms to include. The instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written. So we could include \"Infineon Technologies AG\" (as it appears) and also \"Infineon Technologies\". But they refer to the same company. Should we include both? The instruction doesn't say to deduplicate, but it's typical to deduplicate. However, the instruction says \"extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors\". If a company appears in multiple forms, it's still the same company. So we should include it once. So we need to decide which form to include. The instruction says \"keep the name as written\". So we could include the most complete form that appears. For example, \"Infineon Technologies AG\" is the full legal name. \"Infineon Technologies\" is also used. Which one is more canonical? The instruction says \"full, canonical company name\". So we could choose \"Infineon Technologies AG\". However, the instruction also says \"e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written\". So we should not add \"AG\" if it's not present? Actually, \"Infineon Technologies AG\" includes \"AG\". That's part of the name as written. So we can keep it. So we could include \"Infineon Technologies AG\". But we also have \"Infineon Technologies\". Should we include both? Probably not.\n\nThus we need to decide on a set of distinct company names. Let's list them with the most complete form as appears:\n\n- Infineon Technologies AG (key player)\n- ams-OSRAM (key player)\n- Siltronic AG (key player)\n- Elmos Semiconductor (key player)\n- Robert Bosch GmbH's semiconductor division (key player) – but we might want to include \"Robert Bosch GmbH\" as the company name. However, the text includes \"Robert Bosch GmbH's semiconductor division\". Should we include \"Robert Bosch GmbH\"? The instruction says \"keep the name as written\". So we could include \"Robert Bosch GmbH's semiconductor division\". But that includes \"division\". The instruction says \"names of companies / organizations\". A division is an organization. So it's okay. However, the phrase \"Robert Bosch GmbH's semiconductor division\" is not a company name, but it's an organization. So we could include it. But we also have \"Robert Bosch Semiconductor\". That is also a name. So we have two names for the same entity. Should we include both? Probably not. We need to decide which one to include. The key players list includes \"Robert Bosch GmbH's semiconductor division\". So that is a key player. So we should include that. The domestic leaders list includes \"Robert Bosch Semiconductor\". So that is also a domestic leader. So we could include \"Robert Bosch Semiconductor\". But we need to decide which one to include. The instruction says \"explicitly named as key players, manufacturers, or competitors\". Both are explicitly named. So we could include both. But they refer to the same entity. The instruction doesn't say to deduplicate, but it's typical. However, we need to be careful: The instruction says \"extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors\". It doesn't say \"list each company only once\". So we could include both names. But that would be redundant and might be considered incorrect. Usually, extraction tasks expect deduplication. So we should deduplicate.\n\nThus we need to decide which name to include for that entity. The key players list includes \"Robert Bosch GmbH's semiconductor division\". The domestic leaders list includes \"Robert Bosch Semiconductor\". Which one is more appropriate? The key players list is more directly about key players. So we could include \"Robert Bosch GmbH's semiconductor division\". However, the phrase includes \"division\". The instruction says \"names of companies / organizations\". A division is an organization. So it's okay. But the phrase includes an apostrophe s and \"division\". It might be considered a generic phrase? No, it's specific.\n\nAlternatively, we could include \"Robert Bosch GmbH\". But the text never uses that alone. So we might not include it.\n\nNow, \"Osram\" appears as a domestic leader. Should we include \"Osram\"? Yes, it's a company. It's also part of ams-OSRAM. So we can include \"Osram\". However, note that \"Osram\" is now part of ams-OSRAM. But it's still a brand. So we can include \"Osram\". The text includes \"Osram (now part of ams-OSRAM)\". So we can include \"Osram\". Also \"ams-OSRAM\" is included. So we have both.\n\nNow, \"Siltronic AG\" appears. Also \"Siltronic\" appears. Should we include \"Siltronic AG\"? Yes. Should we also include \"Siltronic\"? Probably not, deduplicate.\n\nNow, \"X-FAB Silicon Foundries\" appears. Include that.\n\nNow, \"Robert Bosch Semiconductor\" appears. Should we include that? It's a domestic leader. So we could include \"Robert Bosch Semiconductor\". But we also have \"Robert Bosch GmbH's semiconductor division\". Which one to include? We could include \"Robert Bosch Semiconductor\". That is a more straightforward company name. The phrase \"Robert Bosch GmbH's semiconductor division\" is a division. So maybe we should include \"Robert Bosch Semiconductor\". However, the key players list includes \"Robert Bosch GmbH's semiconductor division\". So that is a key player. So we need to include that entity. But we could include \"Robert Bosch Semiconductor\" as the name. But the text includes \"Robert Bosch Semiconductor\" as a domestic leader, not necessarily as a key player. But it's still a company. The instruction says \"explicitly named as key players, manufacturers, or competitors\". \"Robert Bosch Semiconductor\" is not explicitly named as a key player; it's named as a domestic leader. The key players list includes \"Robert Bosch GmbH's semiconductor division\". So the key player is \"Robert Bosch GmbH's semiconductor division\". So we should include that. But we could also include \"Robert Bosch Semiconductor\" because it's a company. However, the instruction says \"explicitly named as key players, manufacturers, or competitors\". \"Robert Bosch Semiconductor\" is not explicitly named as a key player; it's named as a domestic leader. So maybe we should not include it. The instruction says \"extract ONLY the names of companies / organizations that are explicitly named as key players, manufacturers, or competitors\". So we need to filter based on that. So we need to identify which names are explicitly named as key players, manufacturers, or competitors. The text includes:\n\n- \"Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, and Robert Bosch GmbH's semiconductor division are the key players in the German chip market.\"\n\nThus key players: Infineon Technologies AG, ams-OSRAM, Siltronic AG, Elmos Semiconductor, Robert Bosch GmbH's semiconductor division.\n\n- \"Top semiconductor companies in Germany include Infineon Technologies, Siltronic (a Wacker Chemie subsidiary), ams-OSRAM, Elmos Semiconductor, and X-FAB Silicon Foundries, which operates German wafer fabs.\"\n\nThus top semiconductor companies: Infineon Technologies, Siltronic, ams-OSRAM, Elmos Semiconductor, X-FAB Silicon Foundries.\n\n- \"Germany's semiconductor landscape features Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, and Elmos Semiconductor as domestic leaders.\"\n\nThus domestic leaders: Infineon Technologies, Robert Bosch Semiconductor, Osram, Siltronic AG, Elmos Semiconductor.\n\nNow, the instruction says \"key players, manufacturers, or competitors\". The domestic leaders are not necessarily key players, but they are manufacturers. The phrase \"domestic leaders\" implies they are key players in the domestic market. So they could be considered manufacturers. So we could include them. However, the instruction says \"explicitly named as key players, manufacturers, or competitors\". The domestic leaders are not explicitly named as manufacturers, but they are companies in the semiconductor landscape. However, the phrase \"domestic leaders\" implies they are leaders, which could be considered key players. So we could include them.\n\nBut we need to be precise: The instruction says \"explicitly named as key players, manufacturers, or competitors\". The text explicitly names \"key players\" in the second sentence. It also names \"top semiconductor companies\" in the third sentence. It also names \"domestic leaders\" in the first sentence. So we could consider all three categories as relevant. So we should include all companies mentioned in those categories.\n\nThus the union includes:\n\n- Infineon Technologies (or Infineon Technologies AG)\n- ams-OSRAM\n- Siltronic AG (or Siltronic)\n- Elmos Semiconductor\n- Robert Bosch GmbH's semiconductor division (or Robert Bosch Semiconductor)\n- X-FAB Silicon Foundries\n- Osram\n\nNow, we need to decide which forms to include. The instruction says \"Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation).\" So we should keep the name as written. So we could include:\n\n- Infineon Technologies AG (as appears in key players list)\n- ams-OSRAM (as appears)\n- Siltronic AG (as appears)\n- Elmos Semiconductor (as appears)\n- Robert Bosch GmbH's semiconductor division (as appears)\n- X-FAB Silicon Foundries (as appears)\n- Osram (as appears)\n\nBut we also have \"Infineon Technologies\" (without AG) appears in domestic leaders and top semiconductor companies. Should we include that? The instruction says \"full, canonical company name\". The full name includes \"AG\". So we could include \"Infineon Technologies AG\". But we also have \"Infineon Technologies\". Should we include both? Probably not. We should include the most complete form.\n\nNow, \"Robert Bosch GmbH's semiconductor division\" includes \"division\". Should we include \"Robert Bosch GmbH\"? The text never uses that alone. So we could include \"Robert Bosch GmbH's semiconductor division\". However, the instruction says \"names of companies / organizations\". A division is an organization. So it's okay. But we also have \"Robert Bosch Semiconductor\". Should we include that? It's a domestic leader. But the key players list includes \"Robert Bosch GmbH's semiconductor division\". So we could include that. But we might also include \"Robert Bosch Semiconductor\". However, we need to decide which one to include. The instruction says \"explicitly named as key players, manufacturers, or competitors\". \"Robert Bosch Semiconductor\" is not explicitly named as a key player; it's a domestic leader. So maybe we should not include it. But the instruction says \"manufacturers\". \"Robert Bosch Semiconductor\" is a manufacturer. So it could be included. However, the phrase \"domestic leaders\" is not explicitly \"manufacturers\". But it's implied. The instruction says \"explicitly named as key players, manufacturers, or competitors\". So we need to look for explicit mentions of \"manufacturer\" or \"competitor\". The text does not contain the word \"manufacturer\" or \"competitor\". It only mentions \"key players\", \"top semiconductor companies\", \"domestic leaders\". So we need to interpret that these categories are the ones we should consider. So we should include all companies mentioned in those categories.\n\nThus we should include:\n\n- Infineon Technologies (or Infineon Technologies AG)\n- ams-OSRAM\n- Siltronic AG (or Siltronic)\n- Elmos Semiconductor\n- Robert Bosch GmbH's semiconductor division (or Robert Bosch Semiconductor)\n- X-FAB Silicon Foundries\n- Osram\n\nNow, we need to decide which forms to include. The instruction says \"keep the name as written but drop trailing punctuation\". So we need to drop trailing punctuation like periods, commas, etc. The names appear with punctuation like commas, periods, etc. We need to drop trailing punctuation. So we need to ensure we don't include trailing punctuation.\n\nNow, we need to output JSON with \"companies\": [list]. The list should be an array of strings.\n\nNow, we need to decide the exact names to include. Let's examine each name as it appears in the text, and decide which form to include.\n\n1. \"Infineon Technologies AG\" appears in the key players list. It includes \"AG\". So we could include \"Infineon Technologies AG\". However, the domestic leaders list includes \"Infineon Technologies\". The top semiconductor companies list includes \"Infineon Technologies\". So there are two forms. Which one is more canonical? The full legal name includes \"AG\". So we could include \"Infineon Technologies AG\". But the instruction says \"keep the name as written\". So we could include \"Infineon Technologies AG\". However, we also have \"Infineon Technologies\". Should we include both? Probably not. We need to deduplicate. So we need to choose one. The instruction says \"full, canonical company name\". So we should include the full name. So \"Infineon Technologies AG\" is the full name. So we should include that.\n\n2. \"ams-OSRAM\" appears as \"ams-OSRAM\". That's the name. So include \"ams-OSRAM\".\n\n3. \"Siltronic AG\" appears. So include \"Siltronic AG\". Also \"Siltronic\" appears. But we can deduplicate.\n\n4. \"Elmos Semiconductor\" appears. So include \"Elmos Semiconductor\".\n\n5. \"Robert Bosch GmbH's semiconductor division\" appears. This includes \"division\". Should we include \"Robert Bosch GmbH's semiconductor division\"? The instruction says \"names of companies / organizations\". A division is an organization. So we could include that. However, the phrase includes an apostrophe s and \"division\". It's not a company name, but it's an organization. So we could include it. But we also have \"Robert Bosch Semiconductor\". Should we include that? It's a domestic leader. But the key players list includes \"Robert Bosch GmbH's semiconductor division\". So we should include that. So we could include \"Robert Bosch GmbH's semiconductor division\". However, the instruction says \"Use the full, canonical company name\". A division is not a company. So maybe we should include \"Robert Bosch GmbH\". But the text never uses that alone. So we might not include it. But we could include \"Robert Bosch Semiconductor\". That is a company name. But it's not explicitly named as a key player. However, it's a domestic leader. The instruction says \"key players, manufacturers, or competitors\". \"Robert Bosch Semiconductor\" is a manufacturer. So we could include it. But we need to decide.\n\nLet's examine the phrase \"Robert Bosch Semiconductor\". It appears in the first sentence: \"Germany's semiconductor landscape features Infineon Technologies, Robert Bosch Semiconductor, Osram (now part of ams-OSRAM), Siltronic AG, and Elmos Semiconductor as domestic leaders.\" So \"Robert Bosch Semiconductor\" is a domestic leader. So it's a manufacturer. So we could include it. However, the key players list includes \"Robert Bosch GmbH's semiconductor division\". That is likely the same entity as \"Robert Bosch Semiconductor\". So we have two names for the same entity. We need to decide which one to include. The instruction says \"explicitly named as key players, manufacturers, or competitors\". Both are explicitly named: \"Robert Bosch Semiconductor\" is explicitly named as a domestic leader (which is a manufacturer). \"Robert Bosch GmbH's semiconductor division\" is explicitly named as a key player. So both are valid. But we need to deduplicate. So we need to choose one. Which one is more appropriate? The key players list is more directly about key players. So we could include \"Robert Bosch GmbH's semiconductor division\". However, the phrase includes \"division\". The instruction says \"names of companies / organizations\". A division is an organization. So it's okay. But the phrase includes an apostrophe s and \"division\". It might be considered a generic phrase? No, it's specific.\n\nAlternatively, we could include \"Robert Bosch Semiconductor\". That is a company name. It's also a manufacturer. So we could include that. Which one is more canonical? \"Robert Bosch Semiconductor\" seems like a brand name. \"Robert Bosch GmbH's semiconductor division\" is a division. The parent company is \"Robert Bosch GmbH\". So the company name is \"Robert Bosch GmbH\". But the text never uses that alone. So we could include \"Robert Bosch Semiconductor\". That is a company name. So we could include that.\n\nNow, \"Osram\" appears. So include \"Osram\".\n\nNow, \"X-FAB Silicon Foundries\" appears. So include \"X-FAB Silicon Foundries\".\n\nNow, \"Siltronic (a Wacker Chemie subsidiary)\" includes \"Siltronic\". So we could include \"Siltronic\". But we already have \"Siltronic AG\". So we can deduplicate.\n\nNow, \"Robert Bosch GmbH's semiconductor division\" includes \"division\". Should we include \"Robert Bosch GmbH\"? The text never uses that alone. So we might not include it.\n\nNow, \"ams-OSRAM\" appears. So include \"ams-OSRAM\".\n\nNow, \"Elmos Semiconductor\" appears. So include \"Elmos Semiconductor\".\n\nNow, \"Infineon Technologies AG\" appears. So include \"Infineon Technologies AG\". Also \"Infineon Technologies\" appears. So we can deduplicate.\n\nNow, \"Siltronic AG\" appears. So include \"Siltronic AG\". Also \"Siltronic\" appears. So we can deduplicate.\n\nNow, \"Robert Bosch Semiconductor\" appears. So include \"Robert Bosch Semiconductor\". Also \"Robert Bosch GmbH's semiconductor division\" appears. So we need to decide which one to include. We could include \"Robert Bosch Semiconductor\". That is a company name. So we can include that.\n\nNow, \"Osram\" appears. So include \"Osram\".\n\nNow, \"X-FAB Silicon Foundries\" appears. So include \"X-FAB Silicon Foundries\".\n\nNow, \"ams-OSRAM\" appears. So include \"ams-OSRAM\".\n\nNow, \"Siltronic AG\" appears. So include \"Siltronic AG\".\n\nNow, \"Elmos Semiconductor\" appears. So include \"Elmos Semiconductor\".\n\nNow, \"Infineon Technologies AG\" appears. So include \"Infine",
+          "latency_s": 52.45,
+          "usage": {
+            "prompt_tokens": 260,
+            "completion_tokens": 8000,
+            "total_tokens": 8260,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 8000,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 0,
+          "fp": 2,
+          "fn": 6,
+          "false_positives": [
+            "Name A",
+            "Name B"
+          ],
+          "hallucinations": [
+            "Name A",
+            "Name B"
+          ]
+        },
+        "Pharmaceutical Market @ India": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Sun Pharmaceutical Industries",
+            "Cipla",
+            "Dr. Reddy's Laboratories",
+            "Lupin",
+            "Aurobindo Pharma",
+            "Sun Pharma",
+            "Cipla Ltd.",
+            "Lupin Ltd.",
+            "Sun Pharmaceutical",
+            "Dr. Reddy's",
+            "Zydus Lifesciences"
+          ],
+          "raw": "{\"companies\": [\"Sun Pharmaceutical Industries\", \"Cipla\", \"Dr. Reddy's Laboratories\", \"Lupin\", \"Aurobindo Pharma\", \"Sun Pharma\", \"Cipla Ltd.\", \"Lupin Ltd.\", \"Sun Pharmaceutical\", \"Dr. Reddy's\", \"Zydus Lifesciences\"]}",
+          "latency_s": 19.19,
+          "usage": {
+            "prompt_tokens": 257,
+            "completion_tokens": 2938,
+            "total_tokens": 3195,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2874,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ India": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Apollo Tyres Ltd",
+            "MRF Limited",
+            "Ceat Ltd",
+            "JK Tyre & Industries Ltd",
+            "TVS Srichakra Ltd",
+            "Balkrishna Industries (BKT)",
+            "Bridgestone India"
+          ],
+          "raw": "{\"companies\": [\"Apollo Tyres Ltd\", \"MRF Limited\", \"Ceat Ltd\", \"JK Tyre & Industries Ltd\", \"TVS Srichakra Ltd\", \"Balkrishna Industries (BKT)\", \"Bridgestone India\"]}",
+          "latency_s": 19.89,
+          "usage": {
+            "prompt_tokens": 253,
+            "completion_tokens": 4690,
+            "total_tokens": 4943,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4641,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Bridgestone India"
+          ],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ India": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Adani Solar",
+            "Adani Green Energy",
+            "Tata Power Solar",
+            "Waaree Energies",
+            "Vikram Solar",
+            "Premier Energies",
+            "Waaree Energies Ltd",
+            "Tata Power Solar Systems",
+            "Goldi Solar",
+            "ReNew Power"
+          ],
+          "raw": "{\"companies\": [\"Adani Solar\", \"Adani Green Energy\", \"Tata Power Solar\", \"Waaree Energies\", \"Vikram Solar\", \"Premier Energies\", \"Waaree Energies Ltd\", \"Tata Power Solar Systems\", \"Goldi Solar\", \"ReNew Power\"]}",
+          "latency_s": 19.73,
+          "usage": {
+            "prompt_tokens": 256,
+            "completion_tokens": 1750,
+            "total_tokens": 2006,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1693,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Steel Market @ India": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Tata Steel",
+            "JSW Steel",
+            "Steel Authority of India Limited (SAIL)",
+            "Jindal Steel & Power",
+            "ArcelorMittal Nippon Steel India (AM/NS India)",
+            "Rashtriya Ispat Nigam Ltd. (Vizag Steel)"
+          ],
+          "raw": "{\"companies\": [\"Tata Steel\", \"JSW Steel\", \"Steel Authority of India Limited (SAIL)\", \"Jindal Steel & Power\", \"ArcelorMittal Nippon Steel India (AM/NS India)\", \"Rashtriya Ispat Nigam Ltd. (Vizag Steel)\"]}",
+          "latency_s": 9.6,
+          "usage": {
+            "prompt_tokens": 284,
+            "completion_tokens": 2078,
+            "total_tokens": 2362,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2016,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ India": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [],
+          "raw": "We need to extract only the names of companies/organizations explicitly named as key players, manufacturers, or competitors in the market. The search text includes several mentions. We must not include market-research firms, report publishers, generic phrases, or ticker symbols. We need to output JSON with \"companies\": [list].\n\nWe need to parse the text:\n\nText:\n\n\"\"\"\nIndia's semiconductor industry is nascent but growing rapidly, with Tata Electronics, Micron Technology India (assembly & test), Kaynes Semiconductor, CG Power & Industrial Solutions, and SPEL Semiconductor leading domestic activities.\nKey players in India's emerging semiconductor market include Tata Electronics (partnering with TSMC), Micron Technology's ATMP facility in Gujarat, CG Power (in JV with Renesas), Kaynes Technology India, and SPEL Semiconductor.\nThe top semiconductor companies operating in India are Tata Electronics, Micron's India operations, CG Power & Industrial Solutions, Kaynes Semiconductor, and Vedanta's proposed fab venture.\n\"\"\"\n\nWe need to extract company names that are explicitly named as key players, manufacturers, or competitors. The text mentions:\n\n- Tata Electronics\n- Micron Technology India (assembly & test) – but the phrase \"Micron Technology India\" is a location? It's a facility. The company is Micron Technology. The text also says \"Micron Technology's ATMP facility in Gujarat\". So the company is Micron Technology. Also \"Micron's India operations\". So the company is Micron Technology. Should we include \"Micron Technology\"? The rule: Use the full, canonical company name (e.g. 'Tesla' -> 'Tesla, Inc.' is NOT required; keep the name as written but drop trailing punctuation). So we keep as written: \"Micron Technology\". Also \"Micron Technology India\" is a location, but the company is Micron Technology. The text includes \"Micron Technology India (assembly & test)\" and \"Micron Technology's ATMP facility\". So the company name is \"Micron Technology\". Should we include \"Micron Technology India\"? The rule says extract names of companies / organizations that are explicitly named as key players, manufacturers, or competitors. \"Micron Technology India\" is a sub-entity, but it's still a company? It's a facility. The phrase \"Micron Technology India (assembly & test)\" is a location. The key players list includes \"Micron Technology's ATMP facility\". So the company is Micron Technology. So we should include \"Micron Technology\". Not \"Micron Technology India\". Also \"Micron's India operations\" is a phrase referencing Micron Technology. So we include \"Micron Technology\". Also \"CG Power & Industrial Solutions\" appears. Also \"Kaynes Semiconductor\" and \"Kaynes Technology India\". The company is Kaynes Semiconductor? Actually \"Kaynes Semiconductor\" appears in first sentence, and \"Kaynes Technology India\" appears later. Are they the same? Possibly Kaynes Technology India is the same entity. But we need to include both as they appear? The rule: extract only the names of companies/organizations that are explicitly named as key players, manufacturers, or competitors. Both appear. So we include \"Kaynes Semiconductor\" and \"Kaynes Technology India\". However, they might be the same company with different naming. But we should include both as they appear. The text also mentions \"SPEL Semiconductor\". Also \"Vedanta's proposed fab venture\". Vedanta is a company. So include \"Vedanta\". Also \"CG Power (in JV with Renesas)\" – the company is CG Power & Industrial Solutions. So include \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"Kaynes Technology India\". Also \"SPEL Semiconductor\". Also \"Vedanta\". Also \"CG Power & Industrial Solutions\". Also \"Tata Electronics\". Also \"Micron Technology\". Also \"Kaynes Semiconductor\". Also \"",
+          "latency_s": 38.37,
+          "usage": {
+            "prompt_tokens": 263,
+            "completion_tokens": 8000,
+            "total_tokens": 8263,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 8000,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ Japan": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Takeda Pharmaceutical Co",
+            "Astellas Pharma Inc",
+            "Daiichi Sankyo Co",
+            "Otsuka Holdings",
+            "Eisai Co",
+            "Chugai Pharmaceutical",
+            "Sumitomo Pharma"
+          ],
+          "raw": "{\"companies\": [\"Takeda Pharmaceutical Co\", \"Astellas Pharma Inc\", \"Daiichi Sankyo Co\", \"Otsuka Holdings\", \"Eisai Co\", \"Chugai Pharmaceutical\", \"Sumitomo Pharma\"]}",
+          "latency_s": 30.86,
+          "usage": {
+            "prompt_tokens": 268,
+            "completion_tokens": 3610,
+            "total_tokens": 3878,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3562,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ Japan": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Bridgestone Corporation",
+            "Sumitomo Rubber Industries",
+            "Yokohama Rubber",
+            "Toyo Tire Corporation",
+            "Falken Tire",
+            "Nitto Tire"
+          ],
+          "raw": "{\"companies\": [\"Bridgestone Corporation\", \"Sumitomo Rubber Industries\", \"Yokohama Rubber\", \"Toyo Tire Corporation\", \"Falken Tire\", \"Nitto Tire\"]}",
+          "latency_s": 10.45,
+          "usage": {
+            "prompt_tokens": 265,
+            "completion_tokens": 433,
+            "total_tokens": 698,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 395,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 1,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ Japan": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Panasonic Energy",
+            "Sharp Solar",
+            "Kyocera Solar",
+            "Mitsubishi Electric Solar",
+            "Canadian Solar Japan",
+            "Panasonic Corporation",
+            "Sharp Corporation",
+            "Mitsubishi Electric",
+            "Toshiba",
+            "SoftBank Energy"
+          ],
+          "raw": "{\"companies\": [\"Panasonic Energy\", \"Sharp Solar\", \"Kyocera Solar\", \"Mitsubishi Electric Solar\", \"Canadian Solar Japan\", \"Panasonic Corporation\", \"Sharp Corporation\", \"Mitsubishi Electric\", \"Toshiba\", \"SoftBank Energy\"]}",
+          "latency_s": 21.21,
+          "usage": {
+            "prompt_tokens": 251,
+            "completion_tokens": 1187,
+            "total_tokens": 1438,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1136,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Canadian Solar Japan"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ Japan": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Nippon Steel Corporation",
+            "JFE Steel Corporation",
+            "Kobe Steel Ltd",
+            "Sumitomo Metal Industries",
+            "Tokyo Steel Manufacturing Co",
+            "Nisshin Steel",
+            "Daido Steel"
+          ],
+          "raw": "{\"companies\": [\"Nippon Steel Corporation\", \"JFE Steel Corporation\", \"Kobe Steel Ltd\", \"Sumitomo Metal Industries\", \"Tokyo Steel Manufacturing Co\", \"Nisshin Steel\", \"Daido Steel\"]}",
+          "latency_s": 34.85,
+          "usage": {
+            "prompt_tokens": 269,
+            "completion_tokens": 4852,
+            "total_tokens": 5121,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4806,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 2,
+          "fn": 0,
+          "false_positives": [
+            "Sumitomo Metal Industries",
+            "Nisshin Steel"
+          ],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ Japan": {
+          "model": "north-mini-code-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Renesas Electronics",
+            "Kioxia",
+            "Sony Semiconductor Solutions",
+            "Rohm Co. Ltd.",
+            "Murata Manufacturing",
+            "Shin-Etsu Chemical"
+          ],
+          "raw": "{\"companies\": [\"Renesas Electronics\", \"Kioxia\", \"Sony Semiconductor Solutions\", \"Rohm Co. Ltd.\", \"Murata Manufacturing\", \"Shin-Etsu Chemical\"]}",
+          "latency_s": 46.17,
+          "usage": {
+            "prompt_tokens": 253,
+            "completion_tokens": 3944,
+            "total_tokens": 4197,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3906,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    },
+    {
+      "model": "mimo-v2.5-free",
+      "TP": 57,
+      "FP": 4,
+      "FN": 64,
+      "precision": 0.934,
+      "recall": 0.471,
+      "f1": 0.626,
+      "hallucinations": 0,
+      "errors": 10,
+      "avg_latency_s": 18.84,
+      "total_tokens": 34784,
+      "per_market": {
+        "Pharmaceutical Market @ United States": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Johnson & Johnson",
+            "Pfizer",
+            "AbbVie",
+            "Merck & Co.",
+            "Bristol-Myers Squibb",
+            "Eli Lilly and Company",
+            "Abbott Laboratories"
+          ],
+          "raw": "{\"companies\": [\"Johnson & Johnson\", \"Pfizer\", \"AbbVie\", \"Merck & Co.\", \"Bristol-Myers Squibb\", \"Eli Lilly and Company\", \"Abbott Laboratories\"]}",
+          "latency_s": 28.55,
+          "usage": {
+            "prompt_tokens": 533,
+            "completion_tokens": 2531,
+            "total_tokens": 3064,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0007569576,
+              "upstream_inference_prompt_cost": 4.82776e-05,
+              "upstream_inference_completions_cost": 0.00070868
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2482,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 7,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ United States": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.63,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 5,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ United States": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "First Solar",
+            "Sunrun",
+            "SunPower",
+            "Enphase Energy",
+            "Tesla Energy",
+            "Canadian Solar",
+            "Vivint Solar"
+          ],
+          "raw": "{\"companies\": [\"First Solar\", \"Sunrun\", \"SunPower\", \"Enphase Energy\", \"Tesla Energy\", \"Canadian Solar\", \"Vivint Solar\"]}",
+          "latency_s": 22.97,
+          "usage": {
+            "prompt_tokens": 507,
+            "completion_tokens": 1933,
+            "total_tokens": 2440,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0005858776,
+              "upstream_inference_prompt_cost": 4.46376e-05,
+              "upstream_inference_completions_cost": 0.00054124
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1896,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 1,
+          "fn": 0,
+          "false_positives": [
+            "Vivint Solar"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ United States": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Nucor Corporation",
+            "Steel Dynamics",
+            "U.S. Steel Corporation",
+            "Commercial Metals Company",
+            "Cleveland-Cliffs"
+          ],
+          "raw": "{\"companies\": [\"Nucor Corporation\", \"Steel Dynamics\", \"U.S. Steel Corporation\", \"Commercial Metals Company\", \"Cleveland-Cliffs\"]}",
+          "latency_s": 18.66,
+          "usage": {
+            "prompt_tokens": 529,
+            "completion_tokens": 1759,
+            "total_tokens": 2288,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0005402376,
+              "upstream_inference_prompt_cost": 4.77176e-05,
+              "upstream_inference_completions_cost": 0.00049252
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1724,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ United States": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.44,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 7,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ Germany": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Bayer AG",
+            "Boehringer Ingelheim",
+            "Merck KGaA",
+            "Fresenius",
+            "Stada Arzneimittel",
+            "B. Braun Melsungen"
+          ],
+          "raw": "{\"companies\": [\"Bayer AG\", \"Boehringer Ingelheim\", \"Merck KGaA\", \"Fresenius\", \"Stada Arzneimittel\", \"B. Braun Melsungen\"]}",
+          "latency_s": 39.7,
+          "usage": {
+            "prompt_tokens": 543,
+            "completion_tokens": 3410,
+            "total_tokens": 3953,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0010044776,
+              "upstream_inference_prompt_cost": 4.96776e-05,
+              "upstream_inference_completions_cost": 0.0009548
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3361,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ Germany": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Continental AG",
+            "Michelin Germany",
+            "Bridgestone Germany",
+            "Goodyear Dunlop Tires Germany",
+            "Pirelli Deutschland",
+            "Goodyear Dunlop Tires Germany GmbH",
+            "Michelin Reifenwerke",
+            "Bridgestone Deutschland GmbH",
+            "Hankook Tire Germany"
+          ],
+          "raw": "{\"companies\": [\"Continental AG\", \"Michelin Germany\", \"Bridgestone Germany\", \"Goodyear Dunlop Tires Germany\", \"Pirelli Deutschland\", \"Goodyear Dunlop Tires Germany GmbH\", \"Michelin Reifenwerke\", \"Bridgestone Deutschland GmbH\", \"Hankook Tire Germany\"]}",
+          "latency_s": 51.17,
+          "usage": {
+            "prompt_tokens": 521,
+            "completion_tokens": 5194,
+            "total_tokens": 5715,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0015009176,
+              "upstream_inference_prompt_cost": 4.65976e-05,
+              "upstream_inference_completions_cost": 0.00145432
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5121,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ Germany": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 9.31,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Steel Market @ Germany": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "ThyssenKrupp Steel Europe",
+            "Salzgitter AG",
+            "ArcelorMittal Germany",
+            "Voestalpine",
+            "Klöckner & Co.",
+            "ThyssenKrupp AG",
+            "ArcelorMittal Deutschland",
+            "Klöckner & Co. SE",
+            "Georgsmarienhütte",
+            "Dillinger Hütte"
+          ],
+          "raw": "{\"companies\": [\"ThyssenKrupp Steel Europe\", \"Salzgitter AG\", \"ArcelorMittal Germany\", \"Voestalpine\", \"Klöckner & Co.\", \"ThyssenKrupp AG\", \"ArcelorMittal Deutschland\", \"Klöckner & Co. SE\", \"Georgsmarienhütte\", \"Dillinger Hütte\"]}",
+          "latency_s": 27.94,
+          "usage": {
+            "prompt_tokens": 535,
+            "completion_tokens": 2680,
+            "total_tokens": 3215,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0007989576,
+              "upstream_inference_prompt_cost": 4.85576e-05,
+              "upstream_inference_completions_cost": 0.0007504
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2591,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 2,
+          "fn": 0,
+          "false_positives": [
+            "Voestalpine",
+            "Georgsmarienhütte"
+          ],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ Germany": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 6.53,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ India": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.44,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ India": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.55,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ India": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.45,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 7,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Steel Market @ India": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Tata Steel",
+            "JSW Steel",
+            "Steel Authority of India Limited",
+            "Jindal Steel & Power",
+            "ArcelorMittal Nippon Steel India",
+            "Rashtriya Ispat Nigam Ltd"
+          ],
+          "raw": "{\"companies\": [\"Tata Steel\", \"JSW Steel\", \"Steel Authority of India Limited\", \"Jindal Steel & Power\", \"ArcelorMittal Nippon Steel India\", \"Rashtriya Ispat Nigam Ltd\"]}",
+          "latency_s": 33.29,
+          "usage": {
+            "prompt_tokens": 541,
+            "completion_tokens": 3506,
+            "total_tokens": 4047,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0010310776,
+              "upstream_inference_prompt_cost": 4.93976e-05,
+              "upstream_inference_completions_cost": 0.00098168
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3451,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ India": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.41,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Pharmaceutical Market @ Japan": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.4,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 7,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Automotive Tire Market @ Japan": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Bridgestone Corporation",
+            "Sumitomo Rubber Industries",
+            "Yokohama Rubber",
+            "Toyo Tire Corporation",
+            "Falken Tire",
+            "Nitto Tire"
+          ],
+          "raw": "{\n  \"companies\": [\"Bridgestone Corporation\", \"Sumitomo Rubber Industries\", \"Yokohama Rubber\", \"Toyo Tire Corporation\", \"Falken Tire\", \"Nitto Tire\"]\n}",
+          "latency_s": 30.22,
+          "usage": {
+            "prompt_tokens": 531,
+            "completion_tokens": 2498,
+            "total_tokens": 3029,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0007474376,
+              "upstream_inference_prompt_cost": 4.79976e-05,
+              "upstream_inference_completions_cost": 0.00069944
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2451,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 6,
+          "fp": 0,
+          "fn": 1,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Solar Panel Market @ Japan": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Panasonic Energy",
+            "Sharp Solar",
+            "Kyocera Solar",
+            "Mitsubishi Electric Solar",
+            "Canadian Solar Japan",
+            "Sharp Corporation",
+            "Mitsubishi Electric",
+            "SoftBank Energy"
+          ],
+          "raw": "{\"companies\": [\"Panasonic Energy\", \"Sharp Solar\", \"Kyocera Solar\", \"Mitsubishi Electric Solar\", \"Canadian Solar Japan\", \"Sharp Corporation\", \"Mitsubishi Electric\", \"SoftBank Energy\"]}",
+          "latency_s": 27.46,
+          "usage": {
+            "prompt_tokens": 503,
+            "completion_tokens": 2314,
+            "total_tokens": 2817,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0006919976,
+              "upstream_inference_prompt_cost": 4.40776e-05,
+              "upstream_inference_completions_cost": 0.00064792
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2266,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 1,
+          "fn": 1,
+          "false_positives": [
+            "Canadian Solar Japan"
+          ],
+          "hallucinations": []
+        },
+        "Steel Market @ Japan": {
+          "model": "mimo-v2.5-free",
+          "ok": true,
+          "error": null,
+          "companies": [
+            "Nippon Steel",
+            "JFE Steel",
+            "Kobe Steel",
+            "Daido Steel",
+            "Tokyo Steel Manufacturing"
+          ],
+          "raw": "{\"companies\": [\"Nippon Steel\", \"JFE Steel\", \"Kobe Steel\", \"Daido Steel\", \"Tokyo Steel Manufacturing\"]}",
+          "latency_s": 37.09,
+          "usage": {
+            "prompt_tokens": 530,
+            "completion_tokens": 3686,
+            "total_tokens": 4216,
+            "cost": 0,
+            "is_byok": true,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0010799376,
+              "upstream_inference_prompt_cost": 4.78576e-05,
+              "upstream_inference_completions_cost": 0.00103208
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3652,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "tp": 5,
+          "fp": 0,
+          "fn": 0,
+          "false_positives": [],
+          "hallucinations": []
+        },
+        "Semiconductor Market @ Japan": {
+          "model": "mimo-v2.5-free",
+          "ok": false,
+          "error": "429 Client Error: Too Many Requests for url: https://opencode.ai/zen/v1/chat/completions",
+          "companies": [],
+          "raw": "",
+          "latency_s": 5.66,
+          "usage": {},
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "false_positives": [],
+          "hallucinations": []
+        }
+      }
+    }
+  ]
+}

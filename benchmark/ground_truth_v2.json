@@ -1,0 +1,184 @@
+{
+  "_note": "Gold sets derived from snippets_v2.json. Aliases cover name variations that appear in or reasonably match the snippet text.",
+
+  "Pharmaceutical Market @ United States": [
+    {"canonical": "Johnson & Johnson", "aliases": ["Johnson & Johnson", "Johnson and Johnson"]},
+    {"canonical": "Pfizer", "aliases": ["Pfizer"]},
+    {"canonical": "AbbVie", "aliases": ["AbbVie"]},
+    {"canonical": "Merck & Co", "aliases": ["Merck & Co", "Merck"]},
+    {"canonical": "Bristol-Myers Squibb", "aliases": ["Bristol-Myers Squibb", "Bristol Myers Squibb"]},
+    {"canonical": "Eli Lilly", "aliases": ["Eli Lilly"]},
+    {"canonical": "Abbott Laboratories", "aliases": ["Abbott Laboratories", "Abbott"]}
+  ],
+
+  "Automotive Tire Market @ United States": [
+    {"canonical": "Goodyear", "aliases": ["Goodyear", "Goodyear Tire"]},
+    {"canonical": "Michelin", "aliases": ["Michelin", "Michelin North America"]},
+    {"canonical": "Bridgestone", "aliases": ["Bridgestone", "Bridgestone Americas"]},
+    {"canonical": "Continental", "aliases": ["Continental", "Continental Tire", "Continental AG"]},
+    {"canonical": "Pirelli", "aliases": ["Pirelli"]}
+  ],
+
+  "Solar Panel Market @ United States": [
+    {"canonical": "First Solar", "aliases": ["First Solar"]},
+    {"canonical": "Sunrun", "aliases": ["Sunrun"]},
+    {"canonical": "SunPower", "aliases": ["SunPower"]},
+    {"canonical": "Enphase Energy", "aliases": ["Enphase Energy", "Enphase"]},
+    {"canonical": "Canadian Solar", "aliases": ["Canadian Solar"]},
+    {"canonical": "Tesla Energy", "aliases": ["Tesla Energy", "Tesla"]}
+  ],
+
+  "Steel Market @ United States": [
+    {"canonical": "Nucor", "aliases": ["Nucor", "Nucor Corporation"]},
+    {"canonical": "Steel Dynamics", "aliases": ["Steel Dynamics"]},
+    {"canonical": "U.S. Steel", "aliases": ["U.S. Steel", "US Steel"]},
+    {"canonical": "Commercial Metals Company", "aliases": ["Commercial Metals Company", "Commercial Metals"]},
+    {"canonical": "Cleveland-Cliffs", "aliases": ["Cleveland-Cliffs", "Cleveland Cliffs"]}
+  ],
+
+  "Semiconductor Market @ United States": [
+    {"canonical": "Intel", "aliases": ["Intel", "Intel Corporation"]},
+    {"canonical": "Nvidia", "aliases": ["Nvidia", "Nvidia Corporation"]},
+    {"canonical": "Qualcomm", "aliases": ["Qualcomm"]},
+    {"canonical": "AMD", "aliases": ["AMD", "Advanced Micro Devices"]},
+    {"canonical": "Texas Instruments", "aliases": ["Texas Instruments"]},
+    {"canonical": "Broadcom", "aliases": ["Broadcom"]},
+    {"canonical": "Applied Materials", "aliases": ["Applied Materials"]}
+  ],
+
+  "Pharmaceutical Market @ Germany": [
+    {"canonical": "Bayer", "aliases": ["Bayer", "Bayer AG"]},
+    {"canonical": "Merck KGaA", "aliases": ["Merck KGaA"]},
+    {"canonical": "Boehringer Ingelheim", "aliases": ["Boehringer Ingelheim"]},
+    {"canonical": "Fresenius", "aliases": ["Fresenius", "Fresenius SE"]},
+    {"canonical": "Stada Arzneimittel", "aliases": ["Stada Arzneimittel", "Stada"]},
+    {"canonical": "B. Braun", "aliases": ["B. Braun", "B Braun"]}
+  ],
+
+  "Automotive Tire Market @ Germany": [
+    {"canonical": "Continental", "aliases": ["Continental", "Continental AG"]},
+    {"canonical": "Michelin", "aliases": ["Michelin", "Michelin Reifenwerke"]},
+    {"canonical": "Bridgestone", "aliases": ["Bridgestone", "Bridgestone Deutschland"]},
+    {"canonical": "Goodyear Dunlop", "aliases": ["Goodyear Dunlop", "Goodyear", "Dunlop"]},
+    {"canonical": "Pirelli", "aliases": ["Pirelli", "Pirelli Deutschland"]},
+    {"canonical": "Hankook", "aliases": ["Hankook", "Hankook Tire Germany"]}
+  ],
+
+  "Solar Panel Market @ Germany": [
+    {"canonical": "Solarwatt", "aliases": ["Solarwatt"]},
+    {"canonical": "SMA Solar Technology", "aliases": ["SMA Solar Technology", "SMA Solar"]},
+    {"canonical": "Viessmann", "aliases": ["Viessmann", "Viessmann Climate Solutions"]},
+    {"canonical": "BayWa r.e.", "aliases": ["BayWa r.e.", "BayWa"]},
+    {"canonical": "Meyer Burger", "aliases": ["Meyer Burger", "Meyer Burger Technology"]},
+    {"canonical": "Energetica", "aliases": ["Energetica"]}
+  ],
+
+  "Steel Market @ Germany": [
+    {"canonical": "ThyssenKrupp", "aliases": ["ThyssenKrupp", "ThyssenKrupp Steel Europe"]},
+    {"canonical": "Salzgitter", "aliases": ["Salzgitter", "Salzgitter AG"]},
+    {"canonical": "ArcelorMittal Germany", "aliases": ["ArcelorMittal Germany", "ArcelorMittal Deutschland", "ArcelorMittal"]},
+    {"canonical": "Klöckner & Co", "aliases": ["Klöckner & Co", "Klockner & Co", "Kloeckner"]},
+    {"canonical": "Dillinger Hütte", "aliases": ["Dillinger Hütte", "Dillinger Hutte", "Dillinger"]}
+  ],
+
+  "Semiconductor Market @ Germany": [
+    {"canonical": "Infineon Technologies", "aliases": ["Infineon Technologies", "Infineon"]},
+    {"canonical": "ams-OSRAM", "aliases": ["ams-OSRAM", "Osram", "ams OSRAM"]},
+    {"canonical": "Siltronic", "aliases": ["Siltronic", "Siltronic AG"]},
+    {"canonical": "Elmos Semiconductor", "aliases": ["Elmos Semiconductor", "Elmos"]},
+    {"canonical": "X-FAB", "aliases": ["X-FAB", "X-FAB Silicon Foundries"]},
+    {"canonical": "Robert Bosch", "aliases": ["Robert Bosch", "Bosch"]}
+  ],
+
+  "Pharmaceutical Market @ India": [
+    {"canonical": "Sun Pharmaceutical", "aliases": ["Sun Pharmaceutical", "Sun Pharma"]},
+    {"canonical": "Cipla", "aliases": ["Cipla"]},
+    {"canonical": "Dr. Reddy's Laboratories", "aliases": ["Dr. Reddy's", "Dr Reddy's", "Dr. Reddys"]},
+    {"canonical": "Lupin", "aliases": ["Lupin"]},
+    {"canonical": "Aurobindo Pharma", "aliases": ["Aurobindo Pharma", "Aurobindo"]},
+    {"canonical": "Zydus Lifesciences", "aliases": ["Zydus Lifesciences", "Zydus"]}
+  ],
+
+  "Automotive Tire Market @ India": [
+    {"canonical": "MRF", "aliases": ["MRF", "MRF Limited", "MRF Tyres"]},
+    {"canonical": "Apollo Tyres", "aliases": ["Apollo Tyres", "Apollo"]},
+    {"canonical": "Ceat", "aliases": ["Ceat", "Ceat Tyres", "Ceat Ltd"]},
+    {"canonical": "JK Tyre", "aliases": ["JK Tyre", "JK Tyre & Industries"]},
+    {"canonical": "Balkrishna Industries", "aliases": ["Balkrishna Industries", "BKT"]},
+    {"canonical": "TVS Srichakra", "aliases": ["TVS Srichakra"]}
+  ],
+
+  "Solar Panel Market @ India": [
+    {"canonical": "Adani Solar", "aliases": ["Adani Solar", "Adani Green Energy"]},
+    {"canonical": "Tata Power Solar", "aliases": ["Tata Power Solar", "Tata Power"]},
+    {"canonical": "Waaree Energies", "aliases": ["Waaree Energies", "Waaree"]},
+    {"canonical": "Vikram Solar", "aliases": ["Vikram Solar"]},
+    {"canonical": "Premier Energies", "aliases": ["Premier Energies"]},
+    {"canonical": "Goldi Solar", "aliases": ["Goldi Solar"]},
+    {"canonical": "ReNew Power", "aliases": ["ReNew Power", "ReNew"]}
+  ],
+
+  "Steel Market @ India": [
+    {"canonical": "Tata Steel", "aliases": ["Tata Steel"]},
+    {"canonical": "JSW Steel", "aliases": ["JSW Steel"]},
+    {"canonical": "SAIL", "aliases": ["SAIL", "Steel Authority of India"]},
+    {"canonical": "Jindal Steel & Power", "aliases": ["Jindal Steel & Power", "Jindal Steel", "JSPL"]},
+    {"canonical": "ArcelorMittal Nippon Steel India", "aliases": ["ArcelorMittal Nippon Steel India", "AM/NS India"]},
+    {"canonical": "Rashtriya Ispat Nigam", "aliases": ["Rashtriya Ispat Nigam", "Vizag Steel"]}
+  ],
+
+  "Semiconductor Market @ India": [
+    {"canonical": "Tata Electronics", "aliases": ["Tata Electronics"]},
+    {"canonical": "Micron Technology India", "aliases": ["Micron Technology India", "Micron"]},
+    {"canonical": "CG Power", "aliases": ["CG Power", "CG Power & Industrial Solutions"]},
+    {"canonical": "Kaynes Technology", "aliases": ["Kaynes Technology India", "Kaynes Technology", "Kaynes Semiconductor"]},
+    {"canonical": "SPEL Semiconductor", "aliases": ["SPEL Semiconductor"]},
+    {"canonical": "Vedanta", "aliases": ["Vedanta"]}
+  ],
+
+  "Pharmaceutical Market @ Japan": [
+    {"canonical": "Takeda Pharmaceutical", "aliases": ["Takeda Pharmaceutical", "Takeda"]},
+    {"canonical": "Astellas Pharma", "aliases": ["Astellas Pharma", "Astellas"]},
+    {"canonical": "Daiichi Sankyo", "aliases": ["Daiichi Sankyo"]},
+    {"canonical": "Otsuka Holdings", "aliases": ["Otsuka Holdings", "Otsuka"]},
+    {"canonical": "Chugai Pharmaceutical", "aliases": ["Chugai Pharmaceutical", "Chugai"]},
+    {"canonical": "Eisai", "aliases": ["Eisai"]},
+    {"canonical": "Sumitomo Pharma", "aliases": ["Sumitomo Pharma"]}
+  ],
+
+  "Automotive Tire Market @ Japan": [
+    {"canonical": "Bridgestone", "aliases": ["Bridgestone", "Bridgestone Corporation"]},
+    {"canonical": "Sumitomo Rubber", "aliases": ["Sumitomo Rubber Industries", "Sumitomo Rubber"]},
+    {"canonical": "Yokohama Rubber", "aliases": ["Yokohama Rubber"]},
+    {"canonical": "Toyo Tire", "aliases": ["Toyo Tire", "Toyo Tire Corporation"]},
+    {"canonical": "Dunlop", "aliases": ["Dunlop"]},
+    {"canonical": "Falken Tire", "aliases": ["Falken Tire", "Falken"]},
+    {"canonical": "Nitto Tire", "aliases": ["Nitto Tire", "Nitto"]}
+  ],
+
+  "Solar Panel Market @ Japan": [
+    {"canonical": "Panasonic Energy", "aliases": ["Panasonic Energy", "Panasonic"]},
+    {"canonical": "Sharp", "aliases": ["Sharp", "Sharp Solar", "Sharp Corporation"]},
+    {"canonical": "Kyocera Solar", "aliases": ["Kyocera Solar", "Kyocera"]},
+    {"canonical": "Mitsubishi Electric", "aliases": ["Mitsubishi Electric"]},
+    {"canonical": "Toshiba", "aliases": ["Toshiba", "Toshiba's energy systems"]},
+    {"canonical": "SoftBank Energy", "aliases": ["SoftBank Energy", "SoftBank"]}
+  ],
+
+  "Steel Market @ Japan": [
+    {"canonical": "Nippon Steel", "aliases": ["Nippon Steel", "Nippon Steel Corporation"]},
+    {"canonical": "JFE Steel", "aliases": ["JFE Steel", "JFE Steel Corporation"]},
+    {"canonical": "Kobe Steel", "aliases": ["Kobe Steel", "Kobelco"]},
+    {"canonical": "Tokyo Steel", "aliases": ["Tokyo Steel", "Tokyo Steel Manufacturing"]},
+    {"canonical": "Daido Steel", "aliases": ["Daido Steel"]}
+  ],
+
+  "Semiconductor Market @ Japan": [
+    {"canonical": "Renesas Electronics", "aliases": ["Renesas Electronics", "Renesas"]},
+    {"canonical": "Kioxia", "aliases": ["Kioxia", "Kioxia Holdings"]},
+    {"canonical": "Sony Semiconductor", "aliases": ["Sony Semiconductor Solutions", "Sony Semiconductor", "Sony"]},
+    {"canonical": "Murata Manufacturing", "aliases": ["Murata Manufacturing", "Murata"]},
+    {"canonical": "Rohm", "aliases": ["Rohm", "Rohm Semiconductor", "Rohm Co"]},
+    {"canonical": "Shin-Etsu Chemical", "aliases": ["Shin-Etsu Chemical", "Shin-Etsu"]}
+  ]
+}
