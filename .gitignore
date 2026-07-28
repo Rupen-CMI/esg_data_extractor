@@ -28,3 +28,7 @@ Thumbs.db
 raw_esg_data/
 downloaded_reports/
 calibration/cache/
+
+# not needed for pipeline
+demo_ui/
+frontend/
