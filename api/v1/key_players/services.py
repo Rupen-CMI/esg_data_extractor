@@ -239,7 +239,7 @@ def extract_key_players(market: str, context: str) -> list | None:
 
         Return ONLY a valid JSON array, no prose, no markdown:
         [
-        {{"name": "Company Name", "country": "Country of headquarters", "confidence": "high | medium | low"}}
+        {{"name": "Company Name", "confidence": "high | medium | low"}}
         ]
 
         Rules:
@@ -247,7 +247,9 @@ def extract_key_players(market: str, context: str) -> list | None:
         - confidence "medium" = mentioned as a company in this market
         - confidence "low" = inferred or unclear
         - Do NOT invent companies not present in the text
-        - country = headquarters country. If not mentioned in the text, use your own knowledge to fill it in. Never leave country empty or null.
+        - Extract the company NAME only. Do not report headquarters, country,
+          or location -- those are resolved from company registries downstream,
+          not from this text.
         - Max 10 companies
 
         Market: {market}
@@ -294,13 +296,31 @@ def extract_key_players(market: str, context: str) -> list | None:
 
 
 async def save_companies_to_db(session: AsyncSession, market: Market, companies: list):
+    """Persist extracted company names. Country is deliberately NOT written.
+
+    This function used to store the LLM extractor's `country` field verbatim,
+    which is what polluted companies.country: measured live, 1415 of 1523 rows
+    read "global" (the model's non-answer when it didn't know), and the rest
+    held cities ("Mumbai", "Shenzhen"), street addresses ("4085 Sladeview
+    Crescent"), and sentence fragments scraped from marketing copy ("Sydney
+    well equipped with the best of machines").
+
+    Country is no longer guessed at all. The prompt no longer asks for it, and
+    nothing here writes it. Country is resolved downstream from company
+    registries -- company_metadata's Wikidata -> GLEIF -> OpenStreetMap chain
+    -- which is real registry data rather than a model's inference from search
+    snippets. graph._resolve_state_country already falls back to
+    metadata["country"] when no country is supplied, so leaving this NULL is
+    the intended path, not a gap.
+    """
     names = [c["name"] for c in companies if c.get("name")]
     if not names:
         return
 
-    # Upsert companies — skip duplicates by name
+    # Upsert companies — skip duplicates by name. `country` is omitted
+    # entirely (nullable, filled by registry resolution at scoring time).
     stmt = insert(Company).values([
-        {"name": c["name"], "country": c.get("country")}
+        {"name": c["name"]}
         for c in companies if c.get("name")
     ])
     stmt = stmt.on_conflict_do_nothing(index_elements=["name"])

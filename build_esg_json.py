@@ -76,6 +76,9 @@ def _row_rank(source: str, year: int) -> tuple:
 
 
 def derive_risk(score: float) -> str:
+    """Risk band from the range MIDPOINT — a single label still needs one
+    number to threshold against, but every score shown to the caller stays a
+    range; this is purely for bucketing, not a returned value."""
     if score >= 75: return "Low"
     if score >= 50: return "Medium"
     if score >= 25: return "High"
@@ -86,6 +89,10 @@ def derive_rating(score: float) -> str:
     if score >= 75: return "Leader"
     if score >= 50: return "Follower"
     return "Laggard"
+
+
+def _mid(low: float, high: float) -> float:
+    return (low + high) / 2.0
 
 
 def _band_score(x: float, best: float, worst: float) -> float:
@@ -147,21 +154,29 @@ def build_all(companies, all_values, metric_defs):
             rank = _row_rank(source, year)
             existing = by_key.get(key)
             if existing is None or rank > existing["rank"]:
+                # Every row must carry a usable [low, high]. Estimates (agentic
+                # sources) populate low_value/high_value directly (see
+                # metric_estimation_agent._upsert_estimate and
+                # ensemble_persistence.py for pillar rows). Real disclosures
+                # have no uncertainty to report -- they collapse to a
+                # degenerate range at the exact reported value, so the output
+                # shape stays uniform (range-only, never a bare point) without
+                # inventing false uncertainty around a known fact.
+                low_v = getattr(cmv, "low_value", None)
+                high_v = getattr(cmv, "high_value", None)
+                if low_v is None or high_v is None:
+                    low_v = high_v = cmv.numeric_value
                 by_key[key] = {
                     "numeric": cmv.numeric_value,
                     "value": cmv.value,
+                    "low": low_v,
+                    "high": high_v,
                     "year": year,
                     "source": source,
                     "rank": rank,
                     "estimated": source in _AGENTIC_SOURCES,
                     "corrected": source in _CORRECTION_SOURCES,
                     "confidence": cmv.confidence,
-                    # Ensemble scorer uncertainty output (agentic_ensemble_v1
-                    # only; NULL on every other source -- see
-                    # db_migrations/005_ensemble_cutover.sql). Carried through
-                    # so _pillar() can surface it alongside the pillar score.
-                    "low_value": getattr(cmv, "low_value", None),
-                    "high_value": getattr(cmv, "high_value", None),
                     "needs_review": getattr(cmv, "needs_review", None),
                     "confidence_label": getattr(cmv, "confidence_label", None),
                     "verdict": getattr(cmv, "verdict", None),
@@ -175,15 +190,11 @@ def build_all(companies, all_values, metric_defs):
     # (emissions, energy, water, waste) are first intensity-normalised by REVENUE
     # (per $M), making the band size-independent: a startup and an MNC with the
     # same carbon-per-$revenue score identically.
-    def _metric_score(cname: str, key: str):
-        """0-100 score for a company on one scored core metric, or None."""
+    def _score_one(cname: str, key: str, val: float):
+        """0-100 score for one numeric value of one scored core metric, or None."""
         meta = _CORE[key]
-        entry = company_raw[cname].get(key)
-        if entry is None:
-            return None
         if meta["kind"] == "boolean":
-            return 100.0 if entry["numeric"] >= 0.5 else 0.0
-        val = entry["numeric"]
+            return 100.0 if val >= 0.5 else 0.0
         if meta["intensity"]:
             denom = company_raw[cname].get(meta["intensity"], {}).get("numeric")
             if not (denom and denom > 0):
@@ -194,6 +205,21 @@ def build_all(companies, all_values, metric_defs):
             return None
         return _band_score(val, band[0], band[1])
 
+    def _metric_score_range(cname: str, key: str):
+        """[low, high] score range for a company on one scored core metric, or
+        None. Scores BOTH ends of the value's own [low, high] range and
+        re-sorts, since direction (higher/lower-is-better) can flip which end
+        of the value range maps to the lower score."""
+        entry = company_raw[cname].get(key)
+        if entry is None:
+            return None
+        s_low = _score_one(cname, key, entry["low"])
+        s_high = _score_one(cname, key, entry["high"])
+        if s_low is None or s_high is None:
+            return None
+        lo, hi = sorted((s_low, s_high))
+        return {"low": round(lo, 1), "high": round(hi, 1)}
+
     # ── Step 4: assemble per-company results
     results = []
     for company in companies:
@@ -201,45 +227,55 @@ def build_all(companies, all_values, metric_defs):
         by_key = company_raw.get(cname, {})
 
         def _pillar(cat: str):
-            """Return (score, basis, detail) — basis in {'agentic', 'core', 'none'}.
+            """Return (range, basis, detail) — basis in {'agentic', 'core', 'none'}.
+            range is always a {'low', 'high'} dict, never a bare score.
             The agentic pillar score (esg_e/s/g_score -- the ensemble scorer's
             verified, confidence-gated output as of the Phase 6 cutover) is
             authoritative whenever it exists: it carries an evidence trail,
             confidence gating, and critic verification that a raw core-metric
             band average has none of. Core-metric bands are only a fallback
             for companies that predate the agentic pillar score entirely.
-            detail is None for 'none'/plain 'core'; for 'agentic' it's a dict
-            with confidence_label/verdict always, plus range/needs_review
-            when the winning row is agentic_ensemble_v1 with populated
-            low/high (every older source leaves those NULL)."""
+            'agentic' rows always have a real low_value/high_value populated
+            (ensemble_persistence.py writes them unconditionally); 'core' rows
+            build a range from scoring the low/high end of every underlying
+            metric; 'none' is an honest empty range, not a fabricated 50."""
             entry = by_key.get(_AGENTIC_PILLAR[cat], {})
-            ag = entry.get("numeric")
-            if ag is not None:
+            if entry.get("low") is not None and entry.get("high") is not None:
                 detail = {
                     "confidence_label": entry.get("confidence_label"),
                     "verdict": entry.get("verdict"),
+                    "needs_review": bool(entry.get("needs_review")),
                 }
-                if entry.get("low_value") is not None and entry.get("high_value") is not None:
-                    detail["range"] = {
-                        "low": round(entry["low_value"], 1), "high": round(entry["high_value"], 1),
-                    }
-                    detail["needs_review"] = bool(entry.get("needs_review"))
-                return round(ag, 1), "agentic", detail
+                rng = {"low": round(entry["low"], 1), "high": round(entry["high"], 1)}
+                return rng, "agentic", detail
 
-            scores = [
-                s for k in SCORED_CORE if _CORE[k]["category"] == cat
-                for s in (_metric_score(cname, k),) if s is not None
+            ranges = [
+                r for k in SCORED_CORE if _CORE[k]["category"] == cat
+                for r in (_metric_score_range(cname, k),) if r is not None
             ]
-            if scores:
-                return round(sum(scores) / len(scores), 1), "core", None
-            return 0.0, "none", None
+            if ranges:
+                rng = {
+                    "low": round(sum(r["low"] for r in ranges) / len(ranges), 1),
+                    "high": round(sum(r["high"] for r in ranges) / len(ranges), 1),
+                }
+                return rng, "core", None
+            return {"low": 0.0, "high": 0.0}, "none", None
 
-        e_score, e_basis, e_detail = _pillar("E")
-        s_score, s_basis, s_detail = _pillar("S")
-        g_score, g_basis, g_detail = _pillar("G")
-        total_score = round(
-            e_score * _PILLAR_WEIGHTS["E"] + s_score * _PILLAR_WEIGHTS["S"] + g_score * _PILLAR_WEIGHTS["G"], 1
-        )
+        e_range, e_basis, e_detail = _pillar("E")
+        s_range, s_basis, s_detail = _pillar("S")
+        g_range, g_basis, g_detail = _pillar("G")
+        total_range = {
+            "low": round(
+                e_range["low"] * _PILLAR_WEIGHTS["E"] + s_range["low"] * _PILLAR_WEIGHTS["S"]
+                + g_range["low"] * _PILLAR_WEIGHTS["G"], 1),
+            "high": round(
+                e_range["high"] * _PILLAR_WEIGHTS["E"] + s_range["high"] * _PILLAR_WEIGHTS["S"]
+                + g_range["high"] * _PILLAR_WEIGHTS["G"], 1),
+        }
+        # Rating/risk bucketing needs one number — use the range midpoint,
+        # never expose it as a returned score.
+        e_mid, s_mid, g_mid = _mid(**e_range), _mid(**s_range), _mid(**g_range)
+        total_mid = _mid(**total_range)
 
         # Provenance across displayed core metrics
         real_core = [k for k in CORE_KEYS if k in by_key and not by_key[k]["estimated"]]
@@ -256,15 +292,19 @@ def build_all(companies, all_values, metric_defs):
         def _metric_dict(k):
             e = by_key[k]
             meta = _CORE[k]
-            # Format the display value uniformly from numeric+unit+kind, so real
-            # and estimated values look consistent (and odd real strings like
-            # "18.400005961044574" or a 0-100 value under a Yes/No key get cleaned).
-            display = _display_value(meta, float(e["numeric"]))
+            # Format each end of the value range uniformly from numeric+unit+kind
+            # (real disclosures carry a degenerate low==high range, so they render
+            # as a single repeated value rather than a fabricated spread).
+            value_range = {
+                "low": _display_value(meta, float(e["low"])),
+                "high": _display_value(meta, float(e["high"])),
+            }
+            score_range = _metric_score_range(cname, k)
             d = {
-                "raw": e["numeric"],
-                "value": display,
+                "range": {"low": e["low"], "high": e["high"]},
+                "value_range": value_range,
                 "unit": key_units.get(k, meta["unit"]),
-                "score": _metric_score(cname, k),
+                "score_range": score_range,
                 "year": e["year"],
                 "estimated": e["estimated"],
             }
@@ -297,12 +337,12 @@ def build_all(companies, all_values, metric_defs):
             # only ever comes from estimation, so its presence means the company has
             # been gap-filled against the CURRENT core schema.
             "has_revenue": "annual_revenue" in by_key,
-            "rating": derive_rating(total_score),
+            "rating": derive_rating(total_mid),
             "esg_scores": {
-                "environment": {"score": e_score, "risk": derive_risk(e_score), **(e_detail or {})},
-                "social":      {"score": s_score, "risk": derive_risk(s_score), **(s_detail or {})},
-                "governance":  {"score": g_score, "risk": derive_risk(g_score), **(g_detail or {})},
-                "total":       {"score": total_score, "risk": derive_risk(total_score)},
+                "environment": {"range": e_range, "risk": derive_risk(e_mid), "basis": e_basis, **(e_detail or {})},
+                "social":      {"range": s_range, "risk": derive_risk(s_mid), "basis": s_basis, **(s_detail or {})},
+                "governance":  {"range": g_range, "risk": derive_risk(g_mid), "basis": g_basis, **(g_detail or {})},
+                "total":       {"range": total_range, "risk": derive_risk(total_mid)},
             },
             "esg_summary": company_summary.get(cname),
             "environmental_metrics": env_metrics or None,
@@ -314,7 +354,7 @@ def build_all(companies, all_values, metric_defs):
             "reporting_year": reporting_year,
         })
 
-    results.sort(key=lambda c: c["esg_scores"]["total"]["score"], reverse=True)
+    results.sort(key=lambda c: _mid(**c["esg_scores"]["total"]["range"]), reverse=True)
     return results
 
 
@@ -357,15 +397,19 @@ def build_market_esg_json(market_name: str, db=None) -> dict | None:
 
         company_jsons = build_all(companies, all_values, metric_defs)
 
-        avg_score = round(
-            sum(c["esg_scores"]["total"]["score"] for c in company_jsons) / len(company_jsons), 1
-        ) if company_jsons else 0
+        if company_jsons:
+            avg_range = {
+                "low": round(sum(c["esg_scores"]["total"]["range"]["low"] for c in company_jsons) / len(company_jsons), 1),
+                "high": round(sum(c["esg_scores"]["total"]["range"]["high"] for c in company_jsons) / len(company_jsons), 1),
+            }
+        else:
+            avg_range = {"low": 0.0, "high": 0.0}
 
         return {
             "market": market_name,
-            "industry_avg_esg_score": avg_score,
+            "industry_avg_esg_score_range": avg_range,
             "total_companies": len(company_jsons),
-            "scoring_method": "fixed_benchmark_revenue_intensity",
+            "scoring_method": "fixed_benchmark_revenue_intensity_range",
             "companies": company_jsons,
         }
 

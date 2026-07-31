@@ -45,20 +45,29 @@ def _load_api_key() -> str:
     key = os.environ.get("ZEN_API_KEY")
     if key:
         return key.strip()
-    # Fallback: read the bare key from .env next to this file.
+    # Fallback: read from .env next to this file. .env is a shared,
+    # multi-variable file (DB_URL, ASYNC_DB_URL, ZEN_API_KEY, ...) -- must
+    # find the ZEN_API_KEY= line specifically, NOT just return the first
+    # non-empty/non-comment line. A prior version did exactly that and
+    # silently returned "neondb" (from DB_NAME=neondb, .env's first line)
+    # as the "API key" whenever ZEN_API_KEY wasn't set as a real env var,
+    # producing a 401 that looked like an account/quota problem but was
+    # actually this parser reading the wrong line entirely.
     env_path = os.path.join(os.path.dirname(__file__), ".env")
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
-        # Support either "ZEN_API_KEY=sk-..." or a bare "sk-..." line.
         for line in content.splitlines():
             line = line.strip()
-            if not line:
+            if not line or line.startswith("#"):
                 continue
             if "=" in line:
-                _, _, val = line.partition("=")
-                return val.strip()
-            return line
+                name, _, val = line.partition("=")
+                if name.strip() == "ZEN_API_KEY":
+                    return val.strip()
+            elif line.startswith("sk-"):
+                # Bare "sk-..." line with no "KEY=" prefix at all.
+                return line
     raise RuntimeError("No Zen API key found. Set ZEN_API_KEY or put it in .env")
 
 
@@ -236,6 +245,8 @@ def call_with_prompt(prompt: str, model: str = DEFAULT_MODEL,
             )
             if resp.status_code in (503, 429) and attempt < retries:
                 wait = 8 * (attempt + 1)
+                print(f"[zen_client] HTTP {resp.status_code} from {model} "
+                      f"(attempt {attempt + 1}/{retries + 1}) -- retrying in {wait}s", flush=True)
                 time.sleep(wait)
                 continue
             resp.raise_for_status()

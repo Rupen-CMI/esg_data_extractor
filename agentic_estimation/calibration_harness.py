@@ -939,6 +939,36 @@ def compute_report(df: pd.DataFrame) -> dict:
             verify_block[label] = entry
         report["verify"] = verify_block
 
+    # RANGE COVERAGE (does the range actually contain truth?): the API now
+    # returns [low, high] as the only value, never the point score alone --
+    # so the calibration question that matters isn't just "is the point close"
+    # (Spearman/pct_MAE above, unaffected -- truth has no range to rank
+    # against, so ranking stays point-based), it's "would a user who only saw
+    # the range have been right." Coverage rate = % of companies where
+    # truth_e/s/g actually falls inside [low_e, high_e] etc. If the range is
+    # honest, coverage should roughly match the confidence it implies (e.g. a
+    # range meant to be ~80% reliable should contain truth ~80% of the time);
+    # too low means ranges are overconfident (too narrow), too high (near
+    # 100%) means they're so wide they're not informative.
+    if "low_e" in ok.columns and ok["low_e"].notna().any():
+        coverage_block = {}
+        pillar_cols = [("E", "low_e", "high_e", "truth_e"), ("S", "low_s", "high_s", "truth_s"),
+                       ("G", "low_g", "high_g", "truth_g")]
+        for label, lc, hc, tc in pillar_cols:
+            if lc not in ok.columns or hc not in ok.columns or tc not in ok.columns:
+                continue
+            sub = ok[[lc, hc, tc]].dropna()
+            if sub.empty:
+                continue
+            inside = (sub[tc] >= sub[lc]) & (sub[tc] <= sub[hc])
+            coverage_block[label] = {
+                "n": int(len(sub)),
+                "coverage_pct": round(100.0 * float(inside.mean()), 1),
+                "mean_width": round(float((sub[hc] - sub[lc]).mean()), 1),
+                "median_width": round(float((sub[hc] - sub[lc]).median()), 1),
+            }
+        report["range_coverage"] = coverage_block
+
     return report
 
 
@@ -1111,6 +1141,20 @@ def _print_report(report: dict) -> None:
             print(f"    verdicts: {v['verdict_counts']}")
         print(f"  (rank_err_flag should be >= rank_err_unflag -- confirms needs_review actually")
         print(f"   marks the worse estimates. pct_skip is the cost-refined trigger's effectiveness.)")
+
+    if report.get("range_coverage"):
+        print(f"\n  RANGE COVERAGE (does [low, high] actually contain truth? -- the API now")
+        print(f"  returns ranges only, so this is the honesty check for that output):")
+        print(f"  {'pillar':<8}{'n':>4}{'coverage_%':>12}{'mean_width':>12}{'median_width':>14}")
+        print("  " + "-" * 50)
+        for label in ("E", "S", "G"):
+            c = report["range_coverage"].get(label)
+            if not c:
+                continue
+            print(f"  {label:<8}{c['n']:>4}{c['coverage_pct']:>11.1f}%{c['mean_width']:>12.1f}{c['median_width']:>14.1f}")
+        print(f"  (coverage_% = % of companies where truth actually fell inside our range --")
+        print(f"   too low means ranges are overconfident/too narrow, near 100% with a huge")
+        print(f"   mean_width means they're wide enough to be uninformative.)")
 
     print(f"\n  Reading it: spearman +1.0 = estimator orders firms exactly like the")
     print(f"  assessor, 0 = no relationship, negative = inverted. pct_MAE = avg")

@@ -1,0 +1,296 @@
+{
+  "E": {
+    "k": 3,
+    "silhouette": 0.07,
+    "n_claims": 207,
+    "clusters": {
+      "0": {
+        "size": 7,
+        "top_terms": [
+          "violation",
+          "environmental",
+          "reports",
+          "pollution",
+          "federal",
+          "tracker reports",
+          "violation tracker",
+          "tracker"
+        ],
+        "factors": {
+          "environmental_controversy": 7
+        },
+        "polarity_mix": {
+          "-1": 7
+        },
+        "representatives": [
+          "Violation Tracker reports a $16K federal penalty for an environmental violation.",
+          "Violation Tracker reports $4.1M in federal environmental penalties against The Andersons.",
+          "Reuters reports Louisiana judge cancelled air permits for a Formosa plastics plant in 2022.",
+          "Reuters reports Formosa Plastics paid nearly $3 million to settle air pollution charges in 2021."
+        ],
+        "severity": 0.75,
+        "label_rationale": "Includes regulator involvement and material penalties, though amounts vary."
+      },
+      "1": {
+        "size": 68,
+        "top_terms": [
+          "cdp",
+          "disclosure",
+          "cdp signal",
+          "climate",
+          "cdp disclosure",
+          "signal",
+          "indicating",
+          "score"
+        ],
+        "factors": {
+          "cdp_disclosure": 56,
+          "scope_1_emissions": 5,
+          "scope_2_emissions": 2,
+          "scope_3_emissions": 2,
+          "net_zero_pledge": 1
+        },
+        "polarity_mix": {
+          "0": 15,
+          "1": 51,
+          "-1": 2
+        },
+        "representatives": [
+          "The CDP signal mentions Aveda Corporation's carbon emissions profile and an 'A' score for transparency, indicating CDP disclosure.",
+          "The CDP signal explicitly states a CDP Climate Disclosure was submitted on October 3rd, 2024.",
+          "The CDP signal explicitly mentions FatFace's 2025 carbon emissions profile and CDP scores, indicating a CDP climate disclosure.",
+          "CDP signal explicitly states EBCO Limited's carbon emissions profile and CDP disclosure."
+        ],
+        "severity": 0.25,
+        "label_rationale": "Routine disclosure of emissions data and CDP participation."
+      },
+      "2": {
+        "size": 132,
+        "top_terms": [
+          "zero",
+          "net zero",
+          "net",
+          "states",
+          "target",
+          "signal",
+          "sbti",
+          "emissions"
+        ],
+        "factors": {
+          "net_zero_pledge": 69,
+          "sbti_commitment": 30,
+          "renewable_energy_pct": 13,
+          "scope_1_emissions": 5,
+          "environmental_controversy": 5
+        },
+        "polarity_mix": {
+          "1": 107,
+          "0": 13,
+          "-1": 12
+        },
+        "representatives": [
+          "The net zero signal states 'Halti is net-zero committed' and mentions 'Status of net-zero carbon emissions targets'.",
+          "The sustainability report states the finalization of its Net Zero Pathway to achieve net zero across the portfolio by 2050.",
+          "The signal explicitly states a net zero pledge by 2040 with interim targets and offsetting commitment.",
+          "Signal states 'ALTERFIN, ALREADY NET ZERO COMPLIANT', indicating a net-zero pledge or achievement."
+        ],
+        "severity": 0.5,
+        "label_rationale": "Concrete net-zero commitments with targets, but common and not severe."
+      }
+    }
+  },
+  "S": {
+    "k": 3,
+    "silhouette": 0.173,
+    "n_claims": 54,
+    "clusters": {
+      "0": {
+        "size": 22,
+        "top_terms": [
+          "rights",
+          "bhrrc",
+          "human",
+          "human rights",
+          "incident",
+          "rights incident",
+          "reports",
+          "labour"
+        ],
+        "factors": {
+          "human_rights_incident": 18,
+          "labor_controversy": 4
+        },
+        "polarity_mix": {
+          "-1": 21,
+          "0": 1
+        },
+        "representatives": [
+          "BHRRC reports that information about deaths of Hugo Albeiro George Pérez and Domar Egidio Zapata has been shared with Atlas Copco, indicating a human rights incident.",
+          "BHRRC reports a worker death at Workmate, a Chilean construction firm, indicating a human rights incident.",
+          "BHRRC reports a class action application against Exxaro and a legal battle with the Sindane family over land, indicating a human rights incident.",
+          "BHRRC outreach mentions forced labor allegations and Kontoor's response, indicating a human rights incident."
+        ],
+        "severity": 1.0,
+        "label_rationale": "Deaths and legal battles over land indicate severe human rights incidents."
+      },
+      "1": {
+        "size": 24,
+        "top_terms": [
+          "labor",
+          "dispute",
+          "labor dispute",
+          "indicating labor",
+          "indicating",
+          "union",
+          "workers",
+          "reports"
+        ],
+        "factors": {
+          "labor_controversy": 21,
+          "workplace_safety": 3
+        },
+        "polarity_mix": {
+          "1": 5,
+          "-1": 19
+        },
+        "representatives": [
+          "Signal reports Grindr employees launching a union drive, indicating a labor dispute at a subsidiary of Beijing Kunlun Tech.",
+          "A strike authorized by 32BJ Union could impact SL Green Realty, indicating a labor dispute.",
+          "Headline reports a strike by Dufry Hudson Group concession workers at Ontario Airport, indicating a labor dispute.",
+          "Google content writers at Accenture voted to join a union, indicating a labor dispute."
+        ],
+        "severity": 0.5,
+        "label_rationale": "Labor disputes and strikes are concrete but common events."
+      },
+      "2": {
+        "size": 8,
+        "top_terms": [
+          "board",
+          "female",
+          "directors",
+          "board composition",
+          "composition",
+          "states",
+          "statement",
+          "lists"
+        ],
+        "factors": {
+          "female_board_pct": 8
+        },
+        "polarity_mix": {
+          "1": 1,
+          "0": 7
+        },
+        "representatives": [
+          "The board composition text lists three non-employee directors, two of whom are female (Mses. Kilgore and Mather), indicating 66.7% female board representation.",
+          "The company's board composition disclosure states a target of at least 30% female directors and reports FMH at 36.4%.",
+          "Board composition lists two female directors, but no percentage is provided.",
+          "The board composition signal states that 2 out of 9 directors are female, which is 22%."
+        ],
+        "severity": 0.25,
+        "label_rationale": "Board composition disclosures are routine and often boilerplate."
+      }
+    }
+  },
+  "G": {
+    "k": 3,
+    "silhouette": 0.068,
+    "n_claims": 349,
+    "clusters": {
+      "0": {
+        "size": 37,
+        "top_terms": [
+          "lawsuit",
+          "filed",
+          "securities",
+          "million",
+          "class",
+          "class action",
+          "action",
+          "fraud"
+        ],
+        "factors": {
+          "litigation": 26,
+          "regulatory_fines": 6,
+          "governance_controversy": 5
+        },
+        "polarity_mix": {
+          "-1": 36,
+          "0": 1
+        },
+        "representatives": [
+          "Securities fraud class action lawsuit filed against company and CEO for the period June 2025 to January 2026.",
+          "The 10-K Item 3 describes a putative securities class action lawsuit filed against the company and certain officers.",
+          "SEC 10-K Item 3 discloses a securities class action lawsuit filed against Sage and two officers.",
+          "SC Johnson not shielded from FMLA lawsuit by administrator."
+        ],
+        "severity": 0.75,
+        "label_rationale": "Securities class action lawsuits with regulatory involvement indicate material legal risk."
+      },
+      "1": {
+        "size": 223,
+        "top_terms": [
+          "compliance",
+          "states",
+          "independent",
+          "board",
+          "certification",
+          "signal",
+          "anti",
+          "certified"
+        ],
+        "factors": {
+          "compliance_certification": 71,
+          "board_independence_pct": 59,
+          "anti_corruption_policy": 30,
+          "litigation": 28,
+          "governance_controversy": 16
+        },
+        "polarity_mix": {
+          "0": 43,
+          "1": 142,
+          "-1": 38
+        },
+        "representatives": [
+          "The signal states ST Consultores Inmobiliarios, S.L. is a Certified B Corporation and regulated by RICS, indicating a compliance certification.",
+          "The signal explicitly states Sarona Asset Management Inc is a Certified B Corporation, which is a compliance certification.",
+          "Signal states Omnibrand Limited is a Certified B Corporation, indicating a compliance certification.",
+          "The signal explicitly states LIQID Investments GmbH is a Certified B Corporation, indicating a compliance certification."
+        ],
+        "severity": 0.25,
+        "label_rationale": "Certification mentions are routine compliance disclosures without material impact."
+      },
+      "2": {
+        "size": 89,
+        "top_terms": [
+          "report",
+          "sustainability",
+          "sustainability report",
+          "esg",
+          "published",
+          "esg report",
+          "2025",
+          "signal"
+        ],
+        "factors": {
+          "esg_report_published": 86,
+          "third_party_esg_audit": 2,
+          "compliance_certification": 1
+        },
+        "polarity_mix": {
+          "1": 87,
+          "0": 1,
+          "-1": 1
+        },
+        "representatives": [
+          "The sustainability report signal includes a 'Sustainability Profile' for the company, indicating an ESG report is published.",
+          "The sustainability report signal explicitly mentions a Disclosure Report 2025, indicating an ESG report has been published.",
+          "The signal is titled 'Sustainability Report' and describes the company's sustainability practices, indicating that an ESG report has been published.",
+          "The sustainability report signal includes a reference to 'Rapport d'Impact 2025' published by Schmidt Groupe, indicating an ESG report has been published."
+        ],
+        "severity": 0.25,
+        "label_rationale": "Publishing an ESG report is a standard disclosure practice with weak impact."
+      }
+    }
+  }
+}

@@ -39,6 +39,67 @@ from agentic_estimation.shared.pipeline_logger import get_logger
 
 log = get_logger("evidence_filters")
 
+# ── Entity gate ──────────────────────────────────────────────────────────────
+# Legal-form suffixes and filler that carry no identifying power. "Ltd" appearing
+# in a snippet says nothing about whether that snippet is about THIS company, so
+# matching on it would pass essentially every corporate page.
+_ENTITY_STOPWORDS = frozenset((
+    "the", "and", "for", "of", "a", "an",
+    "inc", "inc.", "ltd", "ltd.", "llc", "l.l.c", "plc", "co", "co.", "corp",
+    "corp.", "corporation", "company", "group", "holdings", "holding",
+    "limited", "international", "global", "worldwide", "enterprises",
+    "sa", "s.a", "ag", "gmbh", "bv", "b.v", "nv", "n.v", "as", "ab", "oy",
+    "spa", "s.p.a", "srl", "s.r.l", "sas", "sarl", "pty", "pte", "kk",
+    "services", "solutions", "systems", "technologies", "technology",
+))
+
+# Ground-truth leakage. Our accuracy answer-key (bcorp / upright) is published
+# on the open web, so a plain company search can return the very score the
+# pipeline is trying to predict. Any snippet carrying these phrases would feed
+# the target back in as an input feature -- inflating tune-set accuracy while
+# teaching the model nothing that generalizes. Dropped before extraction.
+_LEAKAGE_MARKERS = (
+    "b impact assessment",
+    "median score for ordinary businesses",
+    "overall score of",
+    "certified b corporation",
+    "certified since",
+    "b corp score",
+    "upright net impact",
+    "net impact ratio",
+)
+
+
+def _company_tokens(company: str) -> list[str]:
+    """Identifying tokens from a company name: alphanumeric, >2 chars, not a
+    legal-form suffix. "Sales: Untangled(TM)" -> ["sales", "untangled"]."""
+    words = re.sub(r"[^a-z0-9 ]+", " ", (company or "").lower()).split()
+    return [w for w in words if len(w) > 2 and w not in _ENTITY_STOPWORDS]
+
+
+def mentions_company(text: str, company: str, url: str = "") -> bool:
+    """True if `text` or `url` plausibly refers to `company`.
+
+    A hit on ANY identifying token is deliberate: search snippets truncate
+    names ("Isigny Sainte-Mere" -> "Isigny"), and requiring the full name
+    would drop legitimate evidence. The URL counts because a company's own
+    domain often omits the name from the visible snippet.
+
+    Companies whose name is entirely legal-form/filler yield no tokens; those
+    return True (fail open) rather than dropping every result for them.
+    """
+    toks = _company_tokens(company)
+    if not toks:
+        return True
+    haystack = f"{text} {url}".lower()
+    return any(t in haystack for t in toks)
+
+
+def has_ground_truth_leakage(text: str) -> bool:
+    """True if the text contains a benchmark score we are trying to predict."""
+    low = (text or "").lower()
+    return any(m in low for m in _LEAKAGE_MARKERS)
+
 # Same breadth as signal_agent._GOOGLE_RSS_KEYWORDS / news_api query, flattened
 # to bare words/phrases for compiled word-boundary matching (no OR/quote syntax).
 _ESG_RELEVANCE_TERMS = (
@@ -93,6 +154,52 @@ def matches_esg_keywords(text: str, extra_terms: tuple = ()) -> bool:
     terms = _ESG_RELEVANCE_TERMS + tuple(extra_terms)
     patterns = _compiled_patterns(terms)
     return any(p.search(text) for p in patterns)
+
+
+def filter_search_results(
+    results: list[dict],
+    company: str,
+    prefix: str = "",
+    require_entity: bool = True,
+) -> list[dict]:
+    """Gate a list of raw search results (each {"body", "href"}) individually,
+    BEFORE they are joined into one signal blob.
+
+    This is the fix for the dominant evidence-quality failure: joining first
+    meant one irrelevant result (a different company's proxy statement, or
+    generic "what is an anti-bribery policy" filler returned when a site:
+    query found nothing) became indistinguishable from real evidence inside
+    a single string. Scoring each result on its own lets the bad ones be
+    dropped while the good ones survive.
+
+    Returns the kept results, in order. An empty list means the search found
+    nothing about this company -- callers MUST treat that as "no signal"
+    rather than falling back to the unfiltered text, or the filter is moot.
+    """
+    kept: list[dict] = []
+    dropped_entity = 0
+    dropped_leak = 0
+
+    for r in results:
+        body = (r.get("body") or "").strip()
+        if not body:
+            continue
+        url = r.get("href") or ""
+
+        if has_ground_truth_leakage(body):
+            dropped_leak += 1
+            continue
+        if require_entity and not mentions_company(body, company, url):
+            dropped_entity += 1
+            continue
+        kept.append(r)
+
+    if dropped_entity or dropped_leak:
+        log.info(
+            "filter_search_results [%s/%s]: kept %d/%d (dropped %d off-entity, %d leakage)",
+            prefix or "?", company, len(kept), len(results), dropped_entity, dropped_leak,
+        )
+    return kept
 
 
 def _normalize_title(title: str) -> str:

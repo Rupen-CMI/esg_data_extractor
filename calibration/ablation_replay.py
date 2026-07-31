@@ -25,6 +25,11 @@ Usage:
     # 1. dump (expensive, ~4 LLM calls/company, no DB writes):
     python -m calibration.ablation_replay dump --seed 777 --n 100 --out calibration/abl_seed777_n100.json
 
+    # 1b. or a large stratified corpus (PHASE_5_PLAN.md §0) -- even thirds
+    #     well_known/medium/obscure per truth source, checkpointed/resumable:
+    python -m calibration.ablation_replay dump-stratified --seed 4001 --n-bcorp 350 --n-upright 150 \\
+        --out calibration/abl_seed4001_tune500.json --skip-newsapi
+
     # 2. replay the variant matrix (free, offline, seconds):
     python -m calibration.ablation_replay run --dump calibration/abl_seed777_n100.json --variants all
 """
@@ -268,6 +273,285 @@ def dump(seed: int, n: int, out_path: Path, workers: int = 6) -> None:
     _p(f"wrote {len(records)} records -> {out_path}")
 
 
+# ── Stratified corpus sampling (PHASE_5_PLAN.md §0) ───────────────────────
+#
+# Visibility tiers exist because the pipeline's error profile differs
+# sharply between famous, web-visible companies (rich evidence, formula and
+# holistic both have something to work with) and obscure SMEs (thin/no
+# evidence, most of the score comes from country baseline + peer anchor).
+# Averaging across an unstratified random sample hides that split; even
+# thirds per tier gives every stratum equal statistical power, matching the
+# per-tier "evidence-conditional routing" analysis the Phase 5 plan calls for.
+#
+# bcorp uses its own `size` employee-bucket column as the visibility proxy;
+# upright uses `revenue_usd`. The two truth sources are tiered SEPARATELY
+# (never blended) so bcorp-truth and upright-truth conclusions stay reportable
+# on their own, per the standing house rule (EVALUATION_STRATEGIES.md).
+
+_BCORP_WELLKNOWN_SIZES = {"1000+", "250-999"}     # oversampled toward here for G coverage
+_BCORP_OBSCURE_SIZES = {"0", "1-9"}
+# everything else ("10-49", "50-249") is "medium"
+
+
+def _load_bcorp_pool(seed: int) -> list:
+    """All bcorp rows with usable ground truth (E/S/G/total + size), shuffled
+    once by `seed` -- the same fresh-seed discipline as load_bcorp_truth, just
+    keeping `size` alongside so the caller can stratify instead of taking a
+    flat head-of-list sample."""
+    from agentic_estimation.calibration_harness import _db_conn, TruthRecord
+
+    conn = _db_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT company_name, country, industry, size,
+               overall_score, impact_area_environment, impact_area_governance,
+               impact_area_workers, impact_area_community, impact_area_customers
+        FROM bcorp_lookup
+        WHERE overall_score IS NOT NULL
+          AND company_name IS NOT NULL
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    rng = random.Random(seed)
+    rng.shuffle(rows)
+
+    out = []
+    for (name, country, industry, size, overall, env, gov, workers, community, customers) in rows:
+        social_parts = [v for v in (workers, community, customers) if v is not None]
+        social = sum(social_parts) / len(social_parts) if social_parts else None
+        truth = TruthRecord(name=name, country=country, industry=industry,
+                             truth_e=env, truth_s=social, truth_g=gov, truth_total=overall)
+        out.append((truth, size or ""))
+    return out
+
+
+def _bcorp_tier(size: str) -> str:
+    if size in _BCORP_WELLKNOWN_SIZES:
+        return "well_known"
+    if size in _BCORP_OBSCURE_SIZES:
+        return "obscure"
+    return "medium"
+
+
+def _load_upright_pool(seed: int) -> list:
+    """All upright rows with usable ground truth, shuffled once by `seed`,
+    keeping revenue_usd alongside for tiering (mirrors load_upright_truth's
+    query but returns the full pool instead of head-biased n rows)."""
+    from agentic_estimation.calibration_harness import _db_conn, TruthRecord
+
+    conn = _db_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT name, country, industry, revenue_usd, net_impact_ratio_percentile,
+               e1_ghg_positive, e2_non_ghg_positive, e3_scarce_resources_positive,
+               e4_biodiversity_positive, e5_waste_positive,
+               e1_ghg_negative, e2_non_ghg_negative, e3_scarce_resources_negative,
+               e4_biodiversity_negative, e5_waste_negative,
+               h1_physical_diseases_positive, h2_mental_diseases_positive,
+               h3_nutrition_positive, h4_relationships_positive, h5_meaning_joy_positive,
+               s1_jobs_positive, s3_societal_infra_positive, s4_societal_stability_positive,
+               s5_equality_positive,
+               h1_physical_diseases_negative, h2_mental_diseases_negative,
+               h4_relationships_negative, h5_meaning_joy_negative,
+               s4_societal_stability_negative, s5_equality_negative
+        FROM upright_lookup
+        WHERE net_impact_ratio_percentile IS NOT NULL
+          AND name IS NOT NULL
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    rng = random.Random(seed)
+    rng.shuffle(rows)
+
+    def _net(pos_vals, neg_vals):
+        if not any(v is not None for v in pos_vals + neg_vals):
+            return None
+        return sum(v for v in pos_vals if v is not None) - sum(v for v in neg_vals if v is not None)
+
+    revenues = [r[3] for r in rows if r[3] is not None]
+    revenues.sort()
+
+    def _pctile_rank(v):
+        if v is None or not revenues:
+            return 0.0
+        import bisect
+        return bisect.bisect_left(revenues, v) / len(revenues)
+
+    out = []
+    for r in rows:
+        (name, country, industry, rev, pctile,
+         e1p, e2p, e3p, e4p, e5p, e1n, e2n, e3n, e4n, e5n,
+         h1p, h2p, h3p, h4p, h5p, s1p, s3p, s4p, s5p,
+         h1n, h2n, h4n, h5n, s4n, s5n) = r
+        e_net = _net([e1p, e2p, e3p, e4p, e5p], [e1n, e2n, e3n, e4n, e5n])
+        s_net = _net([h1p, h2p, h3p, h4p, h5p, s1p, s3p, s4p, s5p],
+                     [h1n, h2n, h4n, h5n, s4n, s5n])
+        from agentic_estimation.calibration_harness import TruthRecord
+        truth = TruthRecord(name=name, country=country, industry=industry,
+                             truth_e=e_net, truth_s=s_net, truth_g=None, truth_total=pctile)
+        out.append((truth, _pctile_rank(rev)))
+    return out
+
+
+def _upright_tier(rev_pctile: float) -> str:
+    if rev_pctile >= 2.0 / 3.0:
+        return "well_known"
+    if rev_pctile < 1.0 / 3.0:
+        return "obscure"
+    return "medium"
+
+
+def _stratified_sample(pool: list, tier_fn, n: int) -> list:
+    """Split `pool` (list of (truth, tier_key)) into 3 tiers via `tier_fn`,
+    draw as close to n/3 from each as available (pool is pre-shuffled by the
+    loader, so within-tier order is already randomized -- this just slices).
+    A tier short of its quota donates the shortfall to the other two tiers
+    (round-robin) rather than silently returning < n."""
+    tiers = {"well_known": [], "medium": [], "obscure": []}
+    for truth, key in pool:
+        tiers[tier_fn(key)].append(truth)
+
+    per_tier = n // 3
+    quotas = {"well_known": per_tier, "medium": per_tier, "obscure": n - 2 * per_tier}
+
+    picked: list = []
+    shortfall = 0
+    for tier_name, quota in quotas.items():
+        available = tiers[tier_name]
+        take = min(quota, len(available))
+        picked.extend(available[:take])
+        shortfall += quota - take
+        tiers[tier_name] = available[take:]  # remainder, for shortfall backfill
+
+    if shortfall > 0:
+        remainder = tiers["well_known"] + tiers["medium"] + tiers["obscure"]
+        picked.extend(remainder[:shortfall])
+        if len(remainder) < shortfall:
+            _p(f"WARNING: stratified sample short by {shortfall - len(remainder)} "
+               f"(pool exhausted across all tiers)")
+
+    return picked
+
+
+def build_stratified_corpus(seed: int, n_bcorp: int, n_upright: int) -> list:
+    """The Phase 5 corpus sampler: even thirds (well_known/medium/obscure) per
+    truth source, bcorp's well_known tier drawn from its largest size buckets
+    first (1000+ before 250-999) so G-pillar decisions -- G only exists in
+    bcorp truth -- aren't made purely on tiny SMEs (user decision: oversample
+    large B Corps into the well-known tier)."""
+    bcorp_pool = _load_bcorp_pool(seed)
+    # within well_known, prefer 1000+ over 250-999 (already grouped by
+    # _bcorp_tier; re-sort well_known rows so 1000+ rows sort first)
+    bcorp_pool.sort(key=lambda t: 0 if t[1] == "1000+" else 1)
+    bcorp_sample = _stratified_sample(bcorp_pool, _bcorp_tier, n_bcorp)
+
+    upright_pool = _load_upright_pool(seed)
+    upright_sample = _stratified_sample(upright_pool, _upright_tier, n_upright)
+
+    _p(f"stratified corpus: {len(bcorp_sample)} bcorp + {len(upright_sample)} upright "
+       f"= {len(bcorp_sample) + len(upright_sample)} companies (seed={seed})")
+    return bcorp_sample + upright_sample
+
+
+# ── Checkpointed dump (survives a crash/kill mid-gather) ──────────────────
+#
+# A single-shot dump (see `dump()` above) holds every record in memory and
+# writes once at the end -- exactly the failure mode that lost a completed
+# 40-company gather to a Windows console encoding crash on the LAST company
+# (see _p's docstring). At 650 companies and ~5h wall-clock, a checkpointed
+# JSONL append -- one line per completed company, flushed immediately -- means
+# a crash/kill/network blip loses at most the one in-flight company, and a
+# re-invocation with the same --out path skips everything already done.
+
+def _checkpoint_path(out_path: Path) -> Path:
+    return out_path.with_suffix(out_path.suffix + ".checkpoint.jsonl")
+
+
+def _load_checkpoint(ckpt_path: Path) -> dict:
+    """Returns {company_name: record}. Corrupt/partial trailing lines (from a
+    kill mid-write) are skipped, not fatal -- the company just gets re-dumped."""
+    if not ckpt_path.exists():
+        return {}
+    done: dict = {}
+    for line in ckpt_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        done[rec["name"]] = rec
+    return done
+
+
+def dump_stratified(seed: int, n_bcorp: int, n_upright: int, out_path: Path,
+                     workers: int = 6, skip_newsapi: bool = False) -> None:
+    """Checkpointed stratified corpus dump (PHASE_5_PLAN.md §0). Resumable:
+    re-running with the same --out skips companies already recorded in the
+    .checkpoint.jsonl sidecar. Writes the final consolidated JSON array only
+    once ALL companies are done (matching dump()'s output format so `run`
+    doesn't need to know which dump command produced a file); the checkpoint
+    file is the crash-safe intermediate, kept after a successful run so a
+    user can inspect it or add more companies later without re-gathering.
+
+    skip_newsapi: unsets NEWS_API_KEY for this process only (restored after),
+    so this one gather skips NewsAPI without touching the production default
+    (per user: NewsAPI stays on for the real pipeline, "the more the merrier" --
+    it's only this corpus that's skipping it as a deliberate one-off)."""
+    import concurrent.futures
+    import os
+    from agentic_estimation import calibration_harness as ch
+    from agentic_estimation.layer_3.formula_estimator import _registry_weight_sum
+
+    ch._USE_SATURATION = False
+    reg_wsum = {p: _registry_weight_sum(p) for p in ("E", "S", "G")}
+
+    truths = build_stratified_corpus(seed, n_bcorp, n_upright)
+
+    ckpt_path = _checkpoint_path(out_path)
+    done = _load_checkpoint(ckpt_path)
+    remaining = [t for t in truths if t.name not in done]
+    _p(f"{len(done)} already dumped (resuming from {ckpt_path.name}), "
+       f"{len(remaining)} remaining (workers={workers})")
+
+    old_key = os.environ.pop("NEWS_API_KEY", None) if skip_newsapi else None
+    try:
+        if skip_newsapi:
+            _p("NEWS_API_KEY unset for this gather (--skip-newsapi)")
+        ckpt_file = ckpt_path.open("a", encoding="utf-8")
+        try:
+            completed = 0
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_dump_one, t, reg_wsum): t for t in remaining}
+                for fut in concurrent.futures.as_completed(futures):
+                    rec = fut.result()
+                    if rec is not None:
+                        ckpt_file.write(json.dumps(rec) + "\n")
+                        ckpt_file.flush()
+                        os.fsync(ckpt_file.fileno())
+                        done[rec["name"]] = rec
+                    completed += 1
+                    _p(f"  progress: {completed}/{len(remaining)} this run "
+                       f"({len(done)}/{len(truths)} total)")
+        finally:
+            ckpt_file.close()
+    finally:
+        if skip_newsapi and old_key is not None:
+            os.environ["NEWS_API_KEY"] = old_key
+
+    records = [done[t.name] for t in truths if t.name in done]
+    out_path.write_text(json.dumps(records, indent=2), encoding="utf-8")
+    _p(f"wrote {len(records)} records -> {out_path} "
+       f"({len(truths) - len(records)} failed/missing)")
+
+
 # ── REPLAY: contributions-level rescore (v1-dump compatible) ─────────────
 
 def _contribs_from_dicts(dicts: list):
@@ -326,6 +610,14 @@ def _rescore_claims_level(rec: dict, pillar: str, *, skip_tier0: bool, freeze_fr
 
     if not skip_tier0:
         claims, _flags = validate_claims(claims, signals=signals, country=country)
+    else:
+        # "no_tier0" means only the 5 lexical/numeric/polarity/corroboration/
+        # known-failure-shape rules are skipped -- NOT cluster severity, which
+        # is a separate, later-added step that happens to live inside the same
+        # function. Run it directly so this variant's name still matches what
+        # it measures (see validate_claims' apply_cluster_severity docstring).
+        from agentic_estimation.layer_2.evidence_clusters import apply_cluster_severity
+        apply_cluster_severity(claims)  # adjusts claim objects in place
 
     ctx = _freshness_frozen() if freeze_freshness else _null_ctx()
     with ctx:
@@ -550,6 +842,17 @@ def _cli() -> None:
         ap.add_argument("--workers", type=int, default=6)
         args = ap.parse_args(sys.argv[2:])
         dump(args.seed, args.n, Path(args.out), workers=args.workers)
+    elif cmd == "dump-stratified":
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--seed", type=int, required=True)
+        ap.add_argument("--n-bcorp", type=int, required=True)
+        ap.add_argument("--n-upright", type=int, required=True)
+        ap.add_argument("--out", required=True)
+        ap.add_argument("--workers", type=int, default=6)
+        ap.add_argument("--skip-newsapi", action="store_true")
+        args = ap.parse_args(sys.argv[2:])
+        dump_stratified(args.seed, args.n_bcorp, args.n_upright, Path(args.out),
+                         workers=args.workers, skip_newsapi=args.skip_newsapi)
     elif cmd == "run":
         ap = argparse.ArgumentParser()
         ap.add_argument("--dump", required=True)

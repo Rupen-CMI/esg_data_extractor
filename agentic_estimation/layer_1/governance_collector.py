@@ -72,7 +72,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
 from agentic_estimation.layer_1.signal_agent import _ddg_fallback
-from agentic_estimation.layer_1.sec_filings import resolve_cik, search_def14a_keyword, fetch_10k_section
+from agentic_estimation.layer_1.sec_filings import (
+    resolve_cik, search_def14a_keyword, fetch_10k_section, filing_url)
 
 log = get_logger("governance_collector")
 
@@ -96,7 +97,9 @@ def _board_composition_sec_signal(company: str) -> str:
         log.info("[%s] gov_board_sec -> no independent-director text found in DEF 14A", company)
         return ""
     log.info("[%s] gov_board_sec -> hit (%d chars)", company, len(body))
-    return f"SEC DEF 14A Proxy Statement (board/independence): {body[:1200]}"
+    src = filing_url(cik, "DEF 14A", is_cik=True)
+    return (f"SEC DEF 14A Proxy Statement (board/independence): {body[:1200]}"
+            + (f" <{src}>" if src else ""))
 
 
 def _litigation_sec_signal(company: str) -> str:
@@ -127,7 +130,9 @@ def _litigation_sec_signal(company: str) -> str:
         log.info("[%s] gov_litigation_sec -> no Legal Proceedings section extracted", company)
         return ""
     log.info("[%s] gov_litigation_sec -> hit (%d chars)", company, len(body))
-    return f"SEC 10-K Item 3 Legal Proceedings: {body[:1200]}"
+    src = filing_url(cik, "10-K", is_cik=True)
+    return (f"SEC 10-K Item 3 Legal Proceedings: {body[:1200]}"
+            + (f" <{src}>" if src else ""))
 
 
 def _board_count_wikidata_signal(company: str) -> str:
@@ -165,6 +170,7 @@ def _board_composition_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" proxy statement independent directors board composition audit committee 2023 2024 2025',
         prefix="Board Composition", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] gov_board -> %s", company, "hit" if result else "no result")
     return result
@@ -176,6 +182,7 @@ def _regulatory_fines_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" regulatory fine penalty violation settlement enforcement 2023 2024 2025 -site:wikipedia.org',
         prefix="Regulatory Fines/Violations", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] gov_fines -> %s", company, "hit" if result else "no result")
     return result
@@ -187,6 +194,7 @@ def _compliance_certs_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" anti-corruption policy ISO 37001 compliance certification whistleblower ethics',
         prefix="Compliance Certifications", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] gov_compliance -> %s", company, "hit" if result else "no result")
     return result
@@ -198,6 +206,7 @@ def _litigation_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" lawsuit litigation legal dispute securities fraud shareholder 2023 2024 2025 -site:wikipedia.org',
         prefix="Litigation Records", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] gov_litigation -> %s", company, "hit" if result else "no result")
     return result

@@ -32,3 +32,4 @@ calibration/cache/
 # not needed for pipeline
 demo_ui/
 frontend/
+calibration/

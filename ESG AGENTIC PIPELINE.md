@@ -52,6 +52,130 @@ diagram (§2.1) because LangGraph never sees it as separate nodes/edges.
 
 ## 2. Pipeline diagrams
 
+### 2.0 Combined end-to-end diagram (§2.1–§2.4 merged)
+
+The full production ensemble path — one company, request to persisted score —
+with the substance of each stage kept: what evidence goes in, what each formula
+actually computes, and every decision that can change the output. Left out
+deliberately: mechanical iteration that never changes a result (per-source HTTP
+retries, rate-limit gaps, per-claim/per-factor/per-pillar loop back-edges).
+Those live in §2.1a–§2.3.
+
+Purple = LLM call · blue = DB write · yellow = deterministic math ·
+diamond = a branch that changes the output.
+
+```mermaid
+---
+config:
+  flowchart:
+    htmlLabels: true
+    wrappingWidth: 500
+    padding: 12
+    nodeSpacing: 45
+    rankSpacing: 55
+---
+flowchart TD
+    START(["POST /esg/market-esg → background task<br/>→ run_company_graph(scorer='ensemble')"]) --> MP
+
+    subgraph P1["① COLLECT — free public evidence (Layer 1)"]
+        direction TB
+        MP["mark_processing · status → processing"]
+        NEWS["<b>news + web signals</b> — ~17 sources, parallel<br/>NewsAPI · Google News RSS · DuckDuckGo · Wikipedia<br/>site-restricted BHRRC / SBTi / CDP / GRI<br/>19-market native-language locales<br/>→ fingerprint dedup + ESG relevance gate"]
+        GOV["<b>governance evidence</b><br/>SEC DEF 14A independent directors<br/>10-K Item 3 legal proceedings<br/>Wikidata board count · DDG fallback"]
+        FAC["<b>facility evidence</b><br/>SEC 10-K Item 2 Properties<br/>+ DDG fallback"]
+        META["<b>company metadata</b> — employees / revenue / industry / country<br/>Wikidata → GLEIF → OpenStreetMap → name inference<br/>static FX table to USD; unknown currency → null, never guessed"]
+        MP --> NEWS & GOV & FAC --> META
+    end
+
+    subgraph P2["② EXTRACT — text becomes typed claims (Layer 2)"]
+        direction TB
+        TAG["<b>LLM evidence tagger</b> — 1 call per pillar (E/S/G, concurrent)<br/>emits ExtractedClaim(factor, polarity, strength,<br/>confidence, source_tag) against the<br/><b>closed 28-factor registry</b> — never a 0–100 score<br/>dropped: unknown factor · cross-pillar mismatch · hallucinated source"]
+        CT["<b>Climate TRACE anchors</b> — deterministic, no LLM<br/>owner-name exact match → real facility emissions (conf 0.85)<br/>country×sector emissions percentile (conf 0.25)"]
+        VAL["<b>Tier-0 validators</b> — pure code, drop or cap only, never fabricate<br/>(a) irrelevant cited text → <b>drop</b><br/>(b) impossible number → null / cap 0.3<br/>(c) backwards polarity → ×0.5<br/>(d) single-source on heavy factor → ×0.7<br/>(e) high confidence on thin text → cap 0.5"]
+        TAG --> VAL
+        CT --> VAL
+    end
+
+    META --> TAG
+    META --> CT
+
+    subgraph P3["③ SCORE — the deterministic formula is the primary scorer (Layer 3)"]
+        direction TB
+        BASE["<b>country baseline</b> — World Bank ESG dataset<br/>34 E / 23 S / 17 G indicators<br/>min-max normalized, unweighted mean<br/>no country match → 50.0"]
+        FACTORS["<b>per-factor contribution</b> — one best claim per factor<br/>rank: dataset_lookup › extracted › peer_ratio › coarse_bucket<br/>benchmark: δ = 2·clamp((v−v0)/(v100−v0)) − 1<br/>event: δ = polarity × strength, recency-decayed (floor 0.5)<br/><b>points = weight × confidence × δ</b>"]
+        PEER["<b>peer anchor</b> — real comparable companies, no LLM<br/>bcorp 10.3k / upright 10.1k rows, sector+country crosswalk<br/>8 ordered tiers, each with a sample floor; else <b>abstain</b><br/>percentile → pseudo-contribution, weight 10, confidence ≤ 0.5"]
+        SAT["<b>v5 saturation</b> — bounded, never linear-sums to extremes<br/><b>gate:</b> evidence mass M = Σ w·c′ under 2.5 → claims dropped as thin<br/><b>swing:</b> Δ = Σ(w·c′·δ) / Σw, clamped to [−1, +1]<br/><b>coverage:</b> mult = 0.6 + 0.4 · (Σw active / registry sum)<br/><b>score = baseline + A·tanh(Δ)·mult</b>  (A = 40, S-pillar 35)"]
+        BASE --> FACTORS --> PEER --> SAT
+    end
+
+    VAL -- "surviving claims" --> BASE
+
+    subgraph P4["④ BLEND — formula plus one capped LLM vote (Layer 3)"]
+        direction TB
+        HOL["<b>holistic LLM vote</b> — free-form E/S/G read of the same evidence<br/><i>the noisiest input</i> — weight permanently capped, never adaptive<br/>failure → returns None, formula stands alone"]
+        REC["<b>reconcile</b> — base split <b>0.7 formula / 0.3 holistic</b><br/>weighted by self-confidence:<br/>c_f = min(1, 0.4 + 0.04·M_trust) · c_h = 0.5 fixed<br/>thin evidence lifts holistic to ~35% but <b>never to parity</b><br/><b>range:</b> spread = |formula − holistic| → low/high band<br/><b>label:</b> high (spread ≤ 10) · medium · low (1 vote or spread over 25)"]
+        HOL --> REC
+    end
+
+    SAT --> HOL
+
+    subgraph P5["⑤ VERIFY — adversarial critics, per pillar (Layer 4) · bounded: 1 retry, 2 rounds"]
+        direction TB
+        ELIG{"eligible?<br/>point mode AND<br/>confidence = medium"}
+        PANEL["<b>critic panel</b> — 3 independent LLM lenses<br/>A: does the cited text actually assert this?<br/>B: is the number plausible vs baseline / peers?<br/>C: do formula and holistic narratives contradict?<br/><i>fewer than 2 responders → fail open</i>"]
+        REFUTE{"≥2 of 3 refute?"}
+        CONV{"do ≥2 name the <b>same</b> factor,<br/>and is it re-extractable?"}
+        RETRY["<b>bounded retry</b> — re-extract only that factor<br/>→ re-score → re-reconcile → panel round 2<br/>second refute is final, no third attempt"]
+        VERD["<b>pillar verdict</b><br/>skipped / passed / passed_after_retry → <b>point score</b><br/>refuted → <b>range + needs_review</b>, confidence forced low"]
+        ELIG -- "no — range mode,<br/>or high/low confidence" --> VERD
+        ELIG -- yes --> PANEL --> REFUTE
+        REFUTE -- "no → passed" --> VERD
+        REFUTE -- yes --> CONV
+        CONV -- "no → refuted" --> VERD
+        CONV -- yes --> RETRY --> VERD
+    end
+
+    REC --> ELIG
+
+    subgraph P6["⑥ PERSIST (Layer 4 + orchestration)"]
+        direction TB
+        PERSIST["<b>persist_ensemble_scores</b> → company_metric_values<br/>source agentic_ensemble_v1, outranks older agentic sources<br/>display: low-high/100 when needs_review, else score/100"]
+        METRICS["metrics_persist — CORE_METRICS gap-fill"]
+        EXPLAIN["<b>explainability</b> — plain-English summary paragraph"]
+        MARK["mark_estimated · status → estimated (sole writer)"]
+        PERSIST --> METRICS --> EXPLAIN --> MARK
+    end
+
+    VERD --> PERSIST
+    MARK --> DONE(["frontend polls /esg/estimation-status → ready"])
+
+    classDef llm fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#2e1065
+    classDef db fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+    classDef math fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#422006
+    classDef gate fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#4c0519
+    class TAG,HOL,PANEL,RETRY,EXPLAIN llm
+    class MP,PERSIST,METRICS,MARK db
+    class CT,VAL,BASE,FACTORS,PEER,SAT,REC math
+    class ELIG,REFUTE,CONV gate
+```
+
+**Three things the diagram is asserting**, worth stating in words:
+
+1. **The LLM never emits the final score.** It appears exactly three times —
+   tagging evidence into a closed factor set (②), one capped vote (④), and
+   adversarial critique (⑤). Everything that determines the number is
+   deterministic math in yellow.
+2. **Every stage can degrade honestly rather than fabricate.** No country
+   match → 50.0; no peer sample → abstain; thin evidence → the gate drops the
+   claims and coverage shrinks the swing; holistic failure → formula alone;
+   refuted pillar → a range instead of a point.
+3. **The only revise-and-recheck loop is in ⑤**, and it is hard-bounded at one
+   retry / two panel rounds — everything else is a single forward pass.
+
+Not drawn: the `dry_run` and `scorer=formula` routing variants (table after
+§2.1) and the legacy `scorer=llm` path (§2.4). §2.1a–§2.3 remain the
+authoritative per-node views with every internal loop.
+
 ### 2.1 Full orchestration graph (`agentic_estimation/graph.py`)
 
 One compiled LangGraph serves three scorer paths (`llm` legacy, `formula`

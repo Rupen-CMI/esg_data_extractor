@@ -27,7 +27,7 @@ import sys
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
 from agentic_estimation.layer_1.signal_agent import _ddg_fallback
-from agentic_estimation.layer_1.sec_filings import resolve_cik, fetch_10k_section
+from agentic_estimation.layer_1.sec_filings import resolve_cik, fetch_10k_section, filing_url
 
 log = get_logger("facility_extractor")
 
@@ -49,7 +49,8 @@ def _sec_10k_properties_signal(company: str) -> str:
         log.info("[%s] sec_10k -> no Properties section extracted", company)
         return ""
     log.info("[%s] sec_10k -> hit (%d chars)", company, len(body))
-    return f"SEC 10-K Item 2 Properties: {body[:1500]}"
+    src = filing_url(cik, "10-K", is_cik=True)
+    return f"SEC 10-K Item 2 Properties: {body[:1500]}" + (f" <{src}>" if src else "")
 
 
 # ── Web search fallback (non-US-listed / private companies) ──────────────────

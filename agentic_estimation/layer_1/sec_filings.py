@@ -75,6 +75,26 @@ def _find_latest_filing(cik: str, form_type: str) -> Optional[tuple[str, str]]:
         return None
 
 
+def filing_url(company_or_cik: str, form_type: str, is_cik: bool = False) -> Optional[str]:
+    """Public EDGAR URL of the most recent `form_type` filing for a company.
+
+    Exists so callers that surface filing text as evidence can cite the exact
+    document it came from. The section-extracting helpers below return plain
+    strings (their callers embed them straight into signal text), so the URL
+    built inside _fetch_filing_text was previously unreachable from outside.
+    Resolves through the same cik lookup + submissions index those helpers use,
+    so the URL refers to the same filing they read.
+    """
+    cik = company_or_cik if is_cik else resolve_cik(company_or_cik)
+    if not cik:
+        return None
+    found = _find_latest_filing(cik, form_type)
+    if not found:
+        return None
+    accession, primary_doc = found
+    return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/{primary_doc}"
+
+
 def _fetch_filing_text(cik: str, accession: str, primary_doc: str) -> Optional[str]:
     """Fetch a filing document and return its plain (tag-stripped) text."""
     doc_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/{primary_doc}"

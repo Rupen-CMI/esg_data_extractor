@@ -59,9 +59,13 @@ def test_pct_over_100_nulled():
     assert kept[0].value is None
 
 
-def test_polarity_flip_confidence_halved():
+def test_polarity_flip_confidence_halved(monkeypatch):
     """Inherently-negative factor claimed with polarity=+1 is suspicious --
-    confidence capped, not dropped (it might be a legitimate edge case)."""
+    confidence capped, not dropped (it might be a legitimate edge case).
+    Cluster-severity assignment (a separate, later step that also rescales
+    confidence) is disabled so this asserts the polarity rule in isolation."""
+    from agentic_estimation.layer_2 import evidence_clusters
+    monkeypatch.setattr(evidence_clusters, "apply_cluster_severity", lambda claims: [])
     claims = [ExtractedClaim(
         factor="environmental_controversy", pillar="E", polarity=1, strength=0.5, confidence=0.8,
         value=None, source_tag="net_zero",
@@ -83,7 +87,12 @@ _LONG_FINE_TEXT = ("The company received a fine and penalty in an SEC settlement
 assert len(_LONG_FINE_TEXT) >= 200
 
 
-def test_single_source_high_weight_negative_capped():
+def test_single_source_high_weight_negative_capped(monkeypatch):
+    """Cluster severity disabled -- isolates the corroboration rule (a
+    separate, later step that also rescales confidence once this claim's text
+    matches a labeled cluster; see test_cluster_severity_* below)."""
+    from agentic_estimation.layer_2 import evidence_clusters
+    monkeypatch.setattr(evidence_clusters, "apply_cluster_severity", lambda claims: [])
     claims = [ExtractedClaim(
         factor="regulatory_fines", pillar="G", polarity=-1, strength=0.9, confidence=0.8,
         value=None, source_tag="controversies",
@@ -96,7 +105,9 @@ def test_single_source_high_weight_negative_capped():
     assert any(f.rule == "corroboration" for f in flags)
 
 
-def test_two_source_negative_not_capped():
+def test_two_source_negative_not_capped(monkeypatch):
+    from agentic_estimation.layer_2 import evidence_clusters
+    monkeypatch.setattr(evidence_clusters, "apply_cluster_severity", lambda claims: [])
     claims = [
         ExtractedClaim(factor="regulatory_fines", pillar="G", polarity=-1, strength=0.9, confidence=0.8,
                        value=None, source_tag="controversies", reasoning="SEC fine penalty settlement", method="extracted"),
@@ -111,7 +122,7 @@ def test_two_source_negative_not_capped():
     assert all(abs(c.confidence - 0.8) < 1e-9 for c in kept)
 
 
-def test_duplicate_claims_same_source_all_capped():
+def test_duplicate_claims_same_source_all_capped(monkeypatch):
     """Regression: a single extraction call can return the same underlying
     fact as several near-duplicate claim objects (LLM rewording), all citing
     the SAME source_tag. Counting claim objects instead of distinct sources
@@ -119,7 +130,10 @@ def test_duplicate_claims_same_source_all_capped():
     (2026-07-27): one google_news_rss article extracted 7x as
     labor_controversy, all sharing one source_tag, none capped, because
     len(negative)=7 short-circuited past the single-source check entirely.
-    Real corroboration requires >=2 DISTINCT sources, not >=2 claim objects."""
+    Real corroboration requires >=2 DISTINCT sources, not >=2 claim objects.
+    Cluster severity disabled -- isolates the corroboration rule."""
+    from agentic_estimation.layer_2 import evidence_clusters
+    monkeypatch.setattr(evidence_clusters, "apply_cluster_severity", lambda claims: [])
     claims = [
         ExtractedClaim(factor="regulatory_fines", pillar="G", polarity=-1, strength=0.9, confidence=0.8,
                        value=None, source_tag="controversies", reasoning="SEC fine penalty settlement enforcement", method="extracted"),
@@ -160,3 +174,24 @@ def test_known_failure_shape_long_text_not_capped():
     kept, flags = validate_claims(claims, signals=signals, country=None)
     assert len(kept) == 1
     assert abs(kept[0].confidence - 0.9) < 1e-9
+
+
+def test_cluster_severity_rescales_boilerplate_strength():
+    """A boilerplate ESG-report claim the extractor over-credited (strength
+    0.8) is pulled down to its cluster's labeled impact magnitude (0.25 --
+    'publishing an ESG report is routine'), with a cluster_severity flag
+    recording the adjustment. Locks the evidence_clusters wiring in
+    validate_claims. Requires the committed cluster artifacts."""
+    claims = [ExtractedClaim(
+        factor="esg_report_published", pillar="G", polarity=1, strength=0.8, confidence=0.9,
+        value=None, source_tag="esg_report",
+        reasoning="The company published its annual sustainability report describing its ESG program.",
+        method="extracted",
+    )]
+    signals = {"esg_report": "The company published its annual sustainability report describing its ESG program."}
+    kept, flags = validate_claims(claims, signals=signals, country=None)
+    assert len(kept) == 1
+    cluster_flags = [f for f in flags if f.rule == "cluster_severity"]
+    assert cluster_flags, "expected the cluster_severity step to match this boilerplate claim"
+    assert kept[0].strength == 0.25
+    assert kept[0].confidence <= 0.9

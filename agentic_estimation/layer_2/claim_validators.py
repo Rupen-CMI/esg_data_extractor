@@ -122,8 +122,8 @@ class ValidationFlag:
     factor: str
     pillar: str
     rule: str          # 'lexical_relevance' | 'numeric_bounds' | 'polarity_consistency'
-                        # | 'corroboration' | 'known_failure_shape'
-    action: str         # 'dropped' | 'capped'
+                        # | 'corroboration' | 'known_failure_shape' | 'cluster_severity'
+    action: str         # 'dropped' | 'capped' | 'adjusted'
     detail: str
 
 
@@ -264,6 +264,7 @@ def validate_claims(
     claims: list[ExtractedClaim],
     signals: Optional[dict] = None,
     country: Optional[str] = None,
+    apply_cluster_severity: bool = True,
 ) -> tuple[list[ExtractedClaim], list[ValidationFlag]]:
     """Pure function, no LLM, no DB writes (the one numeric-bounds check that
     reads climate_trace_country_emissions is read-only). Returns (kept_claims,
@@ -274,6 +275,16 @@ def validate_claims(
     signals: {source_tag: text}, the same dict claims were extracted from.
     None is safe (all signal-dependent rules degrade to no-ops), but passing
     it is how rules (a) and (e) actually catch anything.
+
+    apply_cluster_severity: runs the evidence_clusters.py severity step
+    (see below) after the 5 Tier-0 rules. Defaults True for every real caller.
+    Exposed as a separate flag -- NOT tied to whether Tier-0's own rules ran --
+    so a caller like ablation_replay.py's "no_tier0" variant can disable ONLY
+    the 5 lexical/numeric/polarity/corroboration/known-failure-shape rules
+    while still exercising cluster severity, instead of accidentally turning
+    both off at once because they used to be inseparable (cluster severity
+    was added as a step INSIDE this function, after "no_tier0" already existed
+    as "skip validate_claims() entirely").
     """
     signals = signals or {}
     flags: list[ValidationFlag] = []
@@ -299,5 +310,27 @@ def validate_claims(
         kept.append(claim)
 
     flags.extend(_check_corroboration(kept))
+
+    # Cluster-severity assignment (evidence_clusters.py): replaces the
+    # extractor's guessed per-claim strength with the labeled impact magnitude
+    # of the claim's nearest evidence cluster, and scales confidence by
+    # cluster membership. No-op when artifacts are missing or a claim is
+    # out-of-vocabulary (below MIN_MEMBERSHIP), so this can never make a claim
+    # worse-grounded than the LLM guess it replaces.
+    if apply_cluster_severity:
+        try:
+            from agentic_estimation.layer_2.evidence_clusters import (
+                apply_cluster_severity as _apply_cluster_severity,
+            )
+            for adj in _apply_cluster_severity(kept):
+                flags.append(ValidationFlag(
+                    factor=adj["factor"], pillar=adj["pillar"], rule="cluster_severity",
+                    action="adjusted",
+                    detail=(f"cluster {adj['cluster']} (sim={adj['similarity']}): "
+                            f"strength {adj['strength'][0]} -> {adj['strength'][1]}, "
+                            f"confidence {adj['confidence'][0]} -> {adj['confidence'][1]}"),
+                ))
+        except Exception as exc:  # never let severity assignment break validation
+            log.error("cluster severity step failed (%s) -- claims left unadjusted", exc)
 
     return kept, flags

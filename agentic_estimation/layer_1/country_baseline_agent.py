@@ -17,6 +17,7 @@ Country resolution:
 import logging
 import os
 import re
+import statistics
 import sys
 import threading
 from dataclasses import dataclass
@@ -559,7 +560,48 @@ def resolve_country_name(raw: str) -> Optional[str]:
         if economy and economy in _cache:
             return economy
 
+    # Final stage: full ISO 3166 resolution via country_normalizer, then map
+    # the resulting ISO3 back to this dataset's Economy name. The exact/alias/
+    # ISO3 stages above stay first so behaviour for already-working inputs is
+    # bit-identical; this only catches what previously returned None.
+    #
+    # The hand-written _COUNTRY_ALIASES above cannot cover the space (it had
+    # "great britain" but not "britain", and nothing for "Netherlands The",
+    # ISO2 codes, or "Hong Kong S.A.R."). country_normalizer delegates identity
+    # to pycountry's ISO 3166 database and, critically, REFUSES to resolve
+    # cities/regions/LLM non-answers -- so this cannot turn "Mumbai" into India.
+    iso3 = _normalize_to_iso3(stripped)
+    if iso3:
+        economy = _iso3_to_economy(iso3)
+        if economy and economy in _cache:
+            return economy
+        # Real country, but the World Bank publishes no economy row for it
+        # (Taiwan, Guernsey, Jersey) -- or it has too few indicators to have
+        # been cached. Caller falls back to the global average; logged so the
+        # gap is visible rather than silent.
+        log.debug("resolve_country_name: %r -> ISO3 %s has no WB economy baseline",
+                  raw, iso3)
+
     return None
+
+
+def _normalize_to_iso3(raw: str) -> Optional[str]:
+    """country_normalizer.to_iso3, imported lazily and never fatal.
+
+    Isolated in a helper so a missing pycountry dependency degrades to the
+    previous alias-only behaviour instead of breaking country resolution for
+    the whole pipeline.
+    """
+    try:
+        from agentic_estimation.layer_1.country_normalizer import to_iso3
+    except Exception as e:  # pragma: no cover - dependency-missing path
+        log.warning("country_normalizer unavailable (%s); alias-only resolution", e)
+        return None
+    try:
+        return to_iso3(raw)
+    except Exception as e:
+        log.warning("country_normalizer failed on %r: %s", raw, e)
+        return None
 
 
 # ── Fallback for countries/territories absent from the World Bank dataset ────
@@ -576,7 +618,118 @@ _REGIONAL_FALLBACK: dict[str, str] = {
     "channel islands": "United Kingdom",        # British Crown Dependency (Jersey/Guernsey)
     "sint maarten (dutch part)": "Netherlands",  # constituent country, Kingdom of the Netherlands
     "st. martin (french part)": "France",        # French overseas collectivity
+    # Crown Dependencies the World Bank omits entirely (no Metadata row at
+    # all, unlike the four above). Same constitutional basis as
+    # "channel islands", reached now that country_normalizer resolves the
+    # individual island names and ISO3 codes.
+    "guernsey": "United Kingdom",               # British Crown Dependency
+    "jersey": "United Kingdom",                 # British Crown Dependency
 }
+
+# Territories with a real ISO 3166 identity that the World Bank publishes NO
+# economy for, and where no sovereignty fallback is factually available.
+#
+# Taiwan and Hong Kong are the consequential entries: the World Bank omits
+# Taiwan from its country list entirely, and its Hong Kong economy row is
+# absent from the ESG dataset's Metadata sheet. Between them they cover real
+# manufacturers in the benchmark corpus (Foxconn Technology, Formosa Plastics).
+# Unlike the Crown Dependencies above there is no uncontested administrative
+# parent whose baseline could stand in.
+#
+# Entries WITHOUT a _PEER_BASELINE_SETS entry below fall through to the
+# global-average baseline; they are listed here so the gap is documented and
+# greppable rather than looking like an unhandled normalization failure.
+_NO_WB_BASELINE_ISO3: dict[str, str] = {
+    "TWN": "Taiwan -- absent from the World Bank country list",
+    "HKG": "Hong Kong SAR -- no row in the ESG dataset Metadata sheet",
+    "MAC": "Macao SAR -- no row in the ESG dataset Metadata sheet",
+}
+
+# Peer-median baselines for territories with no World Bank economy row.
+#
+# WHY: the global-average fallback is measurably wrong for these. Measured
+# against the 2026-05-01 dataset, the global average is E 70.72 / S 60.68 /
+# G 46.11, while every advanced East Asian economy sits at S 77-89 and G 59-64.
+# Taiwan's two corpus companies (Foxconn Technology, Formosa Plastics) were
+# therefore starting ~20 points low on S and ~16 low on G purely because of a
+# missing upstream row. Since the baseline is what evidence contributions move
+# *from* (and net contributions are typically only a few points), a wrong
+# baseline is a wrong score no amount of evidence corrects.
+#
+# WHY NOT the dataset's own region x income grouping: Taiwan/Hong Kong/Macao
+# have no Metadata row at all, so neither region nor income group can be
+# derived for them -- the peer set has to be stated. And the nearest
+# auto-derived group ("East Asia & Pacific" + "High income") is polluted with
+# Pacific microstates (American Samoa, Nauru, Palau, Guam, New Caledonia) that
+# share a region with Taiwan and nothing else; their inclusion pulls the S
+# median from 81.8 down to 66.2.
+#
+# Peers are chosen on the attributes the baseline indicators actually measure
+# -- income level, industrial structure, and institutional quality -- not
+# geographic adjacency. MEDIAN (not mean) so a single outlier cannot skew a
+# small set. Baselines produced this way are labelled "regional_peer", never
+# "exact", so a score built on an estimate is never presented as that
+# territory's own real data.
+#
+# China is deliberately EXCLUDED from Taiwan's peer set. It is Taiwan's largest
+# trading partner, but on what these indicators measure it is a poor match:
+# upper-middle vs high income, materially different governance (WGI voice &
+# accountability / rule of law), and a much more coal-weighted energy mix.
+# Including it moves E by ~-14 and G by ~-4 for reasons that do not describe
+# Taiwan.
+#
+# Hong Kong and Macao are intentionally NOT given peer sets yet: Hong Kong's
+# governance profile diverged sharply from Singapore's after 2020 (National
+# Security Law, electoral changes) on exactly the WGI dimensions in _G_INDICATORS,
+# so Singapore alone would overstate its G, and Macao's gaming-monoculture
+# economy (~50% of GDP) has no good structural comparator. Both keep the
+# global-average fallback until sourced properly.
+_PEER_BASELINE_SETS: dict[str, tuple[str, ...]] = {
+    # High-income, export-manufacturing, mature democratic institutions.
+    # Korea is the closest single match (comparable scale, conglomerate-heavy
+    # corporate structure, late-1980s democratization).
+    "TWN": ("Japan", "Korea, Rep.", "Singapore"),
+}
+
+_peer_baseline_cache: dict[str, Optional[CountryBaseline]] = {}
+
+
+def _peer_median_baseline(iso3: str) -> Optional[CountryBaseline]:
+    """Median E/S/G across a stated peer set, or None if no set is defined.
+
+    Returns None (not a partial result) when fewer than two peers have real
+    baselines -- a "median" over one country is just that country's data
+    wearing a misleading label.
+    """
+    if iso3 in _peer_baseline_cache:
+        return _peer_baseline_cache[iso3]
+
+    peers = _PEER_BASELINE_SETS.get(iso3)
+    if not peers:
+        _peer_baseline_cache[iso3] = None
+        return None
+
+    _ensure_cache()
+    found = [_cache[name] for name in peers if name in _cache]
+    if len(found) < 2:
+        log.warning("peer baseline for %s: only %d/%d peers have baselines -- "
+                    "falling back to global average", iso3, len(found), len(peers))
+        _peer_baseline_cache[iso3] = None
+        return None
+
+    bl = CountryBaseline(
+        country=f"(peer median: {', '.join(b.country for b in found)})",
+        iso3=iso3,
+        year=max(b.year for b in found),
+        e_score=round(statistics.median(b.e_score for b in found), 2),
+        s_score=round(statistics.median(b.s_score for b in found), 2),
+        g_score=round(statistics.median(b.g_score for b in found), 2),
+        # 0 marks this as derived rather than computed from real indicator
+        # counts, matching _global_average_baseline's convention.
+        indicator_count=0,
+    )
+    _peer_baseline_cache[iso3] = bl
+    return bl
 
 _global_average_cache: Optional[CountryBaseline] = None
 
@@ -615,6 +768,11 @@ def get_country_baseline_with_fallback(country: str) -> tuple[CountryBaseline, s
                      docstring for why this is an exact lookup, not fuzzy matching.
       "regional"  -- a real parent/administrative country's baseline
                      (see _REGIONAL_FALLBACK -- a fixed, hand-verified list)
+      "regional_peer" -- MEDIAN across a stated comparator set, for territories
+                     the World Bank publishes no economy for (see
+                     _PEER_BASELINE_SETS). An ESTIMATE, not the territory's own
+                     data -- the distinct label exists so a score built on one
+                     is never presented as real country data.
       "global_average" -- mean across all 210 countries with real data
                      (a genuine statistic, never an arbitrary flat number)
 
@@ -634,14 +792,46 @@ def get_country_baseline_with_fallback(country: str) -> tuple[CountryBaseline, s
             log.info("resolved %r -> %r via alias/ISO3 lookup", country, resolved_name)
             return resolved_bl, "resolved"
 
-    parent = _REGIONAL_FALLBACK.get(country.strip().lower())
-    if parent:
-        parent_bl = get_country_baseline(parent)
-        if parent_bl is not None:
-            log.info("no baseline for %r -- using regional fallback %r", country, parent)
-            return parent_bl, "regional"
+    # _REGIONAL_FALLBACK is keyed on canonical lowercase country names, so a
+    # raw ISO3 ("GGY") or variant spelling never matched it before. Resolving
+    # the identity to a common name first lets a Crown Dependency arriving as a
+    # code reach its documented constitutional parent.
+    lookup_keys = [country.strip().lower()]
+    iso3 = _normalize_to_iso3(country)
+    if iso3:
+        from agentic_estimation.layer_1.country_normalizer import iso3_to_common_name
+        common = iso3_to_common_name(iso3)
+        if common:
+            lookup_keys.append(common.strip().lower())
 
-    log.warning("no baseline for %r (including alias/regional fallback) -- using global average", country)
+    for key in lookup_keys:
+        parent = _REGIONAL_FALLBACK.get(key)
+        if parent:
+            parent_bl = get_country_baseline(parent)
+            if parent_bl is not None:
+                log.info("no baseline for %r -- using regional fallback %r", country, parent)
+                return parent_bl, "regional"
+
+    # Peer-median stand-in, for territories the World Bank publishes no economy
+    # for but where a defensible comparator set exists (see _PEER_BASELINE_SETS).
+    # Ordered before the global average because a regional peer median is
+    # measurably closer than a world mean for these -- and after the exact /
+    # resolved / regional paths, so it can never override real country data.
+    if iso3:
+        peer_bl = _peer_median_baseline(iso3)
+        if peer_bl is not None:
+            log.info("no World Bank baseline for %r (%s) -- using peer median %s",
+                     country, _NO_WB_BASELINE_ISO3.get(iso3, "no WB economy row"),
+                     peer_bl.country)
+            return peer_bl, "regional_peer"
+
+    if iso3 and iso3 in _NO_WB_BASELINE_ISO3:
+        # Known, documented upstream gap -- not a normalisation failure. Logged
+        # distinctly so these don't get debugged as broken country resolution.
+        log.info("no World Bank baseline exists for %r (%s) -- using global average",
+                 country, _NO_WB_BASELINE_ISO3[iso3])
+    else:
+        log.warning("no baseline for %r (including alias/regional fallback) -- using global average", country)
     return _global_average_baseline(), "global_average"
 
 

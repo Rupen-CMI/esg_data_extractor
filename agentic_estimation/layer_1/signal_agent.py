@@ -35,6 +35,7 @@ Usage:
 
 import os
 import random
+import re
 import threading
 import time
 import xml.etree.ElementTree as ET
@@ -48,7 +49,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
-from agentic_estimation.layer_1.evidence_filters import dedup_and_filter_lines
+from agentic_estimation.layer_1.evidence_filters import (
+    dedup_and_filter_lines,
+    filter_search_results,
+    has_ground_truth_leakage,
+)
 log = get_logger("signal_agent")
 
 _HEADERS = {"User-Agent": "ESG-Signal-Agent/1.0 (research@example.com)"}
@@ -180,8 +185,28 @@ def _newsapi_signal(company: str) -> str:
 _GOOGLE_RSS_KEYWORDS = (
     "ESG OR sustainability OR climate OR emissions OR carbon OR renewable OR pollution OR waste OR recycling OR environmental "
     'OR "net zero" OR "carbon neutral" '
+    # Social terms were entirely negative/neutral ("lawsuit", "discrimination",
+    # "controversy", "fine", "penalty" -- no positive term at all), so the query
+    # could only ever surface bad Social news. A company with genuinely strong
+    # labor practices and a company that simply avoided press coverage were
+    # indistinguishable -- "no bad news found" and "no evidence found" produced
+    # the same (lack of) signal, leaving Social a pure-penalty pillar with no
+    # way to ever score a company UP. Positive terms added below so a workplace
+    # award or DEI program has a chance of being found at all.
     'OR workers OR labor OR labour OR employees OR lawsuit OR "human rights" OR discrimination OR safety OR "supply chain" OR community OR controversy OR fine OR penalty '
-    'OR governance OR board OR executive OR fraud OR compliance OR transparency OR scandal OR corruption OR "data breach"'
+    'OR "best workplace" OR "great place to work" OR "employer of choice" OR diversity OR inclusion OR "gender pay gap" OR "living wage" OR "parental leave" OR "employee wellbeing" OR "union agreement" OR "labor certification" OR "workplace safety award" '
+    # Governance terms had the SAME one-sided defect just fixed for Social:
+    # "fraud", "scandal", "corruption", "data breach" are all negative, and the
+    # only positive-leaning word was "transparency" (which mostly means "a
+    # company disclosed something," not "a company was commended"). Verified
+    # live: Boeing and Volkswagen -- both companies with real governance news
+    # cycles -- returned ZERO positive-governance headlines under this query,
+    # while Wells Fargo surfaced one only by accident (a "Sustainable
+    # Leadership Award" story matched via "sustainability", not any G term).
+    # Positive terms added so a governance-rating upgrade, an independent-board
+    # milestone, or an ethics certification has a chance of being found.
+    'OR governance OR board OR executive OR fraud OR compliance OR transparency OR scandal OR corruption OR "data breach" '
+    'OR "board diversity" OR "independent director" OR "governance rating" OR "ethics award" OR "shareholder rights" OR "ESG leadership" OR "whistleblower protection" OR "audit committee" OR "say on pay" OR "proxy access"'
 )
 
 
@@ -222,6 +247,7 @@ def _google_news_rss_query(company: str, extra: str = "", site: str = "", locale
         for item in items[:8]:
             title = (item.findtext("title") or "").strip()
             pub   = (item.findtext("pubDate") or "")[:16]
+            link  = (item.findtext("link") or "").strip()
             # Found live testing a site:-restricted query against a
             # well-known company on a sparse outlet (ft.com): Google News RSS
             # can return the outlet's generic homepage listing as a filler
@@ -232,7 +258,14 @@ def _google_news_rss_query(company: str, extra: str = "", site: str = "", locale
             # detect and drop before it enters the evidence pool.
             if title.lower().startswith("home - ") and title.count(" - ") >= 2:
                 continue
-            hits.append(f"[{pub}] {title}")
+            # Article URL appended so every headline entering the evidence pool
+            # stays traceable to the page it came from -- claims cite a
+            # source_tag, and a source_tag without a link can't be audited by
+            # anyone reviewing a score. Kept inline in the signal text (rather
+            # than a parallel structure) so it survives every downstream
+            # consumer unchanged: frozen corpus dumps, DB persistence, and the
+            # LLM claim extractor all pass the text through verbatim.
+            hits.append(f"[{pub}] {title}" + (f" <{link}>" if link else ""))
         return "\n".join(hits) if hits else None
     except Exception:
         return None
@@ -274,6 +307,218 @@ def _localized_esg_signal(company: str, country: Optional[str]) -> str:
     hit_count = len(deduped.splitlines())
     log.info("[%s] localized_esg → %d headlines (%d locales)", company, hit_count, len(locales))
     return "Localized ESG News:\n" + "\n".join(deduped.splitlines()[:10])
+
+
+# ── Country-level governance evidence ─────────────────────────────────────────
+# Cached per (iso3, industry) rather than per company: the result is IDENTICAL
+# for every company in a country, so fetching it per company would issue ~390
+# requests to obtain ~30 distinct answers. That waste is not hypothetical -- the
+# corpus gather was rate-limited off the free-tier gateway twice, so avoidable
+# duplicate fetching is a real cost, not a micro-optimisation.
+_country_gov_cache: dict[tuple[str, str], str] = {}
+_country_gov_lock = threading.Lock()
+
+# Governance-relevance gate. A locale-routed query on a native-language term
+# still returns whatever that country's news edition ranks highest, which
+# verified live as air-quality alerts and university awards. A headline only
+# enters the evidence pool if it carries at least one governance word -- the
+# alternative (accepting everything the feed returns) hands the claim extractor
+# unrelated national news and invites it to invent governance claims from it.
+_GOV_RELEVANCE_TERMS: tuple[str, ...] = (
+    # English
+    "governance", "board", "director", "audit", "shareholder", "disclosure",
+    "corrupt", "bribe", "fraud", "complian", "regulat", "enforcement", "fine",
+    "penalt", "sanction", "whistleblow", "insider", "transparen", "accounting",
+    "oversight", "stewardship", "proxy", "executive pay", "remuneration",
+    "minority", "related party", "conflict of interest", "money laundering",
+    # Native-language governance roots for the locales we route to
+    "governan", "gouvernance", "gobierno corporativo", "governo societario",
+    "unternehmensführung", "aufsichtsrat", "vorstand", "korruption",
+    "bestechung", "bolagsstyrning", "selskabsledelse", "eierstyring",
+    "hallinnointi", "tadbir urus", "rasuah",
+    "公司治理", "企業統治", "取締役", "監査", "不正", "汚職",
+    "기업지배구조", "사외이사", "감사", "부정", "공정거래",
+    "董事", "審計", "审计", "腐败", "貪腐", "監管",
+    "การกำกับดูแล", "กรรมการ", "ทุจริต",
+)
+
+
+def _is_governance_relevant(line: str) -> bool:
+    low = line.lower()
+    return any(t in low for t in _GOV_RELEVANCE_TERMS)
+
+
+def _mentions_country(segment: str, country_name: str, iso3: str) -> bool:
+    """True when a snippet actually refers to the target country.
+
+    Matches the common name, its adjectival forms, and the ISO3 code. Kept
+    deliberately simple -- this is a bleed-through guard, not entity linking;
+    a false negative just drops one snippet, while a false positive imports
+    another country's governance regime.
+    """
+    low = segment.lower()
+    name_low = country_name.lower()
+    if name_low in low or iso3.lower() in low.split():
+        return True
+    # "Germany" -> "german", "Japan" -> "japan(ese)", "Taiwan" -> "taiwan(ese)".
+    stem = name_low.split(",")[0].split(" ")[-1]
+    if len(stem) >= 5 and stem[:-1] in low:
+        return True
+    return False
+
+
+def _split_snippet_segments(text: str) -> list[str]:
+    """Split a concatenated DDG result blob back into per-result segments.
+
+    _ddg_fallback joins every result's snippet into one string, each followed by
+    its "<url>" marker. Splitting on those markers recovers the individual
+    results so relevance can be judged per result -- filtering the whole blob
+    would either keep one irrelevant snippet because a sibling matched, or drop
+    a good snippet because the blob as a whole looked off-topic.
+    """
+    segments: list[str] = []
+    for chunk in re.split(r"(?<=>)\s+", text or ""):
+        chunk = chunk.strip()
+        if chunk:
+            segments.append(chunk)
+    return segments or ([text.strip()] if text and text.strip() else [])
+
+
+def _governance_rss_query(term: str, country_name: str, locale: str,
+                          when_days: int = 730) -> Optional[str]:
+    """Google News RSS for one governance term, scoped to a country.
+
+    Unlike _google_news_rss_query this does NOT inject the general ESG keyword
+    group -- the term IS the query. Results are gated on governance relevance
+    before being returned.
+    """
+    q = f'"{term}" {country_name}'
+    if when_days > 0:
+        q += f" when:{when_days}d"
+    url = f"https://news.google.com/rss/search?q={quote_plus(q)}&{locale}"
+    r = _get(url)
+    if not r:
+        return None
+    try:
+        root = ET.fromstring(r.content)
+        hits: list[str] = []
+        for item in root.findall(".//item")[:6]:
+            title = (item.findtext("title") or "").strip()
+            pub = (item.findtext("pubDate") or "")[:16]
+            link = (item.findtext("link") or "").strip()
+            if not title or not _is_governance_relevant(title):
+                continue
+            if title.lower().startswith("home - ") and title.count(" - ") >= 2:
+                continue
+            hits.append(f"[{pub}] {title}" + (f" <{link}>" if link else ""))
+        return "\n".join(hits) if hits else None
+    except Exception:
+        return None
+
+
+def _country_governance_signal(country: Optional[str], industry: str = "") -> str:
+    """Country-level corporate-governance evidence: the governance regime that
+    applies to every company domiciled in `country`.
+
+    WHY: gov_board_sec / gov_litigation_sec read SEC filings and are therefore
+    US-listed only. Measured on the 393-company benchmark corpus, only 53.4% of
+    companies have ANY company-level governance evidence, and all 11 scoring
+    variants came back UNDECIDABLE for G. A country's governance code, board
+    rules, audit regulator and anti-bribery statute are public and apply
+    universally, so they fill that gap for the ~46% with nothing.
+
+    SCOPE CAVEAT: this signal is CONSTANT for all companies in a country, so it
+    adds no within-country ranking signal. It improves coverage and absolute
+    calibration; the industry-qualified variant is the part that can vary within
+    a country. Claims extracted from it are tagged country_governance so
+    downstream consumers can treat them as context, not company-specific
+    evidence.
+    """
+    from agentic_estimation.layer_1.country_normalizer import to_iso3, iso3_to_common_name
+    from agentic_estimation.layer_1.country_governance_keywords import (
+        governance_terms_for, locales_for,
+    )
+
+    if not country:
+        return ""
+    iso3 = to_iso3(country)
+    if not iso3:
+        log.info("country_governance → %r did not resolve to a country, skipping", country)
+        return ""
+
+    # Industry participates in the cache key: "banking governance" and "mining
+    # governance" are genuinely different queries for the same country.
+    sector = (industry or "").strip().lower()[:40]
+    key = (iso3, sector)
+    with _country_gov_lock:
+        if key in _country_gov_cache:
+            log.info("country_governance → cache hit for %s/%s", iso3, sector or "-")
+            return _country_gov_cache[key]
+
+    name = iso3_to_common_name(iso3) or country
+    terms = governance_terms_for(iso3, limit=6)
+    locales = locales_for(iso3)
+
+    hits: list[str] = []
+
+    # 1. Locale-routed news, queried on the governance terms THEMSELVES.
+    #    Deliberately not routed through _google_news_rss_query: that helper is
+    #    company-shaped -- it wraps its subject in quotes and always injects the
+    #    broad _GOOGLE_RSS_KEYWORDS ESG OR-group (~40 climate/labour/waste
+    #    terms). Verified live that reusing it returned air-quality alerts and
+    #    university sustainability awards for Korea/Taiwan: the generic ESG
+    #    group swamped the governance terms. Querying the named instruments
+    #    directly ("공정거래위원회", "公司治理守則", "SEBI LODR") is the whole
+    #    point of having them.
+    for locale in (locales or ("hl=en&gl=US&ceid=US:en",)):
+        for term in terms[:4]:
+            rss = _governance_rss_query(term, name, locale, when_days=730)
+            if rss:
+                hits.extend(rss.splitlines())
+
+    # 2. Web search for the regime itself -- codes/statutes/regulator actions
+    #    live on regulator and law-firm sites, not in news feeds.
+    #
+    #    Each returned snippet is gated on governance relevance individually.
+    #    Verified live that a country-name query pulls in encyclopaedia filler
+    #    ("True south is one end of the axis about which the Earth rotates...",
+    #    Taiwan population statistics) because DuckDuckGo falls back to
+    #    general reference pages when the specific query is sparse. Unfiltered,
+    #    that text reaches the claim extractor as "governance evidence".
+    sector_hint = f" {industry}" if industry else ""
+    for query in (
+        f'"{name}" corporate governance code{sector_hint} board independence disclosure requirements',
+        f'"{name}" securities regulator enforcement{sector_hint} corporate governance violation fine 2024 2025',
+    ):
+        raw = _ddg_fallback(query, prefix="", min_len=80)
+        if not raw:
+            continue
+        # Also require the country to be named in the snippet. Verified live:
+        # a Taiwan governance query returned an India/CII task-force passage and
+        # a US Sarbanes-Oxley passage -- DuckDuckGo matches "corporate
+        # governance code" globally and the country term ranks weakly. Attaching
+        # another country's regime to this country's context would be worse than
+        # returning nothing, since the extractor cannot tell them apart.
+        kept = [seg for seg in _split_snippet_segments(raw)
+                if _is_governance_relevant(seg) and _mentions_country(seg, name, iso3)]
+        if kept:
+            hits.extend(kept)
+
+    if not hits:
+        log.info("country_governance → no results for %s", iso3)
+        with _country_gov_lock:
+            _country_gov_cache[key] = ""
+        return ""
+
+    body = dedup_and_filter_lines("\n".join(hits), require_keyword=False)
+    text = (f"Country Governance Context ({name}"
+            f"{' / ' + industry if industry else ''}):\n"
+            + "\n".join(body.splitlines()[:12]))
+    log.info("country_governance → %s: %d lines (%d locales, %d terms)",
+             iso3, len(body.splitlines()), len(locales or (1,)), len(terms))
+    with _country_gov_lock:
+        _country_gov_cache[key] = text
+    return text
 
 
 def _google_news_rss_signal(company: str) -> str:
@@ -341,6 +586,7 @@ def _bhrrc_signal(company: str) -> str:
     result = _ddg_fallback(
         f'site:business-humanrights.org "{company}"',
         prefix="B&HR Resource Centre", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] bhrrc → %s", company, "hit" if result else "no result")
     return result
@@ -353,6 +599,7 @@ def _sbti_signal(company: str) -> str:
     result = _ddg_fallback(
         f'site:sciencebasedtargets.org "{company}"',
         prefix="SBTi", reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] sbti → %s", company, "hit" if result else "no result")
     return result
@@ -366,6 +613,7 @@ def _cdp_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" CDP score climate disclosure carbon 2023 2024',
         prefix="CDP Climate Disclosure", reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] cdp → %s", company, "hit" if result else "no result")
     return result
@@ -382,6 +630,7 @@ def _gri_signal(company: str) -> str:
     result = _ddg_fallback(
         f'site:globalreporting.org "{company}" sustainability report',
         prefix="GRI Database", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] gri → %s", company, "hit" if result else "no result")
     return result
@@ -432,7 +681,13 @@ def _wikipedia_signal(company: str) -> str:
                 continue
 
             log.info("[%s] wikipedia → hit on slug '%s' (%d chars)", company, slug, len(extract))
-            return f"Wikipedia: {extract}"
+            # Canonical page URL from the REST summary payload, so the
+            # Wikipedia signal is auditable like every other source.
+            page_url = (
+                (data.get("content_urls", {}).get("desktop", {}) or {}).get("page")
+                or f"https://en.wikipedia.org/wiki/{slug}"
+            )
+            return f"Wikipedia: {extract} <{page_url}>"
         except Exception as e:
             log.warning("[%s] wikipedia → parse error on slug '%s': %s", company, slug, e)
 
@@ -446,6 +701,7 @@ def _net_zero_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" net zero carbon neutral 2030 2040 2050 pledge climate target',
         prefix="Net Zero Commitment", min_len=60, reject_wikipedia=True,
+        company=company,
     )
     log.info("[%s] net_zero → %s", company, "hit" if result else "no result")
     return result
@@ -467,7 +723,20 @@ _WIKIPEDIA_BLEED = (
 )
 
 
-def _ddg_fallback(query: str, prefix: str = "", min_len: int = 0, reject_wikipedia: bool = False) -> str:
+# Per-source character budget for DDG snippet text. Raised from the original
+# inline 1200 when source URLs began being appended inline, so adding links
+# doesn't silently evict snippet text the claim extractor previously saw.
+_DDG_TEXT_BUDGET = 1800
+
+
+def _ddg_fallback(
+    query: str,
+    prefix: str = "",
+    min_len: int = 0,
+    reject_wikipedia: bool = False,
+    company: str = "",
+    require_entity: bool = True,
+) -> str:
     """
     DuckDuckGo search serialized through _DDG_LIMITER.
     All DDG-based sources call this, so concurrent threads queue here
@@ -476,6 +745,17 @@ def _ddg_fallback(query: str, prefix: str = "", min_len: int = 0, reject_wikiped
 
     reject_wikipedia: if True, discards results that look like Wikipedia bleed-through
                       (happens when site: queries return 0 results and DDG falls back).
+
+    company: when given, each result is gated individually on whether it
+             actually mentions this company (and on ground-truth leakage)
+             BEFORE the results are joined -- see evidence_filters.
+             filter_search_results. Without this, one off-entity result
+             contaminated the whole joined blob invisibly.
+
+    require_entity: set False for queries that are inherently about a topic
+                    rather than a named company (e.g. country-level governance
+                    regime lookups), where demanding the company name would
+                    reject every legitimate result.
     """
     from ddgs import DDGS, exceptions as ddg_exc
 
@@ -496,7 +776,29 @@ def _ddg_fallback(query: str, prefix: str = "", min_len: int = 0, reject_wikiped
                 log.info("DDG [%s] → top result is Wikipedia, discarding (site query returned nothing)", prefix)
                 return ""
 
-            text = " ".join(r.get("body", "") for r in results if r.get("body")).strip()
+            # Per-result gate BEFORE joining. A site: query that finds nothing
+            # falls back to general results, which for a small/private company
+            # are topic-generic pages ("an anti-bribery policy is a component
+            # of...") or another company entirely. Those look identical to real
+            # evidence once concatenated, so they must be dropped here.
+            if company:
+                results = filter_search_results(
+                    results, company, prefix=prefix, require_entity=require_entity
+                )
+                if not results:
+                    log.info("DDG [%s] → all results filtered out for '%s' (no on-entity evidence)",
+                             prefix, company)
+                    return ""
+
+            # Each result carries its own source URL, appended inline after its
+            # snippet so a reviewer can open the exact page a claim came from.
+            # Previously only r["body"] was kept and r["href"] was discarded,
+            # leaving every DDG-sourced signal (CDP, SBTi, gov_*, facility,
+            # sustainability report) unauditable.
+            text = " ".join(
+                (r.get("body", "") + (f" <{r.get('href')}>" if r.get("href") else ""))
+                for r in results if r.get("body")
+            ).strip()
 
             # Secondary check: text body looks like a Wikipedia extract
             if reject_wikipedia:
@@ -510,7 +812,15 @@ def _ddg_fallback(query: str, prefix: str = "", min_len: int = 0, reject_wikiped
                 return ""
 
             log.debug("DDG [%s] → %d chars returned", prefix, len(text))
-            text = text[:1200]
+            # Budget raised from 1200 to accommodate the appended <url> markers
+            # without evicting snippet text that previously fit. Truncation
+            # backs off to the last completed "<...>" marker so a cut never
+            # lands mid-URL and emits a broken, unopenable link.
+            if len(text) > _DDG_TEXT_BUDGET:
+                text = text[:_DDG_TEXT_BUDGET]
+                cut_open = text.rfind("<")
+                if cut_open > text.rfind(">"):
+                    text = text[:cut_open].rstrip()
             return f"{prefix}: {text}" if prefix else text
         except ddg_exc.RatelimitException:
             log.warning("DDG rate-limited on query [%s] (attempt %d) — backing off", prefix, attempt + 1)
@@ -553,6 +863,12 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         "esg_today":        lambda: _outlet_signal(company, *_OUTLET_SOURCES["esg_today"]),
         "greenbiz":         lambda: _outlet_signal(company, *_OUTLET_SOURCES["greenbiz"]),
         "localized_esg":    lambda: _localized_esg_signal(company, country),
+        # Country-level governance regime -- fills the G-pillar gap for the
+        # ~46% of companies with no company-level governance evidence (the
+        # SEC-backed gov_* sources are US-listed only). Cached per
+        # (country, industry), so this costs one fetch per country, not per
+        # company.
+        "country_governance": lambda: _country_governance_signal(country, industry),
         # Tier 2 — specialist ESG & corporate
         "bhrrc":            lambda: _bhrrc_signal(company),
         "sbti":             lambda: _sbti_signal(company),
@@ -563,11 +879,13 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         "sustainability_report": lambda: _ddg_fallback(
             f'"{company}"{sector_hint} sustainability report 2024 2025 ESG annual disclosure',
             prefix="Sustainability Report", min_len=80, reject_wikipedia=True,
+            company=company,
         ),
         "net_zero":         lambda: _net_zero_signal(company),
         "controversies":    lambda: _ddg_fallback(
             f'"{company}"{sector_hint} environmental violation labor controversy scandal fine 2023 2024 2025 -site:wikipedia.org',
             prefix="ESG Controversies", min_len=60, reject_wikipedia=True,
+            company=company,
         ),
     }
 
@@ -724,6 +1042,7 @@ def fetch_signals_for_companies(
     companies: list[str],
     industry: str = "",
     on_progress: callable | None = None,
+    countries: dict[str, str] | None = None,
 ) -> dict[str, dict[str, str]]:
     """
     Fetch signals for multiple companies with bounded concurrency.
@@ -732,6 +1051,14 @@ def fetch_signals_for_companies(
         companies:   List of company names
         industry:    Shared market/sector context
         on_progress: Optional callback(msg: str) for progress updates
+        countries:   Optional {company_name: country} map -- forwarded into
+            fetch_company_signals so the localized_esg source can fire on this
+            batch call too (PHASE_5_PLAN.md 0.3b / DEFECT_FIX_PLAN.md 1.4:
+            this function previously dropped country entirely, silently
+            skipping localization for every company on the batch path even
+            when the caller had it). None (default) preserves prior behavior
+            -- run_signals.py, the only current caller, has no per-company
+            country data to give it.
 
     Returns:
         Dict of company_name → signals dict
@@ -739,7 +1066,8 @@ def fetch_signals_for_companies(
     results: dict[str, dict[str, str]] = {}
 
     def _fetch_one(company: str) -> tuple[str, dict]:
-        return company, fetch_company_signals(company, industry)
+        country = (countries or {}).get(company)
+        return company, fetch_company_signals(company, industry, country=country)
 
     with ThreadPoolExecutor(max_workers=5) as pool:
         futures = {pool.submit(_fetch_one, c): c for c in companies}

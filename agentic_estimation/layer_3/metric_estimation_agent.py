@@ -81,15 +81,15 @@ _CORE_BY_KEY = {m["key"]: m for m in CORE_METRICS}
 
 
 # ── Estimation prompt ────────────────────────────────────────────────────────
-_ESTIMATE_PROMPT = """You are an ESG data estimator and validator. For EACH metric below, produce the most plausible real-world value for this company, using its size, sector, and country context plus any evidence.
+_ESTIMATE_PROMPT = """You are an ESG data estimator and validator. For EACH metric below, produce a plausible real-world RANGE for this company, using its size, sector, and country context plus any evidence.
 
 Hard rules:
 - Anchor every value to company SIZE. Employee count and revenue bound what is physically possible — a small firm cannot have a large multinational's absolute emissions, energy, water, or waste.
 - Use sector norms: emissions/energy/water intensity per employee differs greatly by industry (heavy manufacturing >> software).
 - Use the country context for governance/policy likelihood and grid renewable mix.
-- Give the value in the metric's NATIVE UNIT shown. For Yes/No metrics return true or false.
-- Round sensibly — don't invent precision. If a metric is truly un-estimable, use null.
-- Give each value a confidence 0.0–1.0.
+- Give the range in the metric's NATIVE UNIT shown. For Yes/No metrics, low and high must both be true or both be false (no partial ranges for booleans).
+- Give a "value_low" and "value_high" bounding your plausible range — the less evidence you have, the wider the range should be. Round sensibly — don't invent precision. If a metric is truly un-estimable, use null for both.
+- Give each range a confidence 0.0–1.0.
 
 VALIDATING REPORTED VALUES:
 - Some metrics may already be REPORTED (listed below). Treat these as trusted UNLESS a value is clearly implausible for a company of this size/sector — e.g. off by orders of magnitude, or an obvious unit error (a 400,000-employee firm reporting 0.02 GJ total energy).
@@ -116,7 +116,7 @@ REPORTED VALUES (validate these; correct only if clearly implausible):
 METRICS TO PRODUCE:
 {metric_list}
 
-Think it through, then END your response with a single JSON object (no markdown fences) mapping each metric key to an object with "value", "confidence", "reasoning", and "corrected":
+Think it through, then END your response with a single JSON object (no markdown fences) mapping each metric key to an object with "value_low", "value_high", "confidence", "reasoning", and "corrected":
 {{
 {example_lines}
 }}"""
@@ -133,14 +133,16 @@ def _metric_list_block() -> str:
 def _example_lines_block() -> str:
     # Show two representative shapes so the model matches the schema
     return (
-        '  "scope_1_emissions": {"value": <number|null>, "confidence": <0-1>, "reasoning": "<short>", "corrected": <true|false>},\n'
-        '  "anti_corruption_policy": {"value": <true|false|null>, "confidence": <0-1>, "reasoning": "<short>", "corrected": <true|false>},\n'
+        '  "scope_1_emissions": {"value_low": <number|null>, "value_high": <number|null>, "confidence": <0-1>, "reasoning": "<short>", "corrected": <true|false>},\n'
+        '  "anti_corruption_policy": {"value_low": <true|false|null>, "value_high": <true|false|null>, "confidence": <0-1>, "reasoning": "<short>", "corrected": <true|false>},\n'
         '  ...one entry per metric key above...'
     )
 
 
 def _reported_block(existing_reals: Optional[dict]) -> str:
-    """Render the company's already-reported core values for validation."""
+    """Render the company's already-reported core values for validation.
+    Reported values are real disclosures (a single fact, not a range) — shown
+    to the model as-is so it validates against the exact reported number."""
     if not existing_reals:
         return "(none reported — estimate all metrics)"
     lines = []
@@ -193,7 +195,8 @@ def _extract_json_object(raw: str) -> Optional[dict]:
 
 
 def _coerce_value(metric: dict, raw_value) -> Optional[float]:
-    """Coerce an LLM value to a stored numeric, respecting the metric kind."""
+    """Coerce a single LLM value (one end of a range) to a stored numeric,
+    respecting the metric kind."""
     if raw_value is None:
         return None
     kind = metric["kind"]
@@ -216,6 +219,19 @@ def _coerce_value(metric: dict, raw_value) -> Optional[float]:
     if kind == "pct" and val > 100:
         val = 100.0
     return val
+
+
+def _coerce_range(metric: dict, raw_low, raw_high) -> Optional[tuple]:
+    """Coerce an LLM (value_low, value_high) pair into an ordered (low, high)
+    numeric tuple, or None if either end is unusable. Boolean metrics collapse
+    to a degenerate (v, v) range since Yes/No has no partial value."""
+    low = _coerce_value(metric, raw_low)
+    high = _coerce_value(metric, raw_high)
+    if low is None or high is None:
+        return None
+    if low > high:
+        low, high = high, low
+    return (low, high)
 
 
 def _display_value(metric: dict, numeric: float) -> str:
@@ -245,7 +261,7 @@ def estimate_metrics_sync(
 ) -> dict[str, dict]:
     """
     Estimate/validate the core metric set. Returns
-    {metric_key: {numeric, value, confidence, reasoning, corrected}}.
+    {metric_key: {low, high, value_low, value_high, confidence, reasoning, corrected}}.
 
     existing_reals: {core_key: numeric} of already-reported values. The model
     validates these and only overrides ones it judges clearly implausible
@@ -295,17 +311,20 @@ def estimate_metrics_sync(
         entry = parsed.get(key)
         if not isinstance(entry, dict):
             continue
-        numeric = _coerce_value(metric, entry.get("value"))
-        if numeric is None:
+        rng = _coerce_range(metric, entry.get("value_low"), entry.get("value_high"))
+        if rng is None:
             continue
+        low, high = rng
         try:
             confidence = float(entry.get("confidence", 0.4))
         except (TypeError, ValueError):
             confidence = 0.4
         confidence = max(0.0, min(1.0, confidence))
         out[key] = {
-            "numeric": numeric,
-            "value": _display_value(metric, numeric),
+            "low": low,
+            "high": high,
+            "value_low": _display_value(metric, low),
+            "value_high": _display_value(metric, high),
             "confidence": confidence,
             "reasoning": str(entry.get("reasoning", ""))[:500],
             "corrected": bool(entry.get("corrected", False)),
@@ -327,20 +346,32 @@ async def _get_core_metric_ids(conn: asyncpg.Connection) -> dict[str, UUID]:
     return mapping
 
 
-async def _upsert_estimate(conn, company_id, metric_id, numeric, value, confidence, reasoning, source):
+async def _upsert_estimate(conn, company_id, metric_id, low, high, value_low, value_high, confidence, reasoning, source):
+    """Persist a core-metric ESTIMATE as a range. numeric_value/value store the
+    midpoint (kept for any code still reading a single number, e.g. sorting),
+    low_value/high_value carry the actual range -- the same columns
+    ensemble_persistence.py already uses for pillar scores, now populated for
+    core metrics too so build_esg_json.py can render every estimated metric
+    as a range, never a bare point."""
+    midpoint = (low + high) / 2.0
+    midpoint_display = f"{value_low} – {value_high}" if value_low != value_high else value_low
     await conn.execute(
         """
         INSERT INTO company_metric_values
-            (company_id, metric_id, numeric_value, value, confidence, reasoning, source, reporting_year)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, EXTRACT(YEAR FROM now())::int)
+            (company_id, metric_id, numeric_value, value, confidence, reasoning, source, reporting_year,
+             low_value, high_value)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, EXTRACT(YEAR FROM now())::int, $8, $9)
         ON CONFLICT (company_id, metric_id, reporting_year, source)
         DO UPDATE SET
             numeric_value = EXCLUDED.numeric_value,
             value         = EXCLUDED.value,
             confidence    = EXCLUDED.confidence,
-            reasoning     = EXCLUDED.reasoning
+            reasoning     = EXCLUDED.reasoning,
+            low_value     = EXCLUDED.low_value,
+            high_value    = EXCLUDED.high_value
         """,
-        str(company_id), str(metric_id), numeric, value, confidence, reasoning, source,
+        str(company_id), str(metric_id), midpoint, midpoint_display, confidence, reasoning, source,
+        low, high,
     )
 
 
@@ -414,7 +445,8 @@ async def estimate_and_save(
             source = CORRECTION_SOURCE if (is_real and est["corrected"]) else ESTIMATE_SOURCE
             await _upsert_estimate(
                 conn, company_id, metric_id,
-                est["numeric"], est["value"], est["confidence"], est["reasoning"], source,
+                est["low"], est["high"], est["value_low"], est["value_high"],
+                est["confidence"], est["reasoning"], source,
             )
             saved += 1
             if source == CORRECTION_SOURCE:
@@ -458,7 +490,8 @@ def _cli() -> None:
     estimates = estimate_metrics_sync(company, industry, resolved, signals, metadata, baseline)
     print(f"\nEstimated {len(estimates)} / {len(CORE_METRICS)} core metrics for {company}:\n")
     for key, est in estimates.items():
-        print(f"  {key:28s} = {est['value']:<18s} (conf {est['confidence']:.2f})  {est['reasoning']}")
+        rng = f"{est['value_low']} – {est['value_high']}"
+        print(f"  {key:28s} = {rng:<24s} (conf {est['confidence']:.2f})  {est['reasoning']}")
 
 
 if __name__ == "__main__":
