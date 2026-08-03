@@ -112,6 +112,56 @@ class PeerAnchorVote:
     basis: str                    # audit line
 
 
+# ── Tier suppression ─────────────────────────────────────────────────────────
+# Two tiers were measured to be INVERTED -- their percentile anti-correlates
+# with real ground truth, so using them actively pushes the score the wrong
+# way. Measured on 669 unique companies pooled across every calibration dump,
+# split into two independent halves by company-name hash:
+#
+#     tier               pillar   split A         split B
+#     sector_only        E        -0.448 (n=77)   -0.204 (n=39)
+#     crosswalk_global   E        -0.570 (n=62)   -0.153 (n=18)
+#     crosswalk_global   S        -0.227 (n=62)   -0.352 (n=18)
+#
+# LIKELY CAUSE: both drop the country dimension, so they re-assert a global
+# sector median against a formula that already carries a country baseline --
+# double-counting sector while ignoring geography. The '..._country' variants
+# of the same tiers are strongly POSITIVE (sector_country: +0.488/+0.405 on E),
+# which is what points at the missing country conditioning rather than at the
+# sector matching itself.
+#
+# Effect of suppressing them, same two splits, anchor-only Spearman:
+#     E  +0.032/+0.069  ->  +0.439/+0.405   (coverage 78% -> 47%)
+#     S  +0.108/+0.115  ->  +0.259/+0.312
+#
+# G IS DELIBERATELY EXCLUDED. G has no inverted tier -- all-tiers scores
+# +0.267/+0.297 there and filtering only costs coverage, so G keeps every tier.
+#
+# NOT suppressed, despite also being global: bcorp_fuzzy_global measured
+# STABLE POSITIVE (E +0.601/+0.550, G +0.273/+0.536). "Global" is not itself
+# the problem, so the suppression list names the two specific tiers rather
+# than pattern-matching on the name.
+_INVERTED_TIERS: dict[str, frozenset] = {
+    "E": frozenset({"sector_only", "crosswalk_global"}),
+    "S": frozenset({"sector_only", "crosswalk_global"}),
+    "G": frozenset(),
+}
+
+
+def _suppressed(pillar: str, tier: str) -> bool:
+    """True if this tier's vote is known to anti-correlate for this pillar."""
+    return tier in _INVERTED_TIERS.get(pillar, frozenset())
+
+
+def _abstain(pillar: str, tier: str, n_peers: int, why: str) -> PeerAnchorVote:
+    """An abstain that RECORDS which tier would have fired, so the audit trail
+    shows a deliberate suppression rather than a missing peer group."""
+    return PeerAnchorVote(
+        pillar=pillar, percentile=None, confidence=0.0, n_peers=n_peers,
+        tier="abstain", basis=f"suppressed {tier} vote: {why}",
+    )
+
+
 def _load_distribution(field: str) -> list[float]:
     if field not in _distribution_cache:
         from agentic_estimation.layer_1.peer_anchor_collector import _db_conn
@@ -202,16 +252,17 @@ def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
                     basis=f"median {field}={med:.1f} of {n} bcorp peers ({cand}/{country}) -> pctile {pctile:.1f}",
                 )
 
-    for cand in candidates:
-        peers = find_peers(sector=cand, country=None, exclude_name=company_name)
-        n = peer_sample_size(peers, field)
-        if n >= _MIN_PEERS_SECTOR_ONLY:
-            med = peer_median(peers, field)
-            pctile = _percentile_rank(med, _load_distribution(field))
-            return PeerAnchorVote(
-                pillar=pillar, percentile=pctile, confidence=0.3, n_peers=n, tier="sector_only",
-                basis=f"median {field}={med:.1f} of {n} bcorp peers ({cand}, any country) -> pctile {pctile:.1f}",
-            )
+    if not _suppressed(pillar, "sector_only"):
+        for cand in candidates:
+            peers = find_peers(sector=cand, country=None, exclude_name=company_name)
+            n = peer_sample_size(peers, field)
+            if n >= _MIN_PEERS_SECTOR_ONLY:
+                med = peer_median(peers, field)
+                pctile = _percentile_rank(med, _load_distribution(field))
+                return PeerAnchorVote(
+                    pillar=pillar, percentile=pctile, confidence=0.3, n_peers=n, tier="sector_only",
+                    basis=f"median {field}={med:.1f} of {n} bcorp peers ({cand}, any country) -> pctile {pctile:.1f}",
+                )
 
     # Tier 3 (crosswalk): sector is a RECOGNIZED label in either vocabulary
     # (bcorp's 22 industry_category values or upright's 30 industry values) --
@@ -271,6 +322,10 @@ def _crosswalk_vote(pillar: str, sector: Optional[str], country: Optional[str],
     attempts = [(None, "crosswalk_global", 0.4)]
     if country:
         attempts.insert(0, (country, "crosswalk_country", 0.55))
+    # Drop the country-less attempt where it was measured to invert, so the
+    # caller falls through to the fuzzy tiers (which are positive) instead of
+    # returning a vote that points the wrong way.
+    attempts = [a for a in attempts if not _suppressed(pillar, a[1])]
 
     for ctry, tier, base_conf in attempts:
         peers = find_peers(sector=canonical, country=ctry, exclude_name=company_name,

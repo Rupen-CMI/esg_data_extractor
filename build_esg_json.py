@@ -57,6 +57,7 @@ _SOURCE_PRIORITY = {"agentic_ensemble_v1": 3, "agentic_evaluator_v1": 2, "agenti
 _PILLAR_WEIGHTS = {"E": 0.40, "S": 0.35, "G": 0.25}
 
 
+
 def _row_rank(source: str, year: int) -> tuple:
     """
     Deduplication rank for competing metric rows. Higher tuple wins:
@@ -116,10 +117,21 @@ def build_all(companies, all_values, metric_defs):
     """
     key_units = {m.key: m.unit for m in metric_defs.values() if m.unit}
 
+    # Real, vetted third-party disclosure scores (Upright's net-impact model,
+    # B Corp's category assessment) -- unlike wikirate's raw physical
+    # quantities, these arrive already normalised/scored by the source, so
+    # they're surfaced as-is in `real_disclosed` rather than run through the
+    # benchmark-band pillar scorer.
+    _REAL_DISCLOSED_KEYS = {
+        "upright_net_impact_percentile", "upright_net_impact_ratio",
+        "bcorp_overall_score", "bcorp_environment_score", "bcorp_workers_score",
+        "bcorp_community_score", "bcorp_customers_score", "bcorp_governance_score",
+    }
+
     # ── Step 1: build {company_name -> {core_key -> entry}} with real>estimate dedup
     # Also keep the agentic pillar keys (the actual pillar scores) and the
     # explainability summary key.
-    keep_keys = CORE_KEYS | set(_AGENTIC_PILLAR.values()) | {AGENTIC_SUMMARY_KEY}
+    keep_keys = CORE_KEYS | set(_AGENTIC_PILLAR.values()) | {AGENTIC_SUMMARY_KEY} | _REAL_DISCLOSED_KEYS
     company_raw = {}
     company_summary = {}
     # Whether a company has ever been gap-filled — i.e. has ≥1 estimate row for a
@@ -147,6 +159,15 @@ def build_all(companies, all_values, metric_defs):
                     company_summary[company.name] = cmv.reasoning
                 continue
             if cmv.numeric_value is None:
+                continue
+            if source == "wikirate":
+                # Verified live: wikirate's keyword-based metric-card matching
+                # returns wrong-scale/wrong-card values for these companies
+                # (e.g. Apple's real employee_count came back as 4.003,
+                # against a real headcount of ~164,000) -- not an isolated
+                # bad key, a systemic matching-quality issue for this batch.
+                # Exclude entirely rather than show a plausible-looking but
+                # wrong number in the metrics table.
                 continue
             if key in CORE_KEYS and source in _AGENTIC_SOURCES:
                 seen_estimate = True
@@ -238,7 +259,21 @@ def build_all(companies, all_values, metric_defs):
             'agentic' rows always have a real low_value/high_value populated
             (ensemble_persistence.py writes them unconditionally); 'core' rows
             build a range from scoring the low/high end of every underlying
-            metric; 'none' is an honest empty range, not a fabricated 50."""
+            metric; 'none' is an honest empty range, not a fabricated 50.
+
+            NOTE: real-disclosure core metrics (wikirate/upright/bcorp) are
+            deliberately NOT given override priority here -- verified live
+            that wikirate's keyword-based metric-card matching returns
+            wrong-scale values for large companies (e.g. Apple's real
+            employee_count came back as 4.003, and a scope_1_emissions value
+            that was almost certainly a mismatched card), so forcing "real
+            beats estimate" through the benchmark-band scorer risked
+            injecting worse numbers than the agentic estimate. See
+            company['real_disclosed'] for the vetted real Upright/BCorp
+            figures instead, surfaced as-is rather than blended into the
+            pillar score."""
+            keys_in_cat = [k for k in SCORED_CORE if _CORE[k]["category"] == cat]
+
             entry = by_key.get(_AGENTIC_PILLAR[cat], {})
             if entry.get("low") is not None and entry.get("high") is not None:
                 detail = {
@@ -250,14 +285,16 @@ def build_all(companies, all_values, metric_defs):
                 return rng, "agentic", detail
 
             ranges = [
-                r for k in SCORED_CORE if _CORE[k]["category"] == cat
+                r for k in keys_in_cat
                 for r in (_metric_score_range(cname, k),) if r is not None
             ]
+            rng = None
             if ranges:
                 rng = {
                     "low": round(sum(r["low"] for r in ranges) / len(ranges), 1),
                     "high": round(sum(r["high"] for r in ranges) / len(ranges), 1),
                 }
+            if rng is not None:
                 return rng, "core", None
             return {"low": 0.0, "high": 0.0}, "none", None
 
@@ -288,6 +325,17 @@ def build_all(companies, all_values, metric_defs):
             data_source = "agentic_estimated"
         else:
             data_source = "no_data"
+
+        # Real, vetted third-party scores (Upright net-impact model, B Corp
+        # assessment) shown as-is -- absolute values, no range, since these
+        # are single reported numbers, not estimates. Does NOT feed the
+        # agentic pillar score (see _pillar()'s docstring for why).
+        real_disclosed = {
+            # .value (not .numeric) -- bcorp_fetcher stores a halved
+            # "normalised" figure in numeric_value; .value carries the raw
+            # reported score, which is what these figures should show.
+            k: by_key[k]["value"] for k in _REAL_DISCLOSED_KEYS if k in by_key
+        }
 
         def _metric_dict(k):
             e = by_key[k]
@@ -332,6 +380,7 @@ def build_all(companies, all_values, metric_defs):
             "country": company.country,
             "esg_scoring": getattr(company, "esg_scoring", "pending"),
             "data_source": data_source,
+            "real_disclosed": real_disclosed,
             "has_estimates": has_estimates.get(cname, False),
             # Completeness marker: revenue is the essential scoring denominator and
             # only ever comes from estimation, so its presence means the company has

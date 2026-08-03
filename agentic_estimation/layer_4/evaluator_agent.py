@@ -33,7 +33,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
-from agentic_estimation.layer_3.scoring_agent import ESGScore, _clamp, _METRIC_KEYS
+from agentic_estimation.layer_3.scoring_agent import ESGScore, _clamp, _METRIC_KEYS, _build_signals_block
 
 log = get_logger("evaluator_agent")
 
@@ -85,20 +85,6 @@ class EvaluationResult:
     final_score: ESGScore           # same as original on pass
     issues: list = field(default_factory=list)
     evaluator_note: str = ""
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _build_signals_block(signals: dict[str, str], max_chars_per_source: int = 500) -> str:
-    if not signals:
-        return "(no signals available)"
-    parts = []
-    for source, text in signals.items():
-        truncated = text[:max_chars_per_source].strip()
-        if len(text) > max_chars_per_source:
-            truncated += "..."
-        parts.append(f"[{source.upper()}]\n{truncated}")
-    return "\n\n".join(parts)
 
 
 def _parse_eval_response(raw: str) -> Optional[dict]:

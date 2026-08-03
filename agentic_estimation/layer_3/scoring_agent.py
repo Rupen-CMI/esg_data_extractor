@@ -54,9 +54,8 @@ Scoring rules:
 - Score above 50 means the company outperforms its country peer group
 - Score below 50 means it underperforms
 - Use ONLY the evidence provided — do not invent facts
-- If evidence for a pillar is thin or absent, score near 45–55 (slightly below average to reflect uncertainty)
+- If evidence for a pillar is thin or absent, score at the country baseline (50) — do not penalize for absence of evidence, only for evidence of actual problems
 - Use the company metadata to calibrate expectations: a large listed multinational is held to a higher standard than a small private firm
-- Be conservative: companies with limited disclosures likely underperform undisclosed
 
 COMPANY: {company}
 INDUSTRY: {industry}
@@ -98,7 +97,7 @@ class ESGScore:
     signals_used: int = 0
 
 
-def _build_signals_block(signals: dict[str, str], max_chars_per_source: int = 600) -> str:
+def _build_signals_block(signals: dict[str, str], max_chars_per_source: int = 4000) -> str:
     """Format signals dict into a readable block for the LLM prompt."""
     if not signals:
         return "(no signals gathered)"

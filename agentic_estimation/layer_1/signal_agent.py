@@ -210,28 +210,145 @@ _GOOGLE_RSS_KEYWORDS = (
 )
 
 
-def _google_news_rss_query(company: str, extra: str = "", site: str = "", locale: str = "hl=en-US&gl=US&ceid=US:en", when_days: int = 365) -> Optional[str]:
+# Headlines kept per feed after recency filtering. Raised from the original
+# inline 8: Google returns ~100 items per query, and taking the first 8 by
+# relevance threw away most of the recent coverage along with the old.
+_MAX_RSS_ITEMS = 20
+
+# QUERY OVERFLOW -- the reason this module batches its keyword group.
+#
+# Google News RSS silently DISCARDS trailing operators once a query exceeds a
+# complexity threshold, then falls back to a plain relevance search. It does
+# not error; it just quietly stops honouring `when:`/`after:`/`site:`.
+# Measured live, holding `when:30d` fixed and varying only the OR-group size:
+#
+#     OR-terms   oldest article returned
+#         8          5 days   -- filter honoured
+#        12         25 days   -- filter honoured
+#        15       5774 days   -- filter DROPPED
+#        20       5774 days   -- filter DROPPED
+#
+# _GOOGLE_RSS_KEYWORDS carries ~60 terms, so `when:Nd` has never actually been
+# applied in production -- which is why decade-old articles reached the claim
+# extractor as if they were current evidence. The company name survives the
+# overflow (85/92 titles still matched it); only the operators are lost.
+#
+# Fix: split the keyword group into small batches, query each with the date
+# operator intact, and union the results. Verified to both filter correctly
+# AND return more articles than the single long query:
+#     Nestle    100 items (oldest 1571d)  ->  279 items (oldest 364d)
+#     Shell     100 items (oldest 2028d)  ->  245 items (oldest 363d)
+# Batching is free: 40 rapid sequential and 25 concurrent requests all
+# returned 200 with no rate limiting and no required User-Agent.
+_RSS_BATCH_SIZE = 5
+
+
+def _keyword_batches(keywords: str, size: int = _RSS_BATCH_SIZE) -> list[str]:
+    """Split an 'A OR B OR "C D"' string into OR-groups of at most `size`
+    terms, keeping quoted phrases intact."""
+    terms, buf, in_quotes = [], [], False
+    for tok in keywords.split():
+        if tok == "OR" and not in_quotes:
+            if buf:
+                terms.append(" ".join(buf))
+                buf = []
+            continue
+        buf.append(tok)
+        if tok.count('"') % 2 == 1:
+            in_quotes = not in_quotes
+    if buf:
+        terms.append(" ".join(buf))
+    return [" OR ".join(terms[i:i+size]) for i in range(0, len(terms), size)]
+
+
+def _filter_items_by_recency(items: list, when_days: int) -> list:
+    """Drop RSS items older than `when_days`, newest first.
+
+    Google's own `when:Nd` operator does not work on the RSS endpoint (see
+    _google_news_rss_query), so recency has to be enforced here. Items whose
+    pubDate cannot be parsed are KEPT rather than dropped -- an unparseable
+    date is not evidence that the article is old, and silently discarding
+    them would lose real coverage.
+
+    when_days <= 0 disables filtering entirely (still sorts newest-first).
+    """
+    from email.utils import parsedate_to_datetime
+    from datetime import datetime, timezone, timedelta
+
+    if not items:
+        return items
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=when_days) if when_days > 0 else None
+
+    dated: list[tuple[Optional[object], object]] = []
+    for it in items:
+        raw = it.findtext("pubDate") or ""
+        try:
+            dt = parsedate_to_datetime(raw)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            dt = None
+        if cutoff is not None and dt is not None and dt < cutoff:
+            continue
+        dated.append((dt, it))
+
+    # Newest first; undated items sort last but are retained.
+    dated.sort(key=lambda pair: (pair[0] is not None, pair[0] or now), reverse=True)
+    return [it for _dt, it in dated]
+
+
+def _google_news_rss_query(company: str, extra: str = "", site: str = "", locale: str = "hl=en-US&gl=US&ceid=US:en", when_days: int = 730) -> Optional[str]:
     """Shared Google News RSS fetch+parse -- used for the general feed, the
     outlet-restricted feeds (Reuters, Bloomberg, Financial Times, ESG Today,
     GreenBiz -- site restriction via Google's site: operator, same trick as
     the DDG site-search helpers use), and the localized-ESG feed (locale
     routes the query to that country's actual Google News edition).
 
-    site: MUST come first in the query string -- found live that Google News
-    RSS silently ignores/ranks-away a trailing "site:x.com" once it comes
-    after a large parenthesized OR-group (verified: identical query with
-    site: at the end returned zero reuters.com articles; moved to the front,
-    the exact same terms returned 100/100 real reuters.com results).
+    The keyword group is sent as SEVERAL small queries rather than one large
+    one, and the results are unioned -- see _RSS_BATCH_SIZE for the measured
+    reason (a long OR-group makes Google silently drop `when:`/`site:`).
 
-    when_days: Google News RSS's own "when:Nd" freshness operator, appended
-    directly to the query string (not a URL param) -- restricts results to
-    the past N days. Default 365 (past year): ESG evidence (pledges,
-    certifications, disclosed incidents) is meaningfully relevant over a
-    longer horizon than typical news search, but an unbounded query pulls in
-    decade-old, no-longer-representative coverage. Set to 0 to omit the
-    restriction entirely (unbounded, prior behavior)."""
+    site: goes first in each query. The original note here said position was
+    the cause of trailing `site:` being ignored; it is really the same
+    overflow -- with a short enough query the operator is honoured wherever
+    it sits. Kept first regardless, since it costs nothing.
+
+    when_days: recency window in days. Enforced BOTH by Google's `when:Nd`
+    operator (which does work, once the query is short enough) and again
+    client-side against each item's pubDate. The client-side pass is a
+    deliberate belt-and-braces: it is what caught the overflow bug in the
+    first place, and it keeps a future query-length regression from silently
+    re-admitting decade-old articles. pubDates are reliable -- 400/400 parsed,
+    always GMT, and reflect original publication rather than index time.
+
+    Default 730 (two years): ESG evidence (pledges, certifications, disclosed
+    incidents) stays relevant longer than typical news, but a resolved
+    five-year-old controversy should not still be moving a score today.
+    Set to 0 to disable the window (results are still sorted newest-first)."""
+    seen_links: set[str] = set()
+    merged: list = []
+    for batch in _keyword_batches(_GOOGLE_RSS_KEYWORDS):
+        items = _rss_fetch_items(company, batch, extra, site, locale, when_days)
+        for it in items:
+            link = (it.findtext("link") or "").strip()
+            key = link or (it.findtext("title") or "").strip()
+            if key and key in seen_links:
+                continue
+            if key:
+                seen_links.add(key)
+            merged.append(it)
+    if not merged:
+        return None
+    return _render_rss_items(_filter_items_by_recency(merged, when_days))
+
+
+def _rss_fetch_items(company: str, keywords: str, extra: str, site: str,
+                      locale: str, when_days: int) -> list:
+    """One Google News RSS request. Returns raw <item> elements (possibly
+    empty); never raises."""
     q = f"site:{site} " if site else ""
-    q += f'"{company}" ({_GOOGLE_RSS_KEYWORDS})'
+    q += f'"{company}" ({keywords})'
     if extra:
         q += f" {extra}"
     if when_days > 0:
@@ -239,12 +356,19 @@ def _google_news_rss_query(company: str, extra: str = "", site: str = "", locale
     url = f"https://news.google.com/rss/search?q={quote_plus(q)}&{locale}"
     r = _get(url)
     if not r:
-        return None
+        return []
     try:
-        root  = ET.fromstring(r.content)
-        items = root.findall(".//item")
+        return ET.fromstring(r.content).findall(".//item")
+    except Exception:
+        return []
+
+
+def _render_rss_items(items: list) -> Optional[str]:
+    """Format already-filtered, newest-first <item> elements into the
+    "[date] headline <url>" lines the claim extractor consumes."""
+    try:
         hits  = []
-        for item in items[:8]:
+        for item in items[:_MAX_RSS_ITEMS]:
             title = (item.findtext("title") or "").strip()
             pub   = (item.findtext("pubDate") or "")[:16]
             link  = (item.findtext("link") or "").strip()

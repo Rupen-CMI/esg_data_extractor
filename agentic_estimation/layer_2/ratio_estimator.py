@@ -253,24 +253,35 @@ async def save_ratio_estimates(company_id, pillar_map: dict[str, str], estimates
     written = 0
     conn = await asyncpg.connect(db_url)
     try:
-        for factor, est in estimates.items():
-            if est.confidence <= 0 or est.value is None:
-                continue  # absent — no claim, per the "no source, no claim" rule
-            pillar = pillar_map.get(factor, "S")  # most Tier-3 factors default to S if unmapped
+        async with conn.transaction():
+            # No unique constraint on this table to ON CONFLICT against, so a
+            # rerun for the same company would otherwise just append on top of
+            # every prior run's rows forever. Clear this producer's own rows
+            # for this company first -- scoped to produced_by so it never
+            # touches rows written by a different producer (e.g.
+            # pillar_extractors.persist_claims()).
             await conn.execute(
-                """
-                INSERT INTO company_evidence_claims
-                    (company_id, pillar, factor, polarity, strength, confidence,
-                     value, reasoning, source_note, produced_by, method)
-                VALUES ($1, $2, $3, 0, $4, $5, $6, $7, $8, 'ratio_estimator', $9)
-                """,
-                str(company_id), pillar, factor,
-                min(est.confidence, 1.0),  # strength: reuse confidence magnitude, polarity neutral (0) — a peer statistic isn't inherently positive/negative
-                est.confidence, est.value,
-                f"Peer-ratio fallback ({est.method}), n_peers={est.n_peers}",
-                est.source_note, est.method,
+                "DELETE FROM company_evidence_claims WHERE company_id = $1 AND produced_by = 'ratio_estimator'",
+                str(company_id),
             )
-            written += 1
+            for factor, est in estimates.items():
+                if est.confidence <= 0 or est.value is None:
+                    continue  # absent — no claim, per the "no source, no claim" rule
+                pillar = pillar_map.get(factor, "S")  # most Tier-3 factors default to S if unmapped
+                await conn.execute(
+                    """
+                    INSERT INTO company_evidence_claims
+                        (company_id, pillar, factor, polarity, strength, confidence,
+                         value, reasoning, source_note, produced_by, method)
+                    VALUES ($1, $2, $3, 0, $4, $5, $6, $7, $8, 'ratio_estimator', $9)
+                    """,
+                    str(company_id), pillar, factor,
+                    min(est.confidence, 1.0),  # strength: reuse confidence magnitude, polarity neutral (0) — a peer statistic isn't inherently positive/negative
+                    est.confidence, est.value,
+                    f"Peer-ratio fallback ({est.method}), n_peers={est.n_peers}",
+                    est.source_note, est.method,
+                )
+                written += 1
     finally:
         await conn.close()
 

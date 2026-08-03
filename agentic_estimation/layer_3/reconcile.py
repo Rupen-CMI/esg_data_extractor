@@ -109,16 +109,45 @@ log = get_logger("reconcile")
 # selective. Per-pillar weights let S trust Holistic more WITHOUT diluting E's
 # already-good Formula signal.
 _PILLAR_WEIGHTS = {
-    # DECISION (2026-07-20): flat 0.7/0.3 is the settled default. The per-pillar
-    # variant (E .75/.25, S .45/.55, G .65/.35) was tried pre-crosswalk but its
-    # backtest never completed, and the fixed-evidence config comparisons done
-    # while validating the v5/v8 formula changes showed that n=30 live runs
-    # carry +/-0.1 evidence-gathering noise per pillar -- far larger than any
-    # weight-split effect we could measure. Per-pillar splits are therefore
-    # UNDECIDABLE at this sample size; revisit in Phase 5 with the full ground
-    # truth (fixed-evidence offline comparison, not fresh-gather backtests).
+    # DECISION (2026-07-20): flat 0.7/0.3 was the settled default, because
+    # per-pillar splits were UNDECIDABLE at n=30 (fresh-gather noise +/-0.1
+    # Spearman/pillar dwarfed any weight effect).
+    #
+    # REVISED 2026-08-02 for S ONLY, on frozen evidence at n=373 tune /
+    # n=94 holdout (calibration/abl_final2_split_*.json, replayed offline via
+    # calibration/weight_tuner.py -- no gather noise, so the earlier
+    # "undecidable" objection no longer applies at this sample size).
+    #
+    # S: 0.7 -> 0.1 formula. Measured S Spearman as the formula's share falls:
+    #     0.7 -> tune +0.094  holdout +0.095   (previous default)
+    #     0.3 -> tune +0.198  holdout +0.268
+    #     0.1 -> tune +0.257  holdout +0.360
+    #     0.0 -> tune +0.277  holdout +0.375
+    #   The curve is MONOTONIC on both splits -- there is no interior optimum,
+    #   which is the signature of a component that subtracts signal rather than
+    #   one whose weight was merely mis-set. Root cause is coverage, not the
+    #   weights: only 14% of tune / 16% of holdout companies have ANY S claim
+    #   (51/373, 15/94), so for ~85% of companies the S "formula vote" is a
+    #   country baseline that ranks at +0.007 tune -- i.e. noise diluting a
+    #   holistic vote that ranks at +0.277/+0.375 on its own.
+    #   Kept at 0.1 rather than 0.0 deliberately: the formula still carries the
+    #   real claims for the 14% that have them, and a nonzero share means new
+    #   S evidence sources (enforcement/BHRRC ingestion) raise this pillar
+    #   automatically instead of being ignored by a hard-zeroed vote. Revisit
+    #   upward once S claim coverage materially exceeds ~15%.
+    #
+    # E and G deliberately UNCHANGED at 0.7/0.3:
+    #   E -- every alternative blend was worse on BOTH splits (0.6 -> tune
+    #        +0.241/holdout +0.198; 0.5 -> +0.229/+0.186; 0.3 -> +0.202/+0.172).
+    #   G -- a 52-parameter fit reached tune +0.276 but FELL on holdout
+    #        (+0.203 -> +0.158), the classic overfit signature, so it was
+    #        rejected. G's real problem is upstream: 94% of G claims are
+    #        esg_report_published (rho -0.051) and compliance_certification
+    #        (rho +0.030) -- boilerplate "we published a policy" facts that
+    #        nearly every company satisfies and that therefore cannot rank
+    #        anyone. Fix the evidence, not this constant.
     "E": {"formula": 0.7, "holistic": 0.3},
-    "S": {"formula": 0.7, "holistic": 0.3},
+    "S": {"formula": 0.1, "holistic": 0.9},
     "G": {"formula": 0.7, "holistic": 0.3},
 }
 _HOLISTIC_CONFIDENCE = 0.5   # fixed cap -- see module docstring

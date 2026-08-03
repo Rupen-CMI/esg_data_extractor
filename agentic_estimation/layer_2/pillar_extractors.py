@@ -43,8 +43,8 @@ from agentic_estimation.shared.claim_types import ExtractedClaim
 
 log = get_logger("pillar_extractors")
 
-_MAX_CHARS_PER_SIGNAL = 1500
-_MAX_TOTAL_CHARS = 12000
+_MAX_CHARS_PER_SIGNAL = 4000
+_MAX_TOTAL_CHARS = 60000
 
 _PILLAR_TOPICS = {
     "E": (
@@ -306,33 +306,44 @@ async def persist_claims(company_id, claims: list[ExtractedClaim], produced_by: 
         tag_to_id = {r["source"]: r["id"] for r in rows}
 
         written = 0
-        for c in claims:
-            source_signal_id = tag_to_id.get(c.source_tag)
-            source_note = None if source_signal_id else f"tag:{c.source_tag} (not found in company_esg_signals)"
-            try:
-                await conn.execute(
-                    """
-                    INSERT INTO company_evidence_claims
-                        (company_id, pillar, factor, polarity, strength, confidence,
-                         value, reasoning, source_signal_id, source_note, produced_by, method)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                    """,
-                    str(company_id), c.pillar, c.factor, c.polarity, c.strength, c.confidence,
-                    c.value, c.reasoning, source_signal_id, source_note, produced_by, c.method,
-                )
-                written += 1
-            except asyncpg.exceptions.ForeignKeyViolationError as exc:
-                # company_id doesn't reference a real, committed companies row
-                # (e.g. threaded through a pipeline stage ahead of its own
-                # insert committing). Fail loudly with context rather than
-                # letting a bare asyncpg error propagate from inside the loop
-                # and abort a whole batch over one bad id -- callers running
-                # a batch (calibration harness, graph fan-out) can catch this
-                # specific error and skip just this company.
-                raise RuntimeError(
-                    f"persist_claims: company_id={company_id} does not exist in companies "
-                    f"table (FK violation on claim factor={c.factor!r})"
-                ) from exc
+        async with conn.transaction():
+            # No unique constraint on this table to ON CONFLICT against, so a
+            # rerun for the same company would otherwise just append on top of
+            # every prior run's claims forever. Clear this producer's own rows
+            # for this company first -- scoped to produced_by so it never
+            # touches rows written by a different producer (e.g.
+            # ratio_estimator.save_ratio_estimates()).
+            await conn.execute(
+                "DELETE FROM company_evidence_claims WHERE company_id = $1 AND produced_by = $2",
+                str(company_id), produced_by,
+            )
+            for c in claims:
+                source_signal_id = tag_to_id.get(c.source_tag)
+                source_note = None if source_signal_id else f"tag:{c.source_tag} (not found in company_esg_signals)"
+                try:
+                    await conn.execute(
+                        """
+                        INSERT INTO company_evidence_claims
+                            (company_id, pillar, factor, polarity, strength, confidence,
+                             value, reasoning, source_signal_id, source_note, produced_by, method)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        """,
+                        str(company_id), c.pillar, c.factor, c.polarity, c.strength, c.confidence,
+                        c.value, c.reasoning, source_signal_id, source_note, produced_by, c.method,
+                    )
+                    written += 1
+                except asyncpg.exceptions.ForeignKeyViolationError as exc:
+                    # company_id doesn't reference a real, committed companies row
+                    # (e.g. threaded through a pipeline stage ahead of its own
+                    # insert committing). Fail loudly with context rather than
+                    # letting a bare asyncpg error propagate from inside the loop
+                    # and abort a whole batch over one bad id -- callers running
+                    # a batch (calibration harness, graph fan-out) can catch this
+                    # specific error and skip just this company.
+                    raise RuntimeError(
+                        f"persist_claims: company_id={company_id} does not exist in companies "
+                        f"table (FK violation on claim factor={c.factor!r})"
+                    ) from exc
     finally:
         await conn.close()
 

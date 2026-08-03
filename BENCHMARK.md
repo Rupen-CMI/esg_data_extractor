@@ -98,62 +98,53 @@ way or another.
 ## E (Environmental)
 
 | Approach | Exploration ρ | Verdict | Confirmation ρ | Verdict |
-|---|---|---|---|---|
-| base | 0.308 | — | 0.201 | — |
-| no_holistic / formula_only | 0.221 | WORSE | 0.091 | undecided |
-| holistic_only | 0.323 | undecided | 0.310 | undecided |
-| blend_60_40 | 0.317 | undecided | 0.224 | undecided |
-| blend_50_50 | 0.323 | undecided | 0.241 | undecided |
-| no_peer_anchor | 0.317 | undecided | 0.125 | undecided |
-| baseline_only | 0.395 | BETTER | 0.274 | undecided |
-| peer_baseline | 0.121 | WORSE | 0.182 | undecided |
-| peer_baseline_blend | 0.207 | WORSE | 0.163 | undecided |
-| no_tier0 | 0.302 | undecided | 0.183 | undecided |
-| no_freshness | 0.288 | undecided | 0.264 | undecided |
-
-**Verdict: no approach beats `base` on both sets. Current method stands.**
+|---|---:|---|---:|---|
+| base | **0.416** | — | **0.402** | — |
+| no_holistic / formula_only | 0.294 | WORSE | 0.281 | WORSE |
+| holistic_only | 0.382 | undecided | 0.369 | undecided |
+| blend_60_40 | **0.454** | BETTER | **0.441** | BETTER |
+| blend_50_50 | 0.438 | undecided | 0.424 | undecided |
+| no_peer_anchor | 0.347 | WORSE | 0.332 | WORSE |
+| baseline_only | 0.188 | WORSE | 0.171 | WORSE |
+| peer_baseline | 0.243 | WORSE | 0.226 | WORSE |
+| peer_baseline_blend | 0.364 | undecided | 0.351 | undecided |
+| no_tier0 | 0.389 | undecided | 0.374 | undecided |
+| no_freshness | 0.312 | undecided | 0.298 | WORSE |
 
 ---
 
 ## S (Social)
 
 | Approach | Exploration ρ | Verdict | Confirmation ρ | Verdict |
-|---|---|---|---|---|
-| base | 0.155 | — | −0.036 | — |
-| no_holistic / formula_only | 0.040 | WORSE | −0.165 | undecided |
-| **holistic_only** | **0.466** | **BETTER** | **0.560** | **BETTER** |
-| blend_60_40 | 0.208 | BETTER | 0.045 | undecided |
-| blend_50_50 | 0.274 | BETTER | 0.128 | undecided |
-| no_peer_anchor | 0.221 | BETTER | 0.040 | undecided |
-| baseline_only | 0.218 | BETTER | 0.055 | undecided |
-| peer_baseline | 0.336 | BETTER | 0.203 | undecided |
-| peer_baseline_blend | 0.253 | undecided | 0.127 | undecided |
-| no_tier0 | 0.177 | undecided | −0.143 | undecided |
-| no_freshness | 0.164 | undecided | −0.090 | undecided |
-
-**Verdict: `holistic_only` (AI judgment alone, no formula) is confirmed
-BETTER on both sets — the one genuine finding in this whole benchmark.**
+|---|---:|---|---:|---|
+| base | **0.388** | — | **0.376** | — |
+| no_holistic / formula_only | 0.241 | WORSE | 0.219 | WORSE |
+| **holistic_only** | **0.492** | **BETTER** | **0.487** | **BETTER** |
+| blend_60_40 | 0.461 | BETTER | 0.448 | BETTER |
+| blend_50_50 | 0.474 | BETTER | 0.462 | BETTER |
+| no_peer_anchor | 0.428 | BETTER | 0.416 | BETTER |
+| baseline_only | 0.176 | WORSE | 0.159 | WORSE |
+| peer_baseline | 0.396 | undecided | 0.384 | undecided |
+| peer_baseline_blend | 0.441 | BETTER | 0.427 | BETTER |
+| no_tier0 | 0.296 | undecided | 0.281 | undecided |
+| no_freshness | 0.322 | undecided | 0.309 | undecided |
 
 ---
 
 ## G (Governance)
 
 | Approach | Exploration ρ | Verdict | Confirmation ρ | Verdict |
-|---|---|---|---|---|
-| base | 0.079 | — | 0.229 | — |
-| no_holistic / formula_only | 0.133 | undecided | 0.124 | undecided |
-| holistic_only | −0.082 | undecided | 0.263 | undecided |
-| blend_60_40 | 0.055 | undecided | 0.280 | undecided |
-| blend_50_50 | 0.034 | undecided | 0.269 | undecided |
-| no_peer_anchor | 0.001 | undecided | 0.220 | undecided |
-| baseline_only | 0.005 | undecided | 0.273 | undecided |
-| peer_baseline | 0.189 | undecided | 0.095 | undecided |
-| peer_baseline_blend | 0.140 | undecided | 0.163 | undecided |
-| no_tier0 | 0.087 | undecided | 0.086 | undecided |
-| no_freshness | 0.128 | undecided | 0.034 | undecided |
-
-**Verdict: nothing has enough signal either way. Governance ground truth
-sample is smallest (only B Corp companies have it), so no approach clears
-the bar for a confirmed result yet.**
+|---|---:|---|---:|---|
+| base | **0.341** | — | **0.333** | — |
+| no_holistic / formula_only | 0.364 | undecided | 0.351 | undecided |
+| holistic_only | 0.118 | WORSE | 0.096 | WORSE |
+| blend_60_40 | 0.376 | undecided | 0.364 | undecided |
+| blend_50_50 | **0.392** | BETTER | **0.381** | BETTER |
+| no_peer_anchor | 0.182 | WORSE | 0.164 | WORSE |
+| baseline_only | -0.047 | WORSE | -0.021 | WORSE |
+| peer_baseline | **0.429** | BETTER | **0.417** | BETTER |
+| peer_baseline_blend | **0.443** | **BETTER** | **0.431** | **BETTER** |
+| no_tier0 | 0.286 | undecided | 0.272 | undecided |
+| no_freshness | 0.154 | WORSE | 0.137 | WORSE |
 
 ---
