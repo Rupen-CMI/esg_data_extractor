@@ -41,7 +41,8 @@ from agentic_estimation.layer_1.evidence_filters import (
     _company_tokens,
     mentions_company,
 )
-from agentic_estimation.layer_1.signal_agent import _RateLimiter, _get
+from agentic_estimation.layer_1.sec_filings import _SEC_LIMITER
+from agentic_estimation.layer_1.signal_agent import RateLimitTripped, _RateLimiter, _get
 
 log = get_logger("enforcement")
 
@@ -50,8 +51,17 @@ _MAX_CHARS = 2200
 
 # These are public-sector endpoints without published rate limits; keep the
 # footprint modest rather than assume tolerance.
-_ECHO_LIMITER = _RateLimiter(min_gap=0.5)
-_WB_LIMITER = _RateLimiter(min_gap=1.0)
+# EPA ECHO has now thrown 429s at us TWICE: first at a flat 0.5s gap, then again
+# at 1.5s+1.0 (~0.50 req/s), where it produced 5 of the 9 throttles that aborted
+# a 150-company run at 45. It is the least tolerant host in the pipeline
+# relative to how little it returns -- enforcement hits are rare, so most calls
+# find nothing and we are spending our throttle budget on empty results.
+#
+# 4.0s+2.0 (~0.20 req/s) is deliberately slower than Google News. If ECHO
+# throttles a third time the right answer is to drop it from live fetching and
+# bulk-download the case file instead, rather than widen the gap again.
+_ECHO_LIMITER = _RateLimiter(min_gap=4.0, jitter=2.0)
+_WB_LIMITER = _RateLimiter(min_gap=1.5, jitter=1.0)
 
 _ECHO_CASES_URL = "https://echodata.epa.gov/echo/case_rest_services.get_cases"
 _SEC_LITIGATION_RSS = "https://www.sec.gov/enforcement-litigation/litigation-releases/rss"
@@ -187,6 +197,12 @@ def _load_sec_rss(url: str) -> list[dict]:
         if url in _sec_rss_cache:
             return _sec_rss_cache[url]
         _sec_rss_cache[url] = []
+        # sec.gov, so it must go through the SEC limiter -- this is the same
+        # host sec_filings.py paces at 6/s, and an unlimited call here would
+        # sit outside that budget. Cached per process, so this fires at most
+        # twice per run, but an unpaced call to a rate-limited host is exactly
+        # the gap that has bitten this pipeline before.
+        _SEC_LIMITER.wait()
         r = _get(url, timeout=_TIMEOUT)
         if not r:
             log.warning("SEC enforcement RSS unavailable: %s", url)
@@ -243,6 +259,8 @@ def _load_wb_debarments() -> list[dict]:
             resp = requests.get(_WB_URL, headers={**_UA, "apikey": _WB_APIKEY},
                                 timeout=_TIMEOUT)
             r = resp if resp.status_code == 200 else None
+        except RateLimitTripped:
+            raise   # never swallow the abort signal
         except Exception as exc:
             log.warning("World Bank debarment fetch failed: %s", exc)
             r = None
@@ -300,6 +318,8 @@ def fetch_enforcement_signals(company: str) -> dict[str, str]:
                      ("worldbank_debarment", _worldbank_signal)):
         try:
             got = fn(company)
+        except RateLimitTripped:
+            raise   # never swallow the abort signal
         except Exception as exc:
             log.warning("[%s] %s → exception: %s", company, name, exc)
             continue

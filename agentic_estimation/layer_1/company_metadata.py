@@ -46,17 +46,65 @@ log = get_logger("company_metadata")
 _HEADERS = {"User-Agent": "ESG-Data-Extractor/1.0 (research-pipeline)"}
 _TIMEOUT = 15
 
-# Per-source rate limiting (seconds between calls)
-_LAST_CALL: dict[str, float] = {"wikidata": 0.0, "gleif": 0.0, "osm": 0.0}
-_MIN_GAP:   dict[str, float] = {"wikidata": 0.6, "gleif": 0.6, "osm": 1.1}
+# ── Per-source rate limiting ─────────────────────────────────────────────────
+# REWRITTEN after an audit found this module was the weakest throttle in the
+# pipeline, and it runs on EVERY company (calibration_harness and
+# governance_collector both call get_company_metadata).
+#
+# Three defects in the previous implementation, all of which only bite under
+# the concurrency the pipeline actually runs at:
+#
+#   1. NOT THREAD-SAFE. The read-modify-write of _LAST_CALL had no lock, so N
+#      concurrent workers all read the same stale timestamp, all computed
+#      wait<=0, and all fired at once -- the throttle silently did nothing
+#      exactly when it was needed. This is the same class of bug that let a
+#      burst of Google News requests through and got the pipeline blocked.
+#   2. NO JITTER. Perfectly-spaced requests are a bot signature; every other
+#      limiter in this codebase randomises its gap.
+#   3. GAPS TOO TIGHT for the politeness policies of these specific hosts --
+#      Wikimedia and OpenStreetMap both publish explicit guidance, and OSM's
+#      Nominatim is an absolute maximum of 1 req/s SHARED across all clients.
+#
+# Now delegates to signal_agent._RateLimiter: one process-wide, lock-held,
+# jittered limiter per host, identical to the mechanism protecting DDG,
+# Google News, Wikipedia and SEC. One implementation, one place to tune.
+from agentic_estimation.layer_1.signal_agent import _RateLimiter, RateLimitTripped
+
+_LIMITERS: dict[str, _RateLimiter] = {
+    # Wikimedia asks for serial, clearly-identified traffic from bots.
+    "wikidata": _RateLimiter(min_gap=1.5, jitter=1.0),
+    # GLEIF publishes no explicit limit; stay conservative, it is a small
+    # public-good API and we query it once per company.
+    "gleif":    _RateLimiter(min_gap=1.5, jitter=1.0),
+    # Nominatim's usage policy is a hard ceiling of 1 request/second across
+    # every client sharing an IP. 2.0s + jitter keeps us clearly under it.
+    "osm":      _RateLimiter(min_gap=2.0, jitter=1.0),
+}
 
 
 def _throttle(source: str) -> None:
-    elapsed = time.monotonic() - _LAST_CALL[source]
-    wait = _MIN_GAP[source] - elapsed
-    if wait > 0:
-        time.sleep(wait)
-    _LAST_CALL[source] = time.monotonic()
+    """Block until this source's next request is allowed. Process-wide and
+    thread-safe: concurrent workers queue here rather than bursting."""
+    lim = _LIMITERS.get(source)
+    if lim is not None:
+        lim.wait()
+
+
+def _check_throttled(r, url: str) -> None:
+    """Feed a 429/503 response into the shared rate-limit tripwire.
+
+    Every request in this module tests `r.ok` rather than calling
+    raise_for_status(), so a throttling response was indistinguishable from
+    "this company has no Wikidata entry" -- it silently became a missing
+    metadata field. Worse, because these calls never went through
+    signal_agent._get, their 429s were never counted at all, so the abort
+    threshold could not see them.
+
+    Raises RateLimitTripped once the shared threshold is crossed.
+    """
+    if r is not None and r.status_code in (429, 503):
+        from agentic_estimation.layer_1.signal_agent import _note_rate_limit
+        _note_rate_limit(url)
 
 
 # ── Name normalisation ────────────────────────────────────────────────────────
@@ -239,6 +287,7 @@ def _wikidata_qid(company: str) -> Optional[str]:
             },
             headers=_HEADERS, timeout=_TIMEOUT,
         )
+        _check_throttled(r, _WIKIDATA_API)
         hits = r.json().get("search", []) if r.ok else []
         if not hits:
             return None
@@ -255,6 +304,8 @@ def _wikidata_qid(company: str) -> Optional[str]:
             return best_hit["id"]
         log.debug("Wikidata: no hit for '%s' cleared the 0.6 name-overlap guard -- falling through", company)
         return None
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.debug("Wikidata QID search failed for '%s': %s", company, exc)
         return None
@@ -272,6 +323,7 @@ def _wikidata_lookup(company: str) -> dict:
             params={"query": _SPARQL.format(qid=qid), "format": "json"},
             headers=_HEADERS, timeout=_TIMEOUT + 10,
         )
+        _check_throttled(r, _WIKIDATA_API)
         rows = r.json().get("results", {}).get("bindings", []) if r.ok else []
         if not rows:
             return {}
@@ -321,6 +373,8 @@ def _wikidata_lookup(company: str) -> dict:
         if not any(facts[k] for k in _substantive):
             return {}
         return facts
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.debug("Wikidata SPARQL failed for '%s' (%s): %s", company, qid, exc)
         return {}
@@ -341,6 +395,7 @@ def _gleif_candidates(company: str) -> list[tuple[str, float]]:
             params={"field": "entity.legalName", "q": _norm(company) or company},
             headers=_GLEIF_HEADERS, timeout=_TIMEOUT,
         )
+        _check_throttled(r, _GLEIF_BASE)
         if not r.ok:
             return []
         out = []
@@ -354,6 +409,8 @@ def _gleif_candidates(company: str) -> list[tuple[str, float]]:
             if score >= 0.6:
                 out.append((lei, score))
         return sorted(out, key=lambda t: -t[1])
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.debug("GLEIF fuzzy search failed for '%s': %s", company, exc)
         return []
@@ -366,7 +423,10 @@ def _gleif_record(lei: str) -> Optional[dict]:
             f"{_GLEIF_BASE}/lei-records/{lei}",
             headers=_GLEIF_HEADERS, timeout=_TIMEOUT,
         )
+        _check_throttled(r, _GLEIF_BASE)
         return r.json().get("data") if r.ok else None
+    except RateLimitTripped:
+        raise
     except Exception:
         return None
 
@@ -391,6 +451,7 @@ def _gleif_lookup(company: str) -> dict:
                 params={"filter[fulltext]": company, "page[size]": 10},
                 headers=_GLEIF_HEADERS, timeout=_TIMEOUT,
             )
+            _check_throttled(r, _GLEIF_BASE)
             if r.ok:
                 for rec in r.json().get("data", []):
                     ent   = rec.get("attributes", {}).get("entity", {})
@@ -426,6 +487,8 @@ def _gleif_lookup(company: str) -> dict:
             "registration_status": reg.get("status"),
             "parent_org_known":    parent_known,
         }
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.debug("GLEIF lookup failed for '%s': %s", company, exc)
         return {}
@@ -449,6 +512,7 @@ def _osm_lookup(company: str) -> dict:
             params={"q": company, "format": "jsonv2", "limit": 5, "addressdetails": 1},
             headers=_HEADERS, timeout=_TIMEOUT,
         )
+        _check_throttled(r, _OSM_URL)
         results = r.json() if r.ok else []
 
         # Require exactly one unambiguous business hit to avoid false positives
@@ -470,6 +534,8 @@ def _osm_lookup(company: str) -> dict:
             "country_code": (addr.get("country_code") or "").upper() or None,
             "hq_city":      addr.get("city") or addr.get("town") or addr.get("village"),
         }
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.debug("OSM lookup failed for '%s': %s", company, exc)
         return {}
@@ -750,6 +816,8 @@ def _load_from_db(company_id: UUID) -> Optional[dict]:
         if row:
             return row[0] if isinstance(row[0], dict) else json.loads(row[0])
         return None
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.warning("company_metadata DB load failed: %s", exc)
         return None
@@ -774,6 +842,8 @@ def _save_to_db(company_id: UUID, meta: dict) -> None:
         conn.commit()
         conn.close()
         log.debug("Metadata saved to DB for company_id=%s", company_id)
+    except RateLimitTripped:
+        raise
     except Exception as exc:
         log.warning("company_metadata DB save failed: %s", exc)
 

@@ -50,6 +50,7 @@ w·c'≈8 passes; one weak claim w·c'≈1.5 gates).
 """
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -84,17 +85,55 @@ class PillarSatParams:
 
 _DEFAULT_SAT_PARAMS: dict[str, PillarSatParams] = {
     "E": PillarSatParams(),
-    # S: A=35 from the ensemble-target (A,k) grid search -- the ONLY tuned value
-    # that survived held-out validation (seed42 tune +0.217 vs default +0.196;
-    # seed101 held-out +0.282 vs default +0.265). E and G tuned candidates both
-    # REGRESSED on held-out (classic n=30 overfit) and stay at defaults; real
-    # parameter fitting deferred to Phase 5 against the full ground truth.
-    "S": PillarSatParams(a_pos=35.0, a_neg=35.0),
+    # S: A=200 (was 35), set 2026-08-04 from a sweep across ALL 19 scored corpora
+    # (n=30..421) run through this function, not an offline approximation.
+    #
+    # WHY S AND NOT E/G. A is a positive scalar on the evidence term, so it cannot
+    # reorder companies except where tanh saturates or the 0-100 clamp bites --
+    # which is why E and G are flat in A (E: A=20 wins 7 corpora, A=200 wins 5,
+    # spread ~0.01; G actively PREFERS low A, A=20 winning 10 of 19). Those two
+    # stay at the default 40.
+    #
+    # S is different because it is starved: 7 kept claims across 193 companies in
+    # heldout250, so most S deltas are near zero and A=35 flattened them into ties
+    # that tanh could not separate. A larger A pulls them apart before saturation.
+    # Measured, S only, corpora won: A=20:3  A=40:5  A=90:0  A=120:0  A=200:11.
+    # Monotone within the largest samples (bcorp_pooled_corpus n=421:
+    # 0.189 -> 0.222; abl_seed4001_tune_clean n=132: 0.135 -> 0.191).
+    #
+    # WHY NOT HIGHER. A=300 wins more corpora still (7 vs 4) but starts CLAMPING:
+    # 5.2% of held-out S scores pin to 0 or 100 at A=300 and 11.4% at A=400, which
+    # destroys ordering information at the tails -- the clamp turns distinct
+    # companies into ties, the exact failure A was raised to avoid. A=200 is the
+    # largest value with 0% clamping (held-out S range 5.5-89.5).
+    #
+    # NOTE the earlier A=90 candidate is NOT shipped: it was fitted when `baseline`
+    # was still additive, and on the current tiebreaker formula it wins ZERO corpora
+    # on any pillar.
+    "S": PillarSatParams(a_pos=200.0, a_neg=200.0),
     "G": PillarSatParams(),
 }
 
 _BETA = 0.6                 # coverage floor: sparse-but-real evidence still moves the score
 _EVIDENCE_THRESHOLD = 2.5   # claim evidence-mass gate (peer anchor exempt)
+
+# How the country baseline enters the final score. See Step 5 for the measurements.
+#   "tiebreaker" (default) -- evidence ranks companies; the baseline only orders
+#                             companies that have NO evidence at all.
+#   "additive"             -- the legacy behaviour (score = baseline + evidence),
+#                             kept so any run can be reproduced against old dumps.
+# Override with ESG_BASELINE_MODE=additive.
+_BASELINE_MODE = os.getenv("ESG_BASELINE_MODE", "tiebreaker")
+
+# Mid-scale anchor for the tiebreaker mode. Arbitrary but fixed: only ORDER is
+# claimed to be meaningful, and a constant shift cannot change order.
+_TIEBREAKER_CENTER = 50.0
+
+# How far a no-evidence company may deviate from centre. Small enough that the
+# no-evidence band never interleaves with evidence-scored companies (whose term is
+# A*tanh(...)*cov_mult, order ~10-40 points), preserving the two-tier separation
+# while still ordering the no-evidence companies by their country prior.
+_TIEBREAKER_BASELINE_WEIGHT = 0.02
 
 
 @dataclass
@@ -166,7 +205,46 @@ def saturate_pillar(
 
     # Step 5: sign-aware saturation.
     a_used = p.a_neg if delta < 0 else p.a_pos
-    raw = baseline + a_used * math.tanh(p.k * delta) * cov_mult
+    evidence_term = a_used * math.tanh(p.k * delta) * cov_mult
+
+    if _BASELINE_MODE == "tiebreaker":
+        # The country baseline is a RANKING TIEBREAKER, not an additive floor.
+        #
+        # WHY (measured 2026-08-04, held-out corpus heldout250-c98d3428, n=193,
+        # zero overlap with any tuning set):
+        #     baseline + evidence   E +0.136  S -0.036  G +0.164
+        #     evidence only         E +0.427  S +0.250  G +0.284
+        #     tiebreaker (this)     E +0.445  S +0.240  G +0.290
+        # A sweep of score = lambda*baseline + evidence declined MONOTONICALLY as
+        # lambda rose, on all three pillars, with the optimum at lambda=0 and no
+        # interior maximum -- the signature of a term that subtracts signal rather
+        # than one that is merely mis-weighted.
+        #
+        # Root cause: the baseline orders COUNTRIES at Spearman +0.068 (n=16
+        # countries) -- essentially random -- while shifting every company by a
+        # large country-specific offset. It therefore injected a big, nearly
+        # uninformative term that swamped the evidence underneath. Verified not a
+        # tie artifact: restricted to companies with nonzero evidence (no mass ties)
+        # the effect is STRONGER, not weaker (E +0.410 vs +0.131).
+        #
+        # The baseline is still needed: 21-30% of company-pillars have no evidence
+        # at all, and dropping it outright would leave them unscored. So it is
+        # retained at a magnitude far below the evidence signal -- it orders the
+        # no-evidence companies among themselves and never reorders companies that
+        # do have evidence. This is the Sustainalytics two-tier pattern (evidence
+        # tier ranked on evidence; prior tier handled separately) arrived at
+        # empirically rather than by adoption.
+        #
+        # Scores are re-centred to mid-scale so downstream consumers still receive a
+        # plausible 0-100 value; only ORDER is claimed to be meaningful, which is
+        # what Spearman measures and what the product reports (ranges, not points).
+        if evidence_term != 0.0:
+            raw = _TIEBREAKER_CENTER + evidence_term
+        else:
+            raw = _TIEBREAKER_CENTER + _TIEBREAKER_BASELINE_WEIGHT * (baseline - _TIEBREAKER_CENTER)
+    else:
+        raw = baseline + evidence_term
+
     score = max(0.0, min(100.0, raw))
 
     return SaturationBreakdown(

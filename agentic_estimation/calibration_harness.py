@@ -174,6 +174,32 @@ class TruthRecord:
     truth_s: Optional[float] = None
     truth_g: Optional[float] = None
     truth_total: Optional[float] = None
+    # Peer-matching metadata. `industry` above is bcorp's FREE-TEXT column (163
+    # distinct values, ~6 companies per value inside a scored corpus) and peer_anchor
+    # matches sector strings with SQL '=' against industry_category / sasb_sector --
+    # so passing `industry` almost never hits an exact-match tier. Measured
+    # 2026-08-04 (n=25, production peer_anchor_vote called unmodified):
+    #     sector=industry           -> 32% abstain, 15 sector_country votes
+    #     sector=industry_category  ->  0% abstain, 57 sector_country votes
+    #     sector=sasb_sector        ->  3% abstain, 72 sector_country votes
+    # The anchor is the strongest single scoring component where it fires (held-out
+    # n=193: anchor-only G +0.364 vs claims-only +0.071; S +0.215 vs -0.021), and it
+    # fires for only 63-65% of company-pillars today -- so the abstentions are pure
+    # lost signal, caused by a vocabulary mismatch rather than by missing data.
+    industry_category: Optional[str] = None
+    sasb_sector: Optional[str] = None
+    size: Optional[str] = None
+    ownership: Optional[str] = None
+
+    @property
+    def peer_sector(self) -> Optional[str]:
+        """The sector string to hand to peer_anchor_vote.
+
+        industry_category first (bcorp's own 22-value vocabulary, which the crosswalk
+        and sector_country tiers match exactly), then sasb_sector, then the free-text
+        industry as a last resort so nothing regresses for rows lacking the columns.
+        """
+        return self.industry_category or self.sasb_sector or self.industry
 
 
 def load_bcorp_truth(n: int, seed: int) -> list[TruthRecord]:
@@ -190,7 +216,8 @@ def load_bcorp_truth(n: int, seed: int) -> list[TruthRecord]:
         """
         SELECT company_name, country, industry,
                overall_score, impact_area_environment, impact_area_governance,
-               impact_area_workers, impact_area_community, impact_area_customers
+               impact_area_workers, impact_area_community, impact_area_customers,
+               industry_category, sasb_sector, size, ownership
         FROM bcorp_lookup
         WHERE overall_score IS NOT NULL
           AND company_name IS NOT NULL
@@ -203,12 +230,15 @@ def load_bcorp_truth(n: int, seed: int) -> list[TruthRecord]:
     rng.shuffle(rows)
 
     out: list[TruthRecord] = []
-    for (name, country, industry, overall, env, gov, workers, community, customers) in rows:
+    for (name, country, industry, overall, env, gov, workers, community, customers,
+         industry_category, sasb_sector, size, ownership) in rows:
         social_parts = [v for v in (workers, community, customers) if v is not None]
         social = sum(social_parts) / len(social_parts) if social_parts else None
         out.append(TruthRecord(
             name=name, country=country, industry=industry,
             truth_e=env, truth_s=social, truth_g=gov, truth_total=overall,
+            industry_category=industry_category, sasb_sector=sasb_sector,
+            size=size, ownership=ownership,
         ))
         if len(out) >= n:
             break
@@ -465,6 +495,13 @@ def _gather_and_score_formula(truth: TruthRecord, row: BacktestRow, capture: Opt
     signals.update(fetch_governance_signals(truth.name))
     signals.update(fetch_facility_signals(truth.name, industry))
     metadata = get_company_metadata(truth.name)
+    # Seed the peer-matching sector into metadata as well as passing it explicitly
+    # below. formula_estimator falls back to metadata["industry"] when no sector= is
+    # given, and ablation_replay._dump_one takes exactly that path -- so without this,
+    # replayed dumps would silently use a different (worse) sector vocabulary than the
+    # live scoring run. Only fills a gap; never overwrites a resolved value.
+    if truth.peer_sector and not metadata.get("industry"):
+        metadata["industry"] = truth.peer_sector
     row.signals_count = len(signals)
     row.metadata_source = metadata.get("source")
 
@@ -490,7 +527,7 @@ def _gather_and_score_formula(truth: TruthRecord, row: BacktestRow, capture: Opt
         _p(f"  [{truth.name}] Tier-0: {row.claims_dropped} claim(s) dropped, {row.claims_capped} capped")
 
     formula_scores = compute_formula_scores(
-        claims, country, metadata, company_name=truth.name, sector=truth.industry, signals=signals,
+        claims, country, metadata, company_name=truth.name, sector=truth.peer_sector, signals=signals,
         use_saturation=_USE_SATURATION, sat_params=_SAT_PARAMS,
     )
 

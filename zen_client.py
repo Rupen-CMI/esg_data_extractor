@@ -194,7 +194,12 @@ _last_call_at = 0.0
 def _throttle() -> None:
     global _last_call_at
     with _rate_lock:
-        wait = _last_call_at + _MIN_GAP_S - time.monotonic()
+        # Jitter the GAP itself, not just the post-gap sleep below. A fixed
+        # 2.0s gap means the request stream has a perfectly regular period
+        # regardless of the per-call jitter that follows it -- the same bot
+        # signature every other limiter in this pipeline was audited to remove.
+        gap = _MIN_GAP_S + random.uniform(0, 1.0)
+        wait = _last_call_at + gap - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         _last_call_at = time.monotonic()
@@ -243,12 +248,26 @@ def call_with_prompt(prompt: str, model: str = DEFAULT_MODEL,
                 json=payload,
                 timeout=timeout,
             )
-            if resp.status_code in (503, 429) and attempt < retries:
-                wait = 8 * (attempt + 1)
-                print(f"[zen_client] HTTP {resp.status_code} from {model} "
-                      f"(attempt {attempt + 1}/{retries + 1}) -- retrying in {wait}s", flush=True)
-                time.sleep(wait)
-                continue
+            if resp.status_code in (503, 429):
+                # Feed the SHARED tripwire that signal_agent uses for evidence
+                # hosts. Without this the counter reads zero while the LLM
+                # provider is throttling us hard -- the run looks healthy and
+                # quietly produces companies with no holistic vote, which is
+                # exactly the invisible-gap failure the tripwire exists to stop.
+                # Retries are still attempted; the tripwire only fires once the
+                # global budget is spent, so a single transient 429 is absorbed.
+                try:
+                    from agentic_estimation.layer_1.signal_agent import _note_rate_limit
+                    _note_rate_limit(ZEN_BASE_URL)   # may raise RateLimitTripped
+                except ImportError:
+                    pass                            # zen_client is usable standalone
+                if attempt < retries:
+                    wait = 8 * (attempt + 1)
+                    print(f"[zen_client] HTTP {resp.status_code} from {model} "
+                          f"(attempt {attempt + 1}/{retries + 1}) -- retrying in {wait}s",
+                          flush=True)
+                    time.sleep(wait)
+                    continue
             resp.raise_for_status()
             data = resp.json()
             msg = data["choices"][0]["message"]
@@ -277,6 +296,12 @@ def call_with_prompt(prompt: str, model: str = DEFAULT_MODEL,
                 "latency_s": round(time.perf_counter() - started, 2),
             }
         except Exception as e:
+            # The abort signal must never be downgraded to "last_error" and
+            # retried -- that is precisely how the tripwire was defeated on the
+            # evidence path, and it reappeared here because this file lives
+            # outside layer_1/ and the earlier audit never scanned it.
+            if type(e).__name__ == "RateLimitTripped":
+                raise
             last_error = str(e)
             if attempt < retries:
                 time.sleep(8 * (attempt + 1))

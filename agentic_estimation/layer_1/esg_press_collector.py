@@ -66,7 +66,7 @@ _MAX_ARTICLES_PER_COMPANY = 3
 # that is actually evidence about it.
 _CONTEXT_CHARS = 900
 
-_FEED_LIMITER = _RateLimiter(min_gap=1.0)
+_FEED_LIMITER = _RateLimiter(min_gap=2.0, jitter=1.0)
 
 # WordPress-style feeds; all verified live to carry <content:encoded>.
 _FEEDS: tuple[tuple[str, str], ...] = (

@@ -35,6 +35,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
+from agentic_estimation.layer_1.signal_agent import RateLimitTripped
 from agentic_estimation.layer_1.sec_filings import (
     cik_for_company,
     extract_phrase_context,
@@ -167,7 +168,7 @@ def _collect_phrase(company: str, cik: str, name: str, phrase: str) -> Optional[
     return name, f"SEC filing text ({phrase}): {body}"
 
 
-def fetch_sec_fulltext_signals(company: str, max_workers: int = 6) -> dict[str, str]:
+def fetch_sec_fulltext_signals(company: str, max_workers: int = 2) -> dict[str, str]:
     """ESG evidence for one company from EDGAR full-text search.
 
     Returns {signal_name: evidence_text}; {} for any company without a CIK
@@ -182,8 +183,11 @@ def fetch_sec_fulltext_signals(company: str, max_workers: int = 6) -> dict[str, 
     log_header(log, "SEC Full-Text", company=company, cik=cik, phrases=len(_ESG_PHRASES))
     signals: dict[str, str] = {}
 
-    # SEC allows 10 req/s; 6 workers each doing a search + a document fetch
-    # stays under that while keeping wall-clock reasonable.
+    # 2, not 6. This function runs INSIDE the pipeline's 5-thread worker pool,
+    # so the real concurrency against sec.gov is workers x max_workers: at 6 that
+    # is 30 threads on one host, which drew 4 HTTP 429s and aborted a run.
+    # The limiter caps the RATE either way; what this bounds is how long the
+    # queue behind it grows, and therefore how bursty the traffic looks.
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(_collect_phrase, company, cik, name, phrase): name
@@ -192,6 +196,8 @@ def fetch_sec_fulltext_signals(company: str, max_workers: int = 6) -> dict[str, 
         for fut in as_completed(futures):
             try:
                 got = fut.result()
+            except RateLimitTripped:
+                raise   # never swallow the abort signal
             except Exception as exc:
                 log.warning("[%s] %s → exception: %s", company, futures[fut], exc)
                 continue

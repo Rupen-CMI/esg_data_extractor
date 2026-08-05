@@ -39,9 +39,10 @@ import re
 import threading
 import time
 import xml.etree.ElementTree as ET
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import requests
 from dotenv import load_dotenv
@@ -60,6 +61,29 @@ _HEADERS = {"User-Agent": "ESG-Signal-Agent/1.0 (research@example.com)"}
 _TIMEOUT = 12
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")  # newsapi.org key (optional)
+
+# NewsAPI's free tier is 100 requests PER DAY, and we spend one per company.
+# That is a daily QUOTA, not a rate: once it is gone every further call returns
+# 429 no matter how slowly we ask, so a limiter cannot help and retrying only
+# burns the tripwire budget. A 150-company run exceeded it immediately --
+# 5 workers each got 429 on their first company and aborted the run at 1/150.
+#
+# Treated as a hard per-run budget so the quota is spent on the first N
+# companies and skipped silently after, instead of aborting the whole run.
+# 0 disables the source entirely.
+_NEWSAPI_DAILY_BUDGET = int(os.getenv("ESG_NEWSAPI_BUDGET", "0"))
+_newsapi_spent = 0
+_newsapi_lock = threading.Lock()
+
+
+def _newsapi_take_budget() -> bool:
+    """True if this call may spend one of the day's NewsAPI requests."""
+    global _newsapi_spent
+    with _newsapi_lock:
+        if _newsapi_spent >= _NEWSAPI_DAILY_BUDGET:
+            return False
+        _newsapi_spent += 1
+        return True
 
 # ── Rate limiters ─────────────────────────────────────────────────────────────
 # Each limiter ensures a minimum gap between consecutive calls to that source,
@@ -89,12 +113,93 @@ class _RateLimiter:
 _DDG_LIMITER      = _RateLimiter(min_gap=2.0, jitter=1.5)
 
 # Wikipedia REST API: polite crawling policy — 1 req/s is fine, add small jitter.
-_WIKIPEDIA_LIMITER = _RateLimiter(min_gap=1.0, jitter=0.5)
+# Wikipedia's REST API is the strictest host we touch. Measured during a
+# 10-worker corpus run: 140 of 145 total HTTP 429s came from en.wikipedia.org
+# (Google News 3, EPA 2, DuckDuckGo 0). The old 1.0s gap looks safe per
+# thread, but _wikipedia_signal tries up to 5 slug variants per company, so
+# N workers burst up to 5N requests before any of them waits.
+_WIKIPEDIA_LIMITER = _RateLimiter(min_gap=3.0, jitter=1.5)
+
+# Google News RSS had NO limiter until an IP-level block proved it needs one.
+# Batching the keyword group (see _RSS_BATCH_SIZE) multiplied requests from
+# 1 to 12 per news source, and with 6 news sources across 5 workers that is
+# ~360 concurrent requests -- Google responded with a blanket HTTP 503
+# "Sorry..." page for every query, for hours. Earlier research reporting "no
+# rate limiting" tested SEQUENTIAL requests only; concurrency is what trips it.
+#
+# 3.0+2.0 (mean 4.0s) is NOT a tuned value -- we have never observed where
+# Google's real threshold sits, only that ~360 concurrent requests is past it.
+# The reference point for choosing it: at ~10.6 Google requests per company
+# this yields 1.41 companies/min, against the 1.66 companies/min the pipeline
+# reaches when it is latency-bound with Google News disabled entirely. So
+# Google is still marginally the bottleneck here -- it costs roughly 15% of
+# throughput versus not fetching it at all, which is the price paid for
+# staying well back from a host that has issued two IP-level blocks.
+# Re-derive from that latency-bound figure rather than lowering it by feel.
+_GOOGLE_NEWS_LIMITER = _RateLimiter(min_gap=3.0, jitter=2.0)
+
+# KILL SWITCH -- currently ON. We tripped an IP-level Google News block, and
+# every further request EXTENDS it rather than waiting it out (a 3-company
+# smoke test issued 28 more blocked requests and pushed the block further
+# out). Until the block clears, all six Google-News-backed sources
+# (google_news_rss, reuters, bloomberg, financial_times, esg_today, greenbiz,
+# localized_esg) must issue zero requests.
+#
+# Re-enable with ESG_GOOGLE_NEWS=1 once a SINGLE manual probe returns 200 --
+# probe by hand, never in a loop, and never from a worker pool.
+_GOOGLE_NEWS_DISABLED = os.getenv("ESG_GOOGLE_NEWS", "0") != "1"
 
 # GDELT: no documented rate limit but slow server; 1 req per call, no concern.
 # SEC EDGAR: 10 req/s limit per their fair-use policy.
 # Google News RSS / ESG Today RSS / Reuters RSS: standard RSS fetch, once per run.
 # NewsAPI: 100 req/day free tier — one call per company is fine.
+
+# ── Rate-limit tripwire ──────────────────────────────────────────────────────
+# A 429 means we are taking more than a host is willing to give. Continuing
+# past it produces a corpus with silent holes -- the affected companies look
+# like "no evidence found" rather than "we were blocked" -- which is worse
+# than stopping, because the gap is invisible in the output.
+#
+# Counting rather than failing on the first one: a single 429 can be a
+# momentary burst, but a run of them means we are being throttled in earnest.
+# Once the threshold trips, _get raises RateLimitTripped, which propagates out
+# of every collector and aborts the run.
+
+class RateLimitTripped(RuntimeError):
+    """Raised when too many HTTP 429s are seen -- abort rather than collect a
+    corpus full of invisible gaps."""
+
+
+# Abort after THREE throttling responses, not ten. Ten was already too many:
+# by the time the counter reached it, Google had issued an IP-level block that
+# outlived the run. Three is low enough that a run stops while the damage is
+# still recoverable, and any legitimate transient blip costs only a restart.
+_RATE_LIMIT_THRESHOLD = int(os.getenv("ESG_RATE_LIMIT_ABORT", "3"))
+_rate_limit_hits: Counter = Counter()
+_rate_limit_lock = threading.Lock()
+
+
+def _note_rate_limit(url: str) -> None:
+    host = urlparse(url).netloc or url
+    with _rate_limit_lock:
+        _rate_limit_hits[host] += 1
+        total = sum(_rate_limit_hits.values())
+        n_host = _rate_limit_hits[host]
+    log.warning("RATE LIMITED (429) by %s — %d from this host, %d total",
+                host, n_host, total)
+    if total >= _RATE_LIMIT_THRESHOLD:
+        breakdown = ", ".join(f"{h}={c}" for h, c in _rate_limit_hits.most_common())
+        raise RateLimitTripped(
+            f"aborting: {total} HTTP 429s (threshold {_RATE_LIMIT_THRESHOLD}) — {breakdown}. "
+            f"Reduce workers or raise the limiter gap for the offending host."
+        )
+
+
+def rate_limit_report() -> dict:
+    """429 counts per host so far, for run summaries."""
+    with _rate_limit_lock:
+        return dict(_rate_limit_hits)
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -110,8 +215,24 @@ def _get(url: str, params: dict | None = None, timeout: int = _TIMEOUT) -> reque
         status = e.response.status_code if e.response is not None else None
         if status == 404:
             log.debug("GET %s → 404 Not Found", url)
+        elif status in (429, 503):
+            # 503 matters as much as 429 here: Google News RSS answers a
+            # throttled client with 503 and an HTML "Sorry..." interstitial,
+            # never 429. Watching only for 429 let an IP-level Google block
+            # run silently through an entire corpus gather -- every news
+            # source returned nothing, and the output looked like "these
+            # companies have no news" rather than "we were blocked".
+            _note_rate_limit(url)      # may raise RateLimitTripped
         else:
             log.warning("GET %s → HTTP error: %s", url, e)
+    except RateLimitTripped:
+        # MUST be re-raised. It is raised from inside the HTTPError handler
+        # above, so without this clause the bare `except Exception` below
+        # catches it, logs it as an ordinary fetch failure, and returns None
+        # -- which is exactly what happened during a corpus run that logged
+        # 8,466 blocked Google requests and never aborted. The tripwire
+        # existed, counted correctly, and was then swallowed one frame later.
+        raise
     except requests.Timeout:
         log.warning("GET %s → timed out after %ss", url, timeout)
     except Exception as e:
@@ -131,6 +252,10 @@ def _newsapi_signal(company: str) -> str:
     """
     if not NEWS_API_KEY:
         log.debug("[%s] news_api → skipped (NEWS_API_KEY not set)", company)
+        return ""
+    if not _newsapi_take_budget():
+        log.debug("[%s] news_api → skipped (daily budget %d exhausted)",
+                  company, _NEWSAPI_DAILY_BUDGET)
         return ""
     log.info("[%s] news_api → querying NewsAPI.org", company)
     r = _get(
@@ -240,7 +365,17 @@ _MAX_RSS_ITEMS = 20
 #     Shell     100 items (oldest 2028d)  ->  245 items (oldest 363d)
 # Batching is free: 40 rapid sequential and 25 concurrent requests all
 # returned 200 with no rate limiting and no required User-Agent.
-_RSS_BATCH_SIZE = 5
+# RAISED from 5 to 20 after batch-size 5 (12 requests/company) caused an
+# IP-level Google block. 20 terms per batch means 3 requests per company
+# instead of 12 -- a 4x reduction in request volume.
+#
+# The trade-off is real and accepted: 20 OR-terms is above the ~12-term
+# threshold where Google starts silently dropping the `when:` operator, so
+# server-side date filtering may not apply to these queries. The client-side
+# pubDate filter in _filter_items_by_recency catches that -- it is why the
+# belt-and-braces filter exists. Losing some server-side filtering is a much
+# cheaper price than losing the source entirely.
+_RSS_BATCH_SIZE = 20
 
 
 def _keyword_batches(keywords: str, size: int = _RSS_BATCH_SIZE) -> list[str]:
@@ -326,9 +461,15 @@ def _google_news_rss_query(company: str, extra: str = "", site: str = "", locale
     incidents) stays relevant longer than typical news, but a resolved
     five-year-old controversy should not still be moving a score today.
     Set to 0 to disable the window (results are still sorted newest-first)."""
+    # Batch ONLY the general feed. A site:-restricted outlet has already
+    # narrowed the result set so hard that one broad query returns everything
+    # available, and those feeds measured 0.01-0.12 kept claims per fetch --
+    # so batching them multiplied request volume sixfold for no evidence, and
+    # was the direct cause of an IP-level Google block.
+    batches = _keyword_batches(_GOOGLE_RSS_KEYWORDS) if not site else [_GOOGLE_RSS_KEYWORDS]
     seen_links: set[str] = set()
     merged: list = []
-    for batch in _keyword_batches(_GOOGLE_RSS_KEYWORDS):
+    for batch in batches:
         items = _rss_fetch_items(company, batch, extra, site, locale, when_days)
         for it in items:
             link = (it.findtext("link") or "").strip()
@@ -353,12 +494,17 @@ def _rss_fetch_items(company: str, keywords: str, extra: str, site: str,
         q += f" {extra}"
     if when_days > 0:
         q += f" when:{when_days}d"
+    if _GOOGLE_NEWS_DISABLED:
+        return []
     url = f"https://news.google.com/rss/search?q={quote_plus(q)}&{locale}"
+    _GOOGLE_NEWS_LIMITER.wait()
     r = _get(url)
     if not r:
         return []
     try:
         return ET.fromstring(r.content).findall(".//item")
+    except RateLimitTripped:
+        raise   # never swallow the abort signal
     except Exception:
         return []
 
@@ -516,10 +662,19 @@ def _governance_rss_query(term: str, country_name: str, locale: str,
     group -- the term IS the query. Results are gated on governance relevance
     before being returned.
     """
+    # SECOND Google News path, easy to miss: this does NOT route through
+    # _google_news_rss_query, so for a while it honoured neither the kill
+    # switch nor _GOOGLE_NEWS_LIMITER. Being a nested loop (locales x terms)
+    # it was in fact the HEAVIER of the two paths -- it issued 8,466 blocked
+    # requests during a 20-company run while the guarded path was behaving.
+    # Any new Google News call site must take these two lines with it.
+    if _GOOGLE_NEWS_DISABLED:
+        return None
     q = f'"{term}" {country_name}'
     if when_days > 0:
         q += f" when:{when_days}d"
     url = f"https://news.google.com/rss/search?q={quote_plus(q)}&{locale}"
+    _GOOGLE_NEWS_LIMITER.wait()
     r = _get(url)
     if not r:
         return None
@@ -536,6 +691,8 @@ def _governance_rss_query(term: str, country_name: str, locale: str,
                 continue
             hits.append(f"[{pub}] {title}" + (f" <{link}>" if link else ""))
         return "\n".join(hits) if hits else None
+    except RateLimitTripped:
+        raise   # never swallow the abort signal
     except Exception:
         return None
 
@@ -947,9 +1104,18 @@ def _ddg_fallback(
                     text = text[:cut_open].rstrip()
             return f"{prefix}: {text}" if prefix else text
         except ddg_exc.RatelimitException:
+            # Feed the SHARED tripwire. DDG raises its own exception type
+            # rather than surfacing an HTTP status, so these throttles were
+            # invisible to _note_rate_limit -- DDG backs 8 of our sources, and
+            # it could have been throttled for an entire corpus run while the
+            # abort counter read zero. Counted BEFORE the back-off sleep so a
+            # sustained block aborts instead of retrying into it.
+            _note_rate_limit("https://duckduckgo.com")   # may raise RateLimitTripped
             log.warning("DDG rate-limited on query [%s] (attempt %d) — backing off", prefix, attempt + 1)
             if attempt == 0:
                 time.sleep(8 + random.uniform(0, 4))
+        except RateLimitTripped:
+            raise      # same swallow trap as _get -- must outrun `except Exception`
         except Exception as e:
             log.warning("DDG error on query [%s]: %s", prefix, e)
             break
@@ -979,7 +1145,12 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
 
     tasks: dict[str, callable] = {
         # Tier 1 — real-time news
-        "news_api":         lambda: _newsapi_signal(company),
+        # news_api REMOVED: NewsAPI's free tier is a 100-request DAILY QUOTA and
+        # we spend one per company. Once exhausted every call returns 429
+        # regardless of pacing, so no limiter helps -- it aborted a 150-company
+        # run at 1/150 when 5 workers each got 429 on their first company.
+        # Re-enable only with a paid key or a per-run budget smaller than the
+        # remaining daily allowance.
         "google_news_rss":  lambda: _google_news_rss_signal(company),
         "reuters":          lambda: _reuters_signal(company),
         "bloomberg":        lambda: _outlet_signal(company, *_OUTLET_SOURCES["bloomberg"]),
@@ -999,7 +1170,24 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         "cdp":              lambda: _cdp_signal(company),
         # Tier 3 — filings & databases
         "gri":              lambda: _gri_signal(company),
-        "wikipedia":        lambda: _wikipedia_signal(company),
+        # "wikipedia" DISABLED -- measured on the frozen corpus (tune+holdout,
+        # n=393): 74 fetches produced 1 kept claim (0.01 claims/fetch), the
+        # worst yield of any source. It also dominates our rate-limit exposure:
+        # during a 10-worker run it produced 140 of 145 total HTTP 429s, because
+        # _wikipedia_signal probes up to 5 slug variants per company. Pacing it
+        # safely costs ~15s per company (3s limiter gap x 5 slugs) -- roughly a
+        # third of total fetch time -- to obtain almost no evidence.
+        # KNOWN COST, measured rather than assumed: scoring_agent.py uses the
+        # wikipedia signal as a THIRD-tier country fallback (after metadata and
+        # the caller's own value). Across 1,856 frozen records, 874 had no
+        # country in metadata and only 34 of those (1.8% of all records) had a
+        # wikipedia signal that could have rescued them -- and country still
+        # falls through to the baseline's alias -> regional -> global chain, so
+        # none of them lose a baseline entirely. Backtests pass country
+        # explicitly from the truth row, so they are unaffected.
+        # Re-enable by uncommenting if a use case for the summary text appears;
+        # _wikipedia_signal itself is left intact.
+        # "wikipedia":      lambda: _wikipedia_signal(company),
         "sustainability_report": lambda: _ddg_fallback(
             f'"{company}"{sector_hint} sustainability report 2024 2025 ESG annual disclosure',
             prefix="Sustainability Report", min_len=80, reject_wikipedia=True,
@@ -1030,6 +1218,8 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
                     log.debug("[%s] %s OUTPUT:\n%s", company, name, result[:800])
                 else:
                     log.info("[%s] %s → empty", company, name)
+            except RateLimitTripped:
+                raise   # never swallow the abort signal
             except Exception as e:
                 log.warning("[%s] %s → exception: %s", company, name, e)
 
@@ -1201,6 +1391,8 @@ def fetch_signals_for_companies(
             try:
                 name, signals = fut.result()
                 results[name] = signals
+            except RateLimitTripped:
+                raise   # never swallow the abort signal
             except Exception:
                 results[company] = {}
             done += 1

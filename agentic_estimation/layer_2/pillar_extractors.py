@@ -32,6 +32,7 @@ CLI:
     python -m agentic_estimation.layer_2.pillar_extractors dry "Nvidia"   # all three pillars
 """
 
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
@@ -240,43 +241,182 @@ def extract_pillar_claims(
             log.warning("[%s/%s] dropping claim -- unknown/mismatched factor %r", company, pillar, factor_key)
             continue
 
-        source_tag = raw_claim.get("source_tag")
-        if source_tag not in valid_tags:
-            log.warning("[%s/%s] dropping claim for %s -- hallucinated source_tag %r",
-                        company, pillar, factor_key, source_tag)
-            continue
-
-        try:
-            polarity = int(raw_claim.get("polarity", 0))
-        except (TypeError, ValueError):
-            polarity = 0
-        polarity = polarity if polarity in (-1, 0, 1) else 0
-
-        try:
-            strength = max(0.0, min(1.0, float(raw_claim.get("strength", 0.5))))
-        except (TypeError, ValueError):
-            strength = 0.5
-        try:
-            confidence = max(0.0, min(1.0, float(raw_claim.get("confidence", 0.4))))
-        except (TypeError, ValueError):
-            confidence = 0.4
-
-        value = None
-        if raw_claim.get("value") is not None:
-            value = _coerce_unit_value(raw_claim.get("value"), raw_claim.get("unit"))
-
-        claims.append(ExtractedClaim(
-            factor=factor_key, pillar=pillar, polarity=polarity, strength=strength,
-            confidence=confidence, value=value, source_tag=source_tag,
-            reasoning=str(raw_claim.get("reasoning", ""))[:300], method="extracted",
-        ))
+        claim = _build_claim(raw_claim, factor, valid_tags, company, pillar)
+        if claim is not None:
+            claims.append(claim)
 
     log.info("[%s/%s] extracted %d valid claims", company, pillar, len(claims))
     return claims
 
 
+def _build_claim(raw_claim: dict, factor, valid_tags: set, company: str,
+                 pillar: str) -> Optional[ExtractedClaim]:
+    """Validate and coerce one raw LLM claim dict into an ExtractedClaim.
+
+    Shared by the per-pillar and merged extraction paths so the two cannot drift
+    apart in how they sanitise model output -- the source_tag check in particular
+    is the anti-hallucination guard, and having two copies of it would mean one
+    could silently lose it.
+    """
+    source_tag = raw_claim.get("source_tag")
+    if source_tag not in valid_tags:
+        log.warning("[%s/%s] dropping claim for %s -- hallucinated source_tag %r",
+                    company, pillar, factor.key, source_tag)
+        return None
+
+    try:
+        polarity = int(raw_claim.get("polarity", 0))
+    except (TypeError, ValueError):
+        polarity = 0
+    polarity = polarity if polarity in (-1, 0, 1) else 0
+
+    try:
+        strength = max(0.0, min(1.0, float(raw_claim.get("strength", 0.5))))
+    except (TypeError, ValueError):
+        strength = 0.5
+    try:
+        confidence = max(0.0, min(1.0, float(raw_claim.get("confidence", 0.4))))
+    except (TypeError, ValueError):
+        confidence = 0.4
+
+    value = None
+    if raw_claim.get("value") is not None:
+        value = _coerce_unit_value(raw_claim.get("value"), raw_claim.get("unit"))
+
+    return ExtractedClaim(
+        factor=factor.key, pillar=pillar, polarity=polarity, strength=strength,
+        confidence=confidence, value=value, source_tag=source_tag,
+        reasoning=str(raw_claim.get("reasoning", ""))[:300], method="extracted",
+    )
+
+
+_MERGED_PROMPT_TEMPLATE = """You are an evidence tagger reviewing signals about a company \
+across ALL THREE ESG pillars. You are NOT a scorer: you never invent facts, never convert \
+a value into a 0-100 score, and never guess a factor's presence without a specific piece \
+of supporting text.
+
+COMPANY: {company}
+
+SIGNALS (each tagged with its source):
+{signals_block}
+
+STEP 1 -- RELEVANCE CHECK: for each signal above, decide whether it actually discusses \
+something relevant to THIS company. Some signals may be off-topic, generic, or about an \
+unrelated company/subject that happened to match a search query -- extract NOTHING from those.
+
+STEP 2 -- EXTRACT CLAIMS for every pillar the evidence supports. Work through the pillars \
+in order (E, then S, then G) and consider each independently: evidence that yields nothing \
+for one pillar may still yield a claim for another. Extract strictly from this closed \
+factor list (do not invent new factor names):
+
+=== E -- {topics_e} ===
+{factors_e}
+
+=== S -- {topics_s} ===
+{factors_s}
+
+=== G -- {topics_g} ===
+{factors_g}
+
+Rules:
+- Only emit a claim if a signal ABOVE actually supports it -- cite that signal's exact \
+  source tag in "source_tag".
+- "pillar" MUST be exactly "E", "S" or "G" and MUST match the section the factor came from.
+- If a factor has a stated numeric value in the text (e.g. "1.2 million tCO2e"), put the \
+  raw number in "value" and the unit exactly as written in "unit" -- do NOT normalise, \
+  rescale, or convert it to a score yourself.
+- "polarity": -1 if the claim is negative for the company (e.g. a controversy, a fine), \
+  +1 if positive (e.g. a pledge, a certification), 0 if it's a neutral disclosed value.
+- "strength" (0-1): how strong/severe/credible the claim is. "confidence" (0-1): how \
+  certain you are this claim is accurate given the source text.
+- No supporting text for a factor -> omit it entirely. Do not pad the list. Emitting \
+  nothing for a pillar is a correct answer when the evidence does not support it.
+
+Respond with ONLY this JSON object (no markdown fences), after your reasoning:
+{{"claims": [{{"pillar": "<E|S|G>", "factor": "<exact key from that pillar's list>", \
+"polarity": <-1|0|1>, "strength": <0-1>, "confidence": <0-1>, "value": <number|null>, \
+"unit": "<string|null>", "source_tag": "<exact tag from signals above>", \
+"reasoning": "<one short sentence>"}}, ...]}}"""
+
+# One merged call instead of three per-pillar calls. The three prompts sent the
+# IDENTICAL signals block (_signals_block does no pillar filtering) and differed
+# only in which factor list they asked for, so we were paying to re-send the same
+# evidence three times: measured at ~4 LLM calls/company, this is 3 of them.
+#
+# Off by default. The merged prompt carries all three factor lists at once, which
+# is a real precision risk -- a longer closed list gives the model more chances to
+# mis-assign a factor to the wrong pillar. Enable only after comparing claim yield
+# against the per-pillar path on the SAME frozen corpus; the env flag exists so
+# that comparison can be run without editing code.
+_MERGE_EXTRACTORS = os.getenv("ESG_MERGE_EXTRACTORS", "0") == "1"
+
+
+def extract_all_claims_merged(company: str, signals: dict[str, str],
+                              metadata: Optional[dict] = None) -> list[ExtractedClaim]:
+    """All three pillars in ONE LLM call. Same contract as extract_all_claims."""
+    from zen_client import call_with_prompt
+
+    if not signals:
+        log.info("[%s] no signals gathered -- skipping extraction", company)
+        return []
+
+    prompt = _MERGED_PROMPT_TEMPLATE.format(
+        company=company,
+        signals_block=_signals_block(signals),
+        topics_e=_PILLAR_TOPICS["E"], factors_e=_factor_list_block("E"),
+        topics_s=_PILLAR_TOPICS["S"], factors_s=_factor_list_block("S"),
+        topics_g=_PILLAR_TOPICS["G"], factors_g=_factor_list_block("G"),
+    )
+
+    log.info("[%s] calling LLM once for all pillars (%d signals)...", company, len(signals))
+    resp = call_with_prompt(
+        prompt, max_tokens=4000, timeout=180,
+        system="You are an ESG evidence tagger. After reasoning, you MUST end with a single "
+               "valid JSON object of the exact shape requested, containing only claims genuinely "
+               "supported by the signals shown to you.",
+    )
+    if not resp.get("ok"):
+        log.warning("[%s] merged LLM call failed: %s", company, resp.get("error"))
+        return []
+
+    parsed = extract_json_object(resp.get("raw", "")) or extract_json_object(resp.get("reasoning", ""))
+    if not parsed or not isinstance(parsed.get("claims"), list):
+        log.warning("[%s] failed to parse merged claims JSON", company)
+        return []
+
+    valid_tags = set(signals.keys())
+    claims: list[ExtractedClaim] = []
+    for raw_claim in parsed["claims"]:
+        if not isinstance(raw_claim, dict):
+            continue
+        factor_key = raw_claim.get("factor")
+        factor = get_factor(factor_key) if factor_key else None
+        if not factor:
+            log.warning("[%s] dropping claim -- unknown factor %r", company, factor_key)
+            continue
+        # Trust the FACTOR's registered pillar over the model's "pillar" field.
+        # The merged prompt shows all three lists at once, so mis-assignment is
+        # the specific new failure mode this path introduces; the factor registry
+        # is authoritative and makes the mistake harmless rather than silent.
+        stated = raw_claim.get("pillar")
+        if stated and stated != factor.pillar:
+            log.info("[%s] claim %r labelled %s but factor is %s -- using %s",
+                     company, factor_key, stated, factor.pillar, factor.pillar)
+        claim = _build_claim(raw_claim, factor, valid_tags, company, factor.pillar)
+        if claim is not None:
+            claims.append(claim)
+
+    by_pillar: dict[str, int] = {}
+    for c in claims:
+        by_pillar[c.pillar] = by_pillar.get(c.pillar, 0) + 1
+    log.info("[%s] merged extraction -> %d claims %s", company, len(claims), by_pillar)
+    return claims
+
+
 def extract_all_claims(company: str, signals: dict[str, str], metadata: Optional[dict] = None) -> list[ExtractedClaim]:
     """Pure: no DB access. Runs the three pillar extractions concurrently."""
+    if _MERGE_EXTRACTORS:
+        return extract_all_claims_merged(company, signals, metadata)
     with ThreadPoolExecutor(max_workers=3) as pool:
         futures = {pool.submit(extract_pillar_claims, p, company, signals, metadata): p for p in ("E", "S", "G")}
         results: list[ExtractedClaim] = []

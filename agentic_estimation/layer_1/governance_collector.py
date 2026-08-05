@@ -71,7 +71,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
-from agentic_estimation.layer_1.signal_agent import _ddg_fallback
+from agentic_estimation.layer_1.signal_agent import RateLimitTripped, _ddg_fallback
 from agentic_estimation.layer_1.sec_filings import (
     resolve_cik, search_def14a_keyword, fetch_10k_section, filing_url)
 
@@ -254,6 +254,8 @@ def fetch_governance_signals(company: str) -> dict[str, str]:
                     log.info("[%s] %s -> OK (%d chars)", company, name, len(result))
                 else:
                     log.info("[%s] %s -> empty", company, name)
+            except RateLimitTripped:
+                raise   # never swallow the abort signal
             except Exception as e:
                 log.warning("[%s] %s -> exception: %s", company, name, e)
 

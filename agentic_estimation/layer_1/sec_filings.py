@@ -35,12 +35,21 @@ log = get_logger("sec_filings")
 
 _TIMEOUT = 20
 
-# SEC publishes a 10 req/s ceiling and enforces it by dropping requests rather
-# than returning 429, so exceeding it looks like "this company has no filings"
-# instead of an error. Measured directly: 16 phrases across 6 threads yielded 1
-# signal for Nike, the same run serialized yielded 5. Every SEC call in this
-# module goes through this limiter, at 8/s for headroom.
-_SEC_LIMITER = _RateLimiter(min_gap=1.0 / 8)
+# SEC publishes a 10 req/s ceiling. The previous 1/6s+0.15 gap (~4.1 req/s)
+# looked like comfortable headroom and was NOT: a 150-company run took 4 HTTP
+# 429s from www.sec.gov and aborted at 45.
+#
+# The reason the published ceiling is misleading here is nesting. This module is
+# called from inside the pipeline's worker pool (5 threads), and
+# fetch_sec_fulltext_signals opens its OWN pool of 6 threads per company, each
+# issuing a search plus up to 2 document fetches across 16 phrases. So up to 30
+# threads contend for this one limiter and sustain the maximum rate for minutes
+# at a stretch -- a burst profile the "10 req/s" figure does not describe.
+#
+# 0.5s+0.4s (~1.4 req/s) trades wall-clock for not being throttled. SEC full-text
+# is our only entity-CERTAIN source (CIK-scoped, no name matching to get wrong),
+# so losing it to a block costs more than the extra minutes.
+_SEC_LIMITER = _RateLimiter(min_gap=0.5, jitter=0.4)
 
 
 def _sec_get(url: str, params: Optional[dict] = None, timeout: int = _TIMEOUT):
