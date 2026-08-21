@@ -64,6 +64,10 @@ class PipelineState(TypedDict, total=False):
     country: Optional[str]
     dry_run: bool
     scorer: str               # 'llm' (default) | 'formula' | 'ensemble' -- see PHASE_2_PLAN.md Step 6, Phase 3 Step 4
+    model: Optional[str]      # optional LLM model override, forwarded to every zen_client.call_with_prompt
+                               # call in this run (extract_claims, holistic_llm, verify_estimate's critics/
+                               # retry). None (default) preserves today's exact behavior (opencode.ai).
+                               # Added 2026-08-18 for Ollama-cloud routing -- see zen_client.py.
 
     # Threaded through stages
     signals: dict
@@ -194,7 +198,8 @@ def _node_extract_claims(state: PipelineState) -> dict:
 
     try:
         all_signals = _gather_all_signals(state)
-        claims = extract_all_claims(state["company_name"], all_signals, state.get("metadata", {}))
+        claims = extract_all_claims(state["company_name"], all_signals, state.get("metadata", {}),
+                                     model=state.get("model"))
         claims += ct_anchor_claims(
             state["company_name"], company_id=state.get("company_id"), country=state.get("country"),
         )
@@ -244,13 +249,62 @@ def node_formula_score(state: PipelineState) -> dict:
         scores = compute_formula_scores(
             state.get("claims", []), state.get("country"), state.get("metadata", {}),
             company_name=state.get("company_name"), sector=state.get("industry"),
-            signals=state.get("signals", {}),
+            signals=state.get("signals", {}), truth_source="upright",
         )
+        _apply_evidence_ladder(state, scores)
         log.info("formula scores: E=%.1f S=%.1f G=%.1f",
                   scores["E"].score, scores["S"].score, scores["G"].score)
         return {"formula_scores": scores}
     except Exception as exc:
         return {"error": f"Formula estimator failed: {exc}"}
+
+
+def _apply_evidence_ladder(state: PipelineState, scores: dict) -> None:
+    """Low-evidence ladder (see research/LOW_EVIDENCE_LADDER_PLAN.md) --
+    a SEPARATE PATH inside this same node, not a parallel pipeline. For
+    each pillar whose formula score has a saturation breakdown (the normal
+    case), blends the existing evidence_term with a coarser-grain prior
+    (industry median -> EXIOBASE structural intensity -> upright peer ->
+    country) via evidence_ladder.climb()/blend() -- a company with zero
+    fetched evidence lands at its sector's real position instead of a flat
+    ~50, while a company WITH real evidence is left untouched (blend()'s
+    w_claims -> 1 as evidence_mass grows, converging exactly to today's
+    score). Also applies the down-only controversy overlay to every
+    pillar regardless of which path produced the base score.
+
+    Never raises -- a ladder/overlay failure degrades to the ORIGINAL
+    formula score for that pillar, never a crash. Mutates `scores` (each
+    PillarFormulaScore.score) in place; records the ladder decision on
+    the same object for the audit trail."""
+    from agentic_estimation.layer_3.evidence_ladder import climb, blend, controversy_overlay, LadderParams
+
+    company_name = state.get("company_name") or ""
+    industry = state.get("industry")
+    country = state.get("country")
+
+    for pillar, fs in scores.items():
+        try:
+            breakdown = fs.breakdown
+            if breakdown is not None:
+                ladder = climb(pillar, company_name, industry, industry, country)
+                # evidence_term is the pre-baseline swing saturate_pillar applied;
+                # reconstruct it from the already-computed score/baseline delta
+                # rather than re-running saturation math (score already carries
+                # the tiebreaker-center + evidence_term reduction).
+                evidence_term = fs.score - 50.0
+                new_score, w_claims = blend(evidence_term, breakdown.evidence_mass, ladder)
+                fs.ladder = {"rung": ladder.rung, "prior_pct": ladder.prior_pct,
+                             "n_basis": ladder.n_basis, "w_claims": w_claims,
+                             "pre_ladder_score": fs.score}
+                fs.score = new_score
+
+            overlay, matched = controversy_overlay(fs.contributions)
+            if overlay != 0.0:
+                fs.score = max(0.0, min(100.0, fs.score + overlay))
+                fs.controversy_overlay = {"points": overlay, "factors": matched}
+        except Exception as exc:
+            log.warning("[%s/%s] evidence ladder failed: %s -- keeping original formula score",
+                        company_name, pillar, exc)
 
 
 # ── Phase 3 ensemble-scorer nodes (scorer='ensemble') ─────────────────────────
@@ -267,7 +321,7 @@ def node_holistic_llm(state: PipelineState) -> dict:
 
     holistic = holistic_vote(
         state["company_name"], state["industry"], state.get("country"),
-        state.get("signals", {}), state.get("metadata", {}),
+        state.get("signals", {}), state.get("metadata", {}), model=state.get("model"),
     )
     if holistic is None:
         log.warning("holistic vote missing -- reconcile will fall back to formula-only")
@@ -314,7 +368,7 @@ def node_verify_estimate(state: PipelineState) -> dict:
         verified = verify_reconciled(
             state["company_name"], state.get("reconciled", {}), state.get("formula_scores", {}),
             state.get("holistic_score"), state.get("claims", []), state.get("signals", {}),
-            state.get("metadata", {}), state.get("country"),
+            state.get("metadata", {}), state.get("country"), model=state.get("model"),
         )
         log.info("verified: E=%s S=%s G=%s",
                   verified["E"].verdict, verified["S"].verdict, verified["G"].verdict)
@@ -776,7 +830,7 @@ def _populate_result_from_ensemble(result: PipelineResult, final_state: dict) ->
 
 def run_company_dry_graph(
     company_name: str, industry: str = "", country: Optional[str] = None, scorer: str = "llm",
-    verify: bool = False,
+    verify: bool = False, model: Optional[str] = None,
 ) -> PipelineResult:
     """Same contract as orchestrator.run_company_dry, routed through the LangGraph scaffold.
     scorer='formula' routes through the Phase 2 evidence-claims + deterministic formula path
@@ -808,6 +862,7 @@ def run_company_dry_graph(
     final_state = graph.invoke({
         "company_name": company_name, "industry": industry, "country": country,
         "dry_run": True, "scorer": scorer, "verify": verify and scorer == "ensemble",
+        "model": model,
     })
 
     result = PipelineResult(company=company_name, industry=industry, country=final_state.get("country") or country)
