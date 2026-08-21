@@ -67,7 +67,7 @@ def _wrap_gated(pillar: str, gated_out, verdict: str, critic_calls: int = 0) -> 
 
 def _retry_pillar(
     pillar: str, company: str, signals: dict, metadata: Optional[dict], country: Optional[str],
-    claims: list, flagged_factor: str, objections: list,
+    claims: list, flagged_factor: str, objections: list, model: Optional[str] = None,
 ) -> Optional[list]:
     """Re-extract ONLY this pillar's `method == 'extracted'` claims, with the
     critics' objection injected. Returns the NEW full claim list for this
@@ -91,6 +91,7 @@ def _retry_pillar(
         new_extracted = extract_pillar_claims(
             pillar, company, signals, metadata,
             objection={"flagged_factor": flagged_factor, "objection_text": objection_text},
+            model=model,
         )
     except Exception as exc:
         log.warning("[%s/%s] retry re-extraction raised: %s -- treating as failed retry",
@@ -127,11 +128,15 @@ def verify_reconciled(
     signals: dict,
     metadata: Optional[dict],
     country: Optional[str],
+    model: Optional[str] = None,
 ) -> dict:
     """Returns dict[pillar, VerifiedScore]. Composes qc_assess()/gate() (the
     already-built Confidence Gate) with the gated critic panel. Never
     raises -- a critic-panel or retry failure degrades to the ORIGINAL
-    gate output for that pillar, never a crash."""
+    gate output for that pillar, never a crash.
+
+    model: optional override forwarded to run_critic_panel. None (default)
+    preserves today's exact behavior."""
     from agentic_estimation.layer_4.critic_panel import run_critic_panel
     from agentic_estimation.layer_3.reconcile import reconcile_all
 
@@ -164,7 +169,8 @@ def verify_reconciled(
 
         # medium confidence + QC ok -> run the panel.
         try:
-            panel = run_critic_panel(pillar, company, rs, fs, holistic, claims, signals, metadata)
+            panel = run_critic_panel(pillar, company, rs, fs, holistic, claims, signals, metadata,
+                                      model=model)
         except Exception as exc:
             log.warning("[%s/%s] critic panel raised: %s -- falling back to original gate output",
                         company, pillar, exc)
@@ -199,7 +205,7 @@ def verify_reconciled(
 
         # Bounded retry (max 1).
         new_claims = _retry_pillar(pillar, company, signals, metadata, country, claims,
-                                    flagged, panel.objections)
+                                    flagged, panel.objections, model=model)
         if new_claims is None:
             # Gap 3: re-extraction failed -> fail closed, do NOT rescore on
             # a gutted/unknown claim set.
@@ -214,7 +220,7 @@ def verify_reconciled(
         from agentic_estimation.layer_3.formula_estimator import compute_formula_scores
         retried_formula_scores = compute_formula_scores(
             new_claims, country, metadata, company_name=company, sector=metadata.get("industry") if metadata else None,
-            signals=signals,
+            signals=signals, truth_source="upright",
         )
         retried_reconciled_all = reconcile_all(retried_formula_scores, holistic)
         retried_rs = retried_reconciled_all[pillar]
@@ -240,7 +246,7 @@ def verify_reconciled(
 
         try:
             panel2 = run_critic_panel(pillar, company, retried_rs, retried_fs, holistic,
-                                       new_claims, signals, metadata)
+                                       new_claims, signals, metadata, model=model)
         except Exception as exc:
             log.warning("[%s/%s] round-2 critic panel raised: %s -- treating as refuted",
                         company, pillar, exc)

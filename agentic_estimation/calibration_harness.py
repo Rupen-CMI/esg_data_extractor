@@ -82,6 +82,17 @@ _SAT_PARAMS = None
 # DEFAULT False -- Phase 4's critic panel adds real LLM cost; opt-in only.
 _VERIFY = False
 
+# Sustainability-report PDF text as an evidence source (report_collector.py).
+# Module-level for the same reason as _USE_SATURATION -- reaches
+# _gather_and_score_formula without threading through every call site.
+#
+# DEFAULT True: the documents are already on disk and cost nothing to read.
+# --no-report-pdf turns it off, which is what an A/B comparison needs -- and
+# that comparison MUST also pass --no-cache or a different --cache-prefix,
+# because the prediction cache is keyed on company name and has no idea this
+# flag exists (see the cache-prefix comment further down).
+_USE_REPORT_PDF = os.getenv("ESG_REPORT_PDF", "1") != "0"
+
 
 # ── Console visibility ───────────────────────────────────────────────────────
 # The pipeline loggers are FILE-ONLY by design (pipeline_logger writes to
@@ -424,7 +435,7 @@ def _estimate_one_via_graph(truth: TruthRecord, with_evaluator: bool, row: Backt
     True here since the graph's dry path always runs the evaluator node — this
     matches what the scaffold actually does end-to-end.
     """
-    from agentic_estimation.graph import run_company_dry_graph
+    from raw_esg_data.graph import run_company_dry_graph
 
     try:
         industry = truth.industry or ""
@@ -494,6 +505,24 @@ def _gather_and_score_formula(truth: TruthRecord, row: BacktestRow, capture: Opt
     signals.update(fetch_company_signals(truth.name, industry, country=truth.country))
     signals.update(fetch_governance_signals(truth.name))
     signals.update(fetch_facility_signals(truth.name, industry))
+    # Sustainability-report PDF text, from documents already downloaded to
+    # raw_esg_data/ (report_coverage.py + the Wayback recovery). Purely local:
+    # no network, no rate-limit exposure, ~10s of parsing on a cache miss and
+    # ~0 on a hit.
+    #
+    # ADDED LAST, DELIBERATELY. pillar_extractors._signals_block iterates
+    # signals in insertion order and `break`s -- not `continue`s -- once the
+    # cumulative prompt passes _MAX_TOTAL_CHARS. Anything inserted after a
+    # large source is therefore at risk of being dropped from the prompt with
+    # no log line. Report text is the biggest source we have, so it goes last,
+    # where it can only cost itself. Do not move this above the three
+    # collectors.
+    if _USE_REPORT_PDF:
+        try:
+            from agentic_estimation.layer_1.report_collector import fetch_report_signals
+            signals.update(fetch_report_signals(truth.name))
+        except Exception as exc:      # a bad PDF must never kill a company
+            _p(f"  [{truth.name}] report signals failed: {type(exc).__name__}: {exc}")
     metadata = get_company_metadata(truth.name)
     # Seed the peer-matching sector into metadata as well as passing it explicitly
     # below. formula_estimator falls back to metadata["industry"] when no sector= is
@@ -697,6 +726,14 @@ def estimate_one(
         # --verify -- these must never share a cache namespace with
         # unverified ensemble predictions.
         cache_prefix = "verified_" + cache_prefix
+    if _USE_REPORT_PDF and scorer in ("formula", "ensemble"):
+        # Report PDF text adds a whole evidence source, so a company scored
+        # with it is a DIFFERENT prediction from the same company scored
+        # without -- exactly the situation the 't0_' prefix above was added
+        # for. Without this, the with/without A/B that justifies the feature
+        # would compare fresh predictions against stale cached ones and report
+        # a difference of zero.
+        cache_prefix = "rpdf_" + cache_prefix
     cpath = _cache_path(cache_dir, cache_prefix + truth.name) if cache_dir else None
     if cpath and cpath.exists():
         try:
@@ -1233,11 +1270,17 @@ def _cli() -> None:
                           "(estimate_verifier.py) on top of the Confidence Gate. "
                           "Ensemble scorer only; adds real LLM cost on pillars "
                           "landing medium-confidence + QC-ok (see PHASE_4_PLAN.md).")
+    ap.add_argument("--no-report-pdf", action="store_true",
+                     help="exclude sustainability-report PDF text from the evidence "
+                          "gather (report_collector.py). Default is to include it. "
+                          "Use for the with/without A/B -- and pass --no-cache too, "
+                          "since the two runs otherwise share a cache namespace.")
     args = ap.parse_args()
 
-    global _USE_SATURATION, _SAT_PARAMS, _VERIFY
+    global _USE_SATURATION, _SAT_PARAMS, _VERIFY, _USE_REPORT_PDF
     _USE_SATURATION = not args.no_saturation
     _VERIFY = args.verify
+    _USE_REPORT_PDF = not args.no_report_pdf
     if _VERIFY and args.scorer != "ensemble":
         raise ValueError("--verify requires --scorer ensemble")
     if args.sat_ak:

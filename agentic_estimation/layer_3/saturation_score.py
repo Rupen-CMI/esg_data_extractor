@@ -111,7 +111,20 @@ _DEFAULT_SAT_PARAMS: dict[str, PillarSatParams] = {
     # was still additive, and on the current tiebreaker formula it wins ZERO corpora
     # on any pillar.
     "S": PillarSatParams(a_pos=200.0, a_neg=200.0),
-    "G": PillarSatParams(),
+    # G: asymmetric, set 2026-08-18 from a sweep on abl_seed4001_tune500.json
+    # (331 real companies with G truth), sweeping a_neg alone with a_pos=40
+    # held fixed. G's negative factors (litigation, regulatory_fines,
+    # governance_controversy) are higher-confidence/adjudicated-fact sources
+    # (court filings, regulator actions) vs a single lower-confidence DDG-
+    # search-derived positive signal -- a confirmed negative event should move
+    # the G score further than an equally-sized positive claim. Measured
+    # MONOTONIC gain as the ratio rose: ratio 1.0 (symmetric) -> +0.166,
+    # ratio 4.0 -> +0.183, with no interior maximum found in the sweep range
+    # (1.0-4.0) -- shipping the largest tested ratio, not extrapolating past
+    # measured data. The SAME sweep shape LOSES for E (best at ratio 1.0,
+    # declining as ratio rises) -- E's environmental_controversy is a single
+    # weaker signal, not several adjudicated-fact ones, so E stays symmetric.
+    "G": PillarSatParams(a_pos=40.0, a_neg=160.0),
 }
 
 _BETA = 0.6                 # coverage floor: sparse-but-real evidence still moves the score

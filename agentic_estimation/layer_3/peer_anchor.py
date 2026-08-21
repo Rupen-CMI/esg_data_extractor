@@ -226,7 +226,7 @@ def _candidate_sectors(sector: Optional[str]) -> list[str]:
 
 
 def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
-                      country: Optional[str]) -> PeerAnchorVote:
+                      country: Optional[str], truth_source: Optional[str] = None) -> PeerAnchorVote:
     """
     Real bcorp peer median for one pillar -> percentile-normalised 0-100 vote.
     Fallback chain mirrors ratio_estimator.py's discipline: sector+country ->
@@ -234,13 +234,35 @@ def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
     country baseline the formula already has -- double counting). Each tier
     tries the raw sector string, then its coarse manufacturing/services bucket
     (see _candidate_sectors) -- first candidate clearing the sample floor wins.
+
+    truth_source: 'bcorp' | 'upright' | None (default). When given, restricts
+    which peer pool is used, to match the truth the caller is about to score
+    against. Found live (2026-08-17): tiers 1-4 (sector+country, sector-only,
+    crosswalk, bcorp-fuzzy) are ALL bcorp-sourced; only tier 5 is upright-
+    sourced. Scoring UPRIGHT truth against a bcorp-sourced peer vote is a real
+    cross-source contamination bug -- bcorp and upright disagree at Spearman
+    -0.538 on industry ordering (see esg-truth-source-decision memory), so a
+    bcorp peer's percentile is not a neutral estimate of an upright-scored
+    company's standing. Measured: filtering to upright-only peers when
+    scoring upright truth took E from rho=-0.239 to +0.001..+0.175 depending
+    on remaining weight (see calibration/dump_frozen150_noLLM.json backtest).
+    None (default) preserves today's exact behaviour -- no filtering, for
+    backward compatibility with existing callers that don't know their truth
+    source (e.g. live production scoring of a company with no ground truth
+    at all, where BOTH pools are legitimately the best available estimate).
     """
     from agentic_estimation.layer_1.peer_anchor_collector import find_peers, peer_median, peer_sample_size
 
     field = _BCORP_PILLAR_FIELD[pillar]
     candidates = _candidate_sectors(sector)
 
+    # Tiers 1-4 below are bcorp-sourced. Skip them entirely when scoring
+    # against upright truth -- see truth_source docstring above.
+    skip_bcorp_tiers = truth_source == "upright"
+
     for cand in candidates:
+        if skip_bcorp_tiers:
+            break
         if country:
             peers = find_peers(sector=cand, country=country, exclude_name=company_name)
             n = peer_sample_size(peers, field)
@@ -252,7 +274,7 @@ def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
                     basis=f"median {field}={med:.1f} of {n} bcorp peers ({cand}/{country}) -> pctile {pctile:.1f}",
                 )
 
-    if not _suppressed(pillar, "sector_only"):
+    if not skip_bcorp_tiers and not _suppressed(pillar, "sector_only"):
         for cand in candidates:
             peers = find_peers(sector=cand, country=None, exclude_name=company_name)
             n = peer_sample_size(peers, field)
@@ -268,26 +290,31 @@ def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
     # (bcorp's 22 industry_category values or upright's 30 industry values) --
     # exact, hand-built mapping, no similarity scoring, tried BEFORE any fuzzy
     # tier since it is the highest-confidence sector match available short of
-    # an exact hit on the caller's own vocabulary (handled above).
-    crosswalk_vote = _crosswalk_vote(pillar, sector, country, company_name, field)
-    if crosswalk_vote is not None:
-        return crosswalk_vote
+    # an exact hit on the caller's own vocabulary (handled above). Bcorp-
+    # sourced (see module docstring) -- skipped for upright truth.
+    if not skip_bcorp_tiers:
+        crosswalk_vote = _crosswalk_vote(pillar, sector, country, company_name, field)
+        if crosswalk_vote is not None:
+            return crosswalk_vote
 
     # Tier 4: bcorp, fuzzy-matched against industry_category (22 real values --
     # finer than sasb_sector's 4 coarse buckets, e.g. "Manufactured Goods",
     # "Energy", "Agriculture, forestry & fishing"). Still real bcorp per-pillar
     # E/S/G data (not a shared total-impact proxy like the upright tier below),
     # so this is tried BEFORE falling through to upright.
-    bcorp_fuzzy_vote = _bcorp_category_fuzzy_vote(pillar, sector, country, company_name, field)
-    if bcorp_fuzzy_vote is not None:
-        return bcorp_fuzzy_vote
+    if not skip_bcorp_tiers:
+        bcorp_fuzzy_vote = _bcorp_category_fuzzy_vote(pillar, sector, country, company_name, field)
+        if bcorp_fuzzy_vote is not None:
+            return bcorp_fuzzy_vote
 
     # Tier 5: upright, fuzzy-matched sector. Last resort -- upright's
     # total-impact percentile is a weaker, shared-across-pillars signal (see
-    # module docstring), lower confidence than any bcorp tier above.
-    upright_vote = _upright_fuzzy_vote(pillar, sector, country, company_name)
-    if upright_vote is not None:
-        return upright_vote
+    # module docstring), lower confidence than any bcorp tier above. Skipped
+    # when scoring bcorp truth, for the same source-matching reason.
+    if truth_source != "bcorp":
+        upright_vote = _upright_fuzzy_vote(pillar, sector, country, company_name)
+        if upright_vote is not None:
+            return upright_vote
 
     return PeerAnchorVote(pillar=pillar, percentile=None, confidence=0.0, n_peers=0, tier="abstain",
                            basis="no sector+country, sector-only, crosswalk, bcorp-fuzzy, or upright-fuzzy peer group met the sample-size floor")

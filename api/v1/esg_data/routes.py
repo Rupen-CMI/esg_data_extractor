@@ -184,7 +184,7 @@ def _ensure_estimates(specs: list[tuple[str, str]], market_name: str) -> None:
     import os
     from database import Sessionlocal
     from agentic_estimation.orchestrator import run_metrics_only
-    from agentic_estimation.graph import run_company_graph
+    from raw_esg_data.graph import run_company_graph
 
     # Phase 6 cutover: full-pipeline runs go through the new ensemble scorer
     # (Tier-0 validators + v5 formula + v8 reconcile + Confidence Gate) via

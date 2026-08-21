@@ -34,11 +34,139 @@ DEFAULT_MODEL = "deepseek-v4-flash-free"
 
 # Models that are actually usable on the free tier (qwen/minimax promos ended;
 # nemotron is too slow/unstable). Ordered as a sensible fallback chain.
+#
+# NOTE 2026-08-18: "north-mini-code-free" is CONFIRMED DEAD -- a live GET
+# /v1/models call no longer lists it; calling it returns 401, not a real auth
+# failure (the same key works fine for every other model). Live model list as
+# of today: deepseek-v4-flash-free, mimo-v2.5-free, hy3-free,
+# nemotron-3-ultra-free, nemotron-3.5-lightning-free, laguna-s-2.1-free. This
+# constant is left stale (not corrected) because nothing in the live pipeline
+# reads it for fallback selection today -- pillar_extractors.py is pinned to
+# DEFAULT_MODEL only, per call_with_prompt's own no-cross-model-fallback
+# design. Fix if/when a real fallback-chain caller is built.
 USABLE_FREE_MODELS = [
     "deepseek-v4-flash-free",
     "north-mini-code-free",
     "mimo-v2.5-free",
 ]
+
+# ── Ollama routing (2026-08-18) ──────────────────────────────────────────────
+# opencode.ai's free tier has been intermittently 429-throttling this session
+# (confirmed: fresh 429s on an otherwise-idle process, not something our own
+# concurrency caused -- looks like shared free-tier load, out of our control).
+# gpt-oss:120b-cloud, pulled via local Ollama, runs on Ollama's OWN cloud
+# infrastructure -- a genuinely separate backend/quota from opencode.ai, not
+# just a different model name on the same throttled host. Verified live:
+# responds correctly, produces valid closed-factor-list JSON, no subscription
+# wall (unlike deepseek-v4-flash:cloud, which 402s without one).
+#
+# Routing is by SUFFIX, not an explicit allowlist -- any "*-cloud" or "*:cloud"
+# style name reaching call_with_prompt is treated as an Ollama model, so this
+# doesn't need updating every time a new Ollama cloud model is pulled.
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_CLOUD_MODEL = "gpt-oss:120b-cloud"
+
+
+def _is_ollama_model(model: str) -> bool:
+    return model.endswith("-cloud") or ":cloud" in model or model.endswith(":cloud")
+
+
+# Separate rate limiter + separate 429 counter from opencode.ai's -- these are
+# different hosts with different quotas; conflating them would either starve
+# Ollama calls with opencode.ai's pacing for no reason, or (worse) let an
+# opencode.ai throttle silently absorb budget that should have been Ollama's
+# own tripwire, masking a real Ollama-side ban risk. "We don't want to get
+# banned here too" (user, 2026-08-18) -- this exists so Ollama gets its own
+# accounting, not opencode.ai's leftovers.
+_OLLAMA_MIN_GAP_S = float(os.getenv("ESG_OLLAMA_MIN_GAP", "2.0"))
+_ollama_rate_lock = threading.Lock()
+_ollama_last_call_at = 0.0
+_ollama_error_lock = threading.Lock()
+_ollama_error_count = 0
+_OLLAMA_ERROR_THRESHOLD = 3   # same threshold discipline as signal_agent's RateLimitTripped
+
+
+class OllamaRateLimitTripped(RuntimeError):
+    """Same spirit as signal_agent.RateLimitTripped, kept separate: a cascade
+    of Ollama-side errors (which could mean a cloud-quota exhaustion, not
+    just a transient network blip) should stop the run, not retry into it."""
+
+
+def _ollama_throttle() -> None:
+    """Same reserve-then-sleep + randomised-gap discipline as opencode.ai's
+    _throttle() (zen_client.py above) -- a fixed gap is a detectable, uniform
+    request-spacing signature, and this run uses 3 concurrent workers
+    (pillar_extractors' per-pillar pool), so bursts are a real risk here too,
+    not just on the host that already got hammered tonight."""
+    global _ollama_last_call_at
+    with _ollama_rate_lock:
+        now = time.monotonic()
+        gap = _OLLAMA_MIN_GAP_S + random.uniform(0, 1.0)
+        wait = _ollama_last_call_at + gap - now
+        _ollama_last_call_at = max(now, _ollama_last_call_at + gap)
+    if wait > 0:
+        time.sleep(wait)
+    time.sleep(random.uniform(0.3, 1.5))   # + jitter before the call itself
+
+
+def _call_ollama_cloud(prompt: str, model: str, system: str, max_tokens: int, timeout: int) -> dict:
+    """Ollama /api/generate, non-streaming. CLEAN ABORT ON ANY ERROR, no
+    retry -- same discipline as opencode.ai's path (user decision,
+    2026-08-18): do not hammer a host that just failed us, cloud quota
+    exhaustion looks identical to a transient blip from here and both
+    deserve the same caution."""
+    global _ollama_error_count
+    _ollama_throttle()
+    started = time.perf_counter()
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    try:
+        resp = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={"model": model, "prompt": full_prompt, "stream": False},
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            with _ollama_error_lock:
+                _ollama_error_count += 1
+                count = _ollama_error_count
+            print(f"[zen_client] Ollama HTTP {resp.status_code} from {model} "
+                  f"({count}/{_OLLAMA_ERROR_THRESHOLD}) -- aborting immediately, no retry",
+                  flush=True)
+            if count >= _OLLAMA_ERROR_THRESHOLD:
+                raise OllamaRateLimitTripped(
+                    f"aborting: {count} Ollama errors (threshold {_OLLAMA_ERROR_THRESHOLD}) "
+                    f"on {model} -- possible quota exhaustion, stopping rather than risk a ban."
+                )
+            return {"ok": False, "raw": "", "error": f"Ollama HTTP {resp.status_code}",
+                    "model_used": None, "latency_s": round(time.perf_counter() - started, 2)}
+        data = resp.json()
+        # Ollama reasoning models (gpt-oss, qwen3) split "thinking" (chain of
+        # thought) from "response" (the final answer) -- same shape issue
+        # zen_client already handles for opencode.ai's reasoning_content.
+        # "response" is what to parse; "thinking" is context only.
+        content = data.get("response") or ""
+        thinking = data.get("thinking") or ""
+        if not content:
+            with _ollama_error_lock:
+                _ollama_error_count += 1
+            return {"ok": False, "raw": "", "error": "empty Ollama response",
+                    "model_used": None, "latency_s": round(time.perf_counter() - started, 2)}
+        return {"ok": True, "raw": content, "reasoning": thinking, "error": None,
+                "model_used": model, "latency_s": round(time.perf_counter() - started, 2)}
+    except OllamaRateLimitTripped:
+        raise
+    except Exception as exc:
+        with _ollama_error_lock:
+            _ollama_error_count += 1
+            count = _ollama_error_count
+        print(f"[zen_client] Ollama call failed: {type(exc).__name__}: {exc} "
+              f"({count}/{_OLLAMA_ERROR_THRESHOLD})", flush=True)
+        if count >= _OLLAMA_ERROR_THRESHOLD:
+            raise OllamaRateLimitTripped(
+                f"aborting: {count} Ollama errors (threshold {_OLLAMA_ERROR_THRESHOLD})"
+            )
+        return {"ok": False, "raw": "", "error": str(exc),
+                "model_used": None, "latency_s": round(time.perf_counter() - started, 2)}
 
 
 def _load_api_key() -> str:
@@ -186,9 +314,48 @@ _JITTER_RANGE_S = (0.3, 1.5)
 # this function concurrently, so the rate limit has to be enforced with a
 # shared lock, not a per-call sleep. Same pacing discipline as
 # climate_trace_harvester.py's _MIN_GAP, applied here across threads.
-_MIN_GAP_S = 2.0
+#
+# Overridable via ESG_LLM_MIN_GAP for runs where wall-clock matters more than
+# headroom: this gap is the single largest cost in a scoring run (150 companies
+# x ~8 calls is ~50 min at 2.0s, ~35 min at 1.5s). Lower it only when watching
+# the run -- 429s here feed _note_rate_limit and can trip the abort guard, and a
+# tripped run costs far more than the minutes saved.
+_MIN_GAP_S = float(os.getenv("ESG_LLM_MIN_GAP", "2.0"))
 _rate_lock = threading.Lock()
 _last_call_at = 0.0
+
+# ADAPTIVE BACKOFF -- DEAD CODE as of 2026-08-18, kept for now, no callers.
+# call_with_prompt() used to call penalise() on every 429 so a throttle would
+# slow the whole run rather than just the one call that hit it. Removed: user
+# decision was clean-abort-no-retry instead (retrying, even slower, is still
+# load on a host that just told us to stop). If a future caller wants a
+# soft-degrade path again, this is still here and still correct; nothing
+# currently invokes it.
+_PENALTY_MAX = float(os.getenv("ESG_LLM_PENALTY_MAX", "8.0"))
+_PENALTY_DECAY_S = float(os.getenv("ESG_LLM_PENALTY_DECAY", "600"))
+_penalty = 1.0
+_penalty_set_at = 0.0
+
+
+def _current_penalty() -> float:
+    """Penalty multiplier, decaying linearly to 1.0 over _PENALTY_DECAY_S."""
+    global _penalty
+    if _penalty <= 1.0:
+        return 1.0
+    age = time.monotonic() - _penalty_set_at
+    if age >= _PENALTY_DECAY_S:
+        _penalty = 1.0
+        return 1.0
+    return 1.0 + (_penalty - 1.0) * (1.0 - age / _PENALTY_DECAY_S)
+
+
+def penalise(factor: float = 2.0) -> None:
+    """Slow every subsequent LLM call after a throttle. Compounds, capped."""
+    global _penalty, _penalty_set_at
+    with _rate_lock:
+        _penalty = min(_current_penalty() * factor, _PENALTY_MAX)
+        _penalty_set_at = time.monotonic()
+    print(f"[zen_client] backing off x{_penalty:.1f} after throttle", flush=True)
 
 
 def _throttle() -> None:
@@ -198,7 +365,7 @@ def _throttle() -> None:
         # 2.0s gap means the request stream has a perfectly regular period
         # regardless of the per-call jitter that follows it -- the same bot
         # signature every other limiter in this pipeline was audited to remove.
-        gap = _MIN_GAP_S + random.uniform(0, 1.0)
+        gap = (_MIN_GAP_S + random.uniform(0, 1.0)) * _current_penalty()
         wait = _last_call_at + gap - time.monotonic()
         if wait > 0:
             time.sleep(wait)
@@ -218,7 +385,17 @@ def call_with_prompt(prompt: str, model: str = DEFAULT_MODEL,
     reasoning_content -- a silent non-answer that a fallback chain would mask.
     Real calibration/comparison work needs every call attributable to one
     known model, not a chain that can silently hand off to a weaker one.
+
+    Ollama routing: if `model` matches _is_ollama_model() (e.g.
+    "gpt-oss:120b-cloud"), this transparently routes to local Ollama's
+    /api/generate instead of opencode.ai -- separate rate limiter, separate
+    error counter, same clean-abort-no-retry discipline. Every existing
+    caller (pillar_extractors.py etc.) is unaffected unless it's explicitly
+    passed an Ollama-style model name.
     """
+    if _is_ollama_model(model):
+        return _call_ollama_cloud(prompt, model, system or "", max_tokens, timeout)
+
     api_key = _load_api_key()
     sys_msg = system or ("You are a JSON-only extraction engine. You must respond with ONLY "
                          "valid JSON. No thinking, no explanation, no markdown, no prose.")
@@ -249,25 +426,25 @@ def call_with_prompt(prompt: str, model: str = DEFAULT_MODEL,
                 timeout=timeout,
             )
             if resp.status_code in (503, 429):
-                # Feed the SHARED tripwire that signal_agent uses for evidence
-                # hosts. Without this the counter reads zero while the LLM
-                # provider is throttling us hard -- the run looks healthy and
-                # quietly produces companies with no holistic vote, which is
-                # exactly the invisible-gap failure the tripwire exists to stop.
-                # Retries are still attempted; the tripwire only fires once the
-                # global budget is spent, so a single transient 429 is absorbed.
+                # CLEAN ABORT, NO RETRY (user decision, 2026-08-18): retrying
+                # after a 429 -- even with backoff -- is still additional load
+                # on a host that just told us to stop, and risks worsening
+                # whatever cooldown/ban window we're already in. Previously
+                # this retried up to `retries` times with an 8/16/24s wait and
+                # a decaying penalise() multiplier; that whole soft-recovery
+                # path is removed. One 429 now ends the call immediately and
+                # feeds the SHARED tripwire signal_agent uses for evidence
+                # hosts, so a throttled LLM run is visible the same way a
+                # throttled web-fetch run already is -- not a quiet gap.
                 try:
                     from agentic_estimation.layer_1.signal_agent import _note_rate_limit
                     _note_rate_limit(ZEN_BASE_URL)   # may raise RateLimitTripped
                 except ImportError:
                     pass                            # zen_client is usable standalone
-                if attempt < retries:
-                    wait = 8 * (attempt + 1)
-                    print(f"[zen_client] HTTP {resp.status_code} from {model} "
-                          f"(attempt {attempt + 1}/{retries + 1}) -- retrying in {wait}s",
-                          flush=True)
-                    time.sleep(wait)
-                    continue
+                print(f"[zen_client] HTTP {resp.status_code} from {model} -- "
+                      f"aborting immediately, no retry", flush=True)
+                return {"ok": False, "raw": "", "error": f"HTTP {resp.status_code} (no retry)",
+                        "model_used": None, "latency_s": round(time.perf_counter() - started, 2)}
             resp.raise_for_status()
             data = resp.json()
             msg = data["choices"][0]["message"]

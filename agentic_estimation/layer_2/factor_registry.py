@@ -44,6 +44,20 @@ class Factor:
 
 # ── Hand-set weights for the CORE_METRICS-backed benchmark_band factors ──────
 # (scored ones only -- "neutral" direction entries are context, not weighted)
+#
+# BADGE-FACTOR ZEROING (2026-08-18): anti_corruption_policy, whistleblower_
+# mechanism, esg_report_published, third_party_esg_audit are one-sided
+# "badge" factors -- measured across 138 real evidence files, extracted
+# claims for these skew 90-99% positive (esg_report_published: 728 pos / 8
+# neg). A near-unanimous badge does not discriminate between companies; it
+# mostly just says "this company has a website/PR function", not "this
+# company performs better than a peer without the badge". Kept in the
+# registry (still extractable/loggable/auditable) but weight=0 so they
+# contribute zero swing to the score. Measured on the largest available real-
+# claims dataset (calibration/abl_seed4001_tune500.json, 498 companies,
+# dropping all 8 badge-factor contributions entirely): E +0.190->+0.226
+# (+0.036), S unchanged (0.426 -- no badge factors fire for S), G +0.166->
+# +0.184 (+0.018). No regressions on any pillar.
 _CORE_METRIC_WEIGHTS = {
     "scope_1_emissions":        8,
     "scope_2_emissions":        8,
@@ -57,28 +71,47 @@ _CORE_METRIC_WEIGHTS = {
     "employee_turnover_rate":   4,
     "lost_time_injury_rate":    6,
     "board_independence_pct":   8,
-    "anti_corruption_policy":   5,
-    "whistleblower_mechanism":  4,
-    "esg_report_published":     4,
-    "third_party_esg_audit":    5,
+    "anti_corruption_policy":   0,   # badge factor, zeroed -- see note above
+    "whistleblower_mechanism":  0,   # badge factor, zeroed -- see note above
+    "esg_report_published":     0,   # badge factor, zeroed -- see note above
+    "third_party_esg_audit":    0,   # badge factor, zeroed -- see note above
 }
 
 # ── New qualitative/event factors (no CORE_METRICS equivalent) ───────────────
 # (key, pillar, weight, direction, description)
+# net_zero_pledge, sbti_commitment, cdp_disclosure, compliance_certification
+# are also confirmed one-sided badge factors (90%+ positive skew) -- zeroed
+# for the same reason as the CORE_METRICS badges above. Controversy-shaped
+# factors (environmental_controversy, labor_controversy, human_rights_
+# incident, regulatory_fines, litigation, governance_controversy) are NOT
+# touched: their skew (95-100% negative) is CORRECT there, since they come
+# from a targeted negative-event search rather than self-disclosure -- that
+# skew must be trusted MORE, not rebalanced to match the badges.
 _EVENT_FACTORS = [
-    ("net_zero_pledge",             "E", 5,  "higher", "Public net-zero / carbon-neutral pledge with a stated target year"),
-    ("sbti_commitment",              "E", 6,  "higher", "Science Based Targets initiative commitment or validated target"),
-    ("cdp_disclosure",                "E", 4,  "higher", "CDP climate disclosure submitted"),
+    ("net_zero_pledge",             "E", 0,  "higher", "Public net-zero / carbon-neutral pledge with a stated target year"),
+    ("sbti_commitment",              "E", 0,  "higher", "Science Based Targets initiative commitment or validated target"),
+    ("cdp_disclosure",                "E", 0,  "higher", "CDP climate disclosure submitted"),
     ("environmental_controversy",     "E", 10, "lower",  "Reported environmental violation, spill, or pollution controversy"),
     ("sector_emissions_intensity",    "E", 4,  "lower",  "Company's sector emissions intensity vs. country peers (Climate TRACE anchor)"),
 
     ("labor_controversy",             "S", 10, "lower",  "Reported labor dispute, unsafe conditions, or wage violation"),
     ("human_rights_incident",         "S", 12, "lower",  "Reported human rights incident (BHRRC-tracked)"),
     ("workplace_safety",              "S", 6,  "higher", "Positive workplace safety record or certification"),
+    # New 2026-08-20: consumer/user/product harm (child safety, privacy,
+    # data misuse, product safety) had no factor to land on before --
+    # confirmed live that the LLM was stretching this class of real,
+    # adjudicated-fact evidence (e.g. a $567M fine against Meta for failing
+    # to protect children on its platforms) into human_rights_incident, the
+    # closest available bucket, not a correct one. Weighted alongside
+    # labor_controversy (10) -- same real-adjudicated-event class, not a
+    # badge/self-disclosure factor, so it is NOT zeroed like the badges
+    # above. See claim_validators.py's _FACTOR_TOPIC_TERMS for the matching
+    # keyword list this needs to survive Tier-0 lexical relevance.
+    ("consumer_harm_incident",        "S", 10, "lower",  "Reported consumer/user harm: child safety, privacy violation, data misuse, or product safety failure"),
 
     ("regulatory_fines",              "G", 9,  "lower",  "Regulatory fine or sanction against the company"),
     ("litigation",                    "G", 7,  "lower",  "Material litigation (from 10-K Item 3 or news)"),
-    ("compliance_certification",      "G", 5,  "higher", "Anti-corruption / compliance certification or program"),
+    ("compliance_certification",      "G", 0,  "higher", "Anti-corruption / compliance certification or program"),
     ("governance_controversy",        "G", 8,  "lower",  "Reported governance/ethics controversy not covered by "
                                                           "litigation, fines, or a specific policy (e.g. human "
                                                           "rights sourcing allegations, executive misconduct)"),

@@ -75,8 +75,31 @@ _FACTOR_TOPIC_TERMS: dict[str, tuple[str, ...]] = {
     "lost_time_injury_rate": ("injury", "safety", "trir", "osha", "accident", "fatality"),
     "workplace_safety": ("safety", "injury", "trir", "osha", "accident", "workplace"),
     "labor_controversy": ("strike", "union", "labor", "labour", "wage", "layoff", "dispute"),
+    # Broadened 2026-08-20: the original 6-phrase list only matched the
+    # narrow named categories (modern slavery/forced labor/child labor).
+    # Confirmed live -- a China Construction Bank BHRRC claim ("former
+    # employee alleges arrest and torture... Alien Tort Statute", LLM
+    # confidence 0.9) was dropped here because "torture"/"arrest" matched
+    # none of the 6 phrases, even though the LLM had correctly classified
+    # a real, serious human-rights incident. Real BHRRC/press vocabulary
+    # for human-rights violations is much broader than the 3 named treaty
+    # categories this list originally covered.
     "human_rights_incident": ("human rights", "modern slavery", "forced labor", "forced labour",
-                               "child labor", "child labour"),
+                               "child labor", "child labour", "torture", "arrest", "detention",
+                               "detained", "disappearance", "persecution", "trafficking",
+                               "abuse", "violence", "harassment", "discrimination",
+                               "extrajudicial", "indigenous", "displacement", "repression"),
+    # New 2026-08-20: real BHRRC/press content covers consumer/user/product
+    # harm (child-safety findings, privacy violations, data misuse, product
+    # safety) that had NO home in the old 7-factor S list -- confirmed live
+    # on Meta (a real $567M fine for failing to protect children on its
+    # platforms, COPPA violation) getting stretched into human_rights_incident
+    # by the LLM (the closest available bucket, not a correct one) because
+    # nothing else existed to classify it under. See factor_registry.py for
+    # the new consumer_harm_incident factor this term list backs.
+    "consumer_harm_incident": ("child safety", "privacy", "data protection", "data breach",
+                                "consumer protection", "product safety", "coppa", "user harm",
+                                "harm to children", "misled consumers", "deceptive practice"),
     "board_independence_pct": ("board", "independent director", "director", "governance"),
     "anti_corruption_policy": ("anti-corruption", "bribery", "corruption", "compliance"),
     "whistleblower_mechanism": ("whistleblower", "ethics", "grievance"),
@@ -129,6 +152,25 @@ class ValidationFlag:
 
 def _topic_terms_for(factor_key: str, pillar: str) -> tuple[str, ...]:
     return _FACTOR_TOPIC_TERMS.get(factor_key) or _PILLAR_FALLBACK_TERMS.get(pillar, ())
+
+
+# Tag families that are ONE underlying source split across several signal keys.
+# Corroboration counts distinct sources, so without collapsing these, a source
+# that emits N tags would corroborate itself N times over and escape the
+# single-source cap entirely.
+#
+# report_pdf_e / _s / _g are three slices of THE SAME company report --
+# report_collector splits by pillar only to fit pillar_extractors'
+# per-signal char budget, not because they are independent evidence.
+_TAG_FAMILIES = ("report_pdf",)
+
+
+def _corroboration_source(source_tag: str) -> str:
+    """Collapse a signal tag to the independent source it actually represents."""
+    for fam in _TAG_FAMILIES:
+        if (source_tag or "").startswith(fam):
+            return fam
+    return source_tag or ""
 
 
 def _check_lexical_relevance(claim: ExtractedClaim, signals: dict) -> Optional[ValidationFlag]:
@@ -244,7 +286,7 @@ def _check_corroboration(claims: list[ExtractedClaim]) -> list[ValidationFlag]:
         # let exactly that slip through uncapped in production (Cardinal
         # Health: one google_news_rss article extracted 7x as
         # labor_controversy, all sharing one source_tag, never capped).
-        sources = {c.source_tag for c in negative}
+        sources = {_corroboration_source(c.source_tag) for c in negative}
         if len(sources) != 1:
             continue  # >=2 distinct sources: genuinely corroborated.
         # Single distinct source, possibly duplicated across N claim objects

@@ -159,6 +159,7 @@ def score_company_sync(
     country: Optional[str] = None,
     signals: Optional[dict[str, str]] = None,
     metadata: Optional[dict] = None,
+    model: Optional[str] = None,
 ) -> Optional[ESGScore]:
     """
     Compute ESG scores synchronously (no DB write).
@@ -167,6 +168,9 @@ def score_company_sync(
     If metadata is None, fetches it via company_metadata.get_company_metadata.
     If country is None, tries metadata first, then signals['wikipedia'], then
     falls back to no-baseline mode (uses 50/50/50 as neutral baseline).
+
+    model: optional override forwarded to zen_client.call_with_prompt. None
+    (default) preserves today's exact behavior (opencode.ai's DEFAULT_MODEL).
     """
     from agentic_estimation.layer_1.signal_agent import fetch_company_signals
     from agentic_estimation.layer_1.country_baseline_agent import (
@@ -174,7 +178,7 @@ def score_company_sync(
         extract_country_from_wikipedia,
     )
     from agentic_estimation.layer_1.company_metadata import get_company_metadata, format_for_prompt
-    from zen_client import call_with_prompt
+    from zen_client import call_with_prompt, DEFAULT_MODEL
 
     log_header(log, "Scoring Agent", company=company, industry=industry or "N/A", country=country or "auto-detect")
 
@@ -234,9 +238,10 @@ def score_company_sync(
         signals_block=signals_block,
     )
 
-    log.info("[%s] calling LLM for scoring...", company)
+    log.info("[%s] calling LLM for scoring (model=%s)...", company, model or "default")
     resp = call_with_prompt(
         prompt,
+        model=model or DEFAULT_MODEL,
         max_tokens=4000,
         timeout=240,
         system="You are an expert ESG analyst. After your reasoning, you MUST end your response with a valid JSON object containing e_score, s_score, g_score, e_reasoning, s_reasoning, g_reasoning.",

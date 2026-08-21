@@ -181,6 +181,7 @@ def extract_pillar_claims(
     signals: dict[str, str],
     metadata: Optional[dict] = None,
     objection: Optional[dict] = None,
+    model: Optional[str] = None,
 ) -> list[ExtractedClaim]:
     """Pure: no DB access. One LLM call for one pillar.
 
@@ -191,8 +192,15 @@ def extract_pillar_claims(
     reviewer's stated concern. This is the explicit correction channel --
     NOT a signals-dict piggyback, which would fabricate a citable
     source_tag that was never a real gathered signal. None (the default)
-    is a no-op -- identical prompt/behavior to every existing caller."""
-    from zen_client import call_with_prompt
+    is a no-op -- identical prompt/behavior to every existing caller.
+
+    model: optional override, passed straight to zen_client.call_with_prompt.
+    None (default) uses zen_client's own DEFAULT_MODEL (opencode.ai). Pass
+    e.g. "gpt-oss:120b-cloud" to route through local Ollama's cloud backend
+    instead (added 2026-08-18: opencode.ai's free tier was intermittently
+    429-throttling this session; Ollama's cloud models run on a separate
+    backend/quota entirely). Every existing caller is unaffected."""
+    from zen_client import call_with_prompt, DEFAULT_MODEL
 
     if not signals:
         log.info("[%s/%s] no signals gathered -- skipping extraction", company, pillar)
@@ -214,9 +222,10 @@ def extract_pillar_claims(
         factor_list=_factor_list_block(pillar),
     )
 
-    log.info("[%s/%s] calling LLM (%d signals)...", company, pillar, len(signals))
+    log.info("[%s/%s] calling LLM (%d signals, model=%s)...", company, pillar, len(signals),
+             model or DEFAULT_MODEL)
     resp = call_with_prompt(
-        prompt, max_tokens=2500, timeout=120,
+        prompt, model=model or DEFAULT_MODEL, max_tokens=2500, timeout=120,
         system="You are an ESG evidence tagger. After reasoning, you MUST end with a single "
                "valid JSON object of the exact shape requested, containing only claims genuinely "
                "supported by the signals shown to you.",
@@ -413,12 +422,17 @@ def extract_all_claims_merged(company: str, signals: dict[str, str],
     return claims
 
 
-def extract_all_claims(company: str, signals: dict[str, str], metadata: Optional[dict] = None) -> list[ExtractedClaim]:
-    """Pure: no DB access. Runs the three pillar extractions concurrently."""
+def extract_all_claims(company: str, signals: dict[str, str], metadata: Optional[dict] = None,
+                        model: Optional[str] = None) -> list[ExtractedClaim]:
+    """Pure: no DB access. Runs the three pillar extractions concurrently.
+
+    model: optional override forwarded to extract_pillar_claims (see its
+    docstring). None (default) preserves today's exact behavior."""
     if _MERGE_EXTRACTORS:
         return extract_all_claims_merged(company, signals, metadata)
     with ThreadPoolExecutor(max_workers=3) as pool:
-        futures = {pool.submit(extract_pillar_claims, p, company, signals, metadata): p for p in ("E", "S", "G")}
+        futures = {pool.submit(extract_pillar_claims, p, company, signals, metadata, model=model): p
+                   for p in ("E", "S", "G")}
         results: list[ExtractedClaim] = []
         for fut in futures:
             try:

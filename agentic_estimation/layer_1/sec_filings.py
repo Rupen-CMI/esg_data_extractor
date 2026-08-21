@@ -66,6 +66,26 @@ _EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
 # process. Preferred over resolve_cik()'s browse-edgar name search, which is
 # fuzzy and returns whichever registrant EDGAR ranks first for a query string.
 _TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+
+# Words that may trail a registrant's name without changing WHICH company it is --
+# legal forms, geographies, and corporate-unit words. Used to decide whether
+# "<registrant> <extra words>" is the same company with qualifiers
+# ("Bonduelle Americas US" -> Bonduelle) or a different company that merely shares
+# a first word ("Wise Investments Ltd" is not the registrant "Wise").
+_NAME_QUALIFIERS = frozenset({
+    # legal forms
+    "inc", "incorporated", "corp", "corporation", "co", "company", "llc", "lp",
+    "llp", "ltd", "limited", "plc", "gmbh", "ag", "sa", "nv", "bv", "spa", "srl",
+    "pty", "pvt", "private", "kk", "as", "ab", "oyj", "oy",
+    # geographies / units
+    "usa", "us", "u.s.", "america", "americas", "north", "south", "east", "west",
+    "europe", "european", "asia", "asia-pacific", "apac", "international", "global",
+    "worldwide", "uk", "canada", "india", "japan", "china", "australia", "brasil",
+    "brazil", "mexico", "deutschland", "france", "italia",
+    # corporate structure
+    "holdings", "holding", "group", "groupe", "grp", "sub", "subsidiary",
+    "the", "and", "of",
+})
 _cik_map: Optional[dict[str, str]] = None
 _cik_map_lock = threading.Lock()
 
@@ -126,8 +146,14 @@ def _load_cik_map() -> dict[str, str]:
                 key = _normalize_name(title)
                 if key:
                     _cik_map.setdefault(key, cik)
+                # Tickers are indexed under a "ticker:" prefix, NOT bare. A bare
+                # ticker key collides with ordinary company names: our corpus
+                # contains B Corps called "Mine" and "FEED", which matched the
+                # tickers MINE (Mayfair Gold) and FEED (EnVue Medical) and inherited
+                # their CIKs. Callers who genuinely hold a ticker can look up
+                # "ticker:<sym>"; a company NAME must never resolve this way.
                 if ticker:
-                    _cik_map.setdefault(ticker, cik)
+                    _cik_map.setdefault(f"ticker:{ticker}", cik)
             log.info("loaded CIK map: %d keys", len(_cik_map))
         except (ValueError, AttributeError) as exc:
             log.warning("company_tickers.json parse failed: %s", exc)
@@ -152,14 +178,47 @@ def cik_for_company(company: str) -> Optional[str]:
     cmap = _load_cik_map()
     if key in cmap:
         return cmap[key]
-    # "Bonduelle Americas US" -> match registrant "Bonduelle"; require the
-    # candidate to be a leading word-boundary prefix so "Apple" can't match
-    # "Applebee's" and vice versa.
+    # "Bonduelle Americas US" -> match registrant "Bonduelle": the QUERY may carry
+    # extra qualifiers beyond a registrant's name.
+    #
+    # The reverse direction is NOT safe and was removed 2026-08-05. Allowing a
+    # registrant to be longer than the query lets any short company name claim an
+    # unrelated filer: "Metropolitan Group" (a small agency in our corpus) matched
+    # registrant "Metropolitan Bank" and inherited CIK 0001476034. A CIK is used to
+    # scope EDGAR full-text search, so a wrong one silently attributes another
+    # company's filings as this company's evidence -- worse than returning None,
+    # which is the normal and correct outcome for the many non-US firms we score.
+    # The trailing words must look like QUALIFIERS (a region, a legal form, a unit),
+    # not a different company name. "Bonduelle Americas US" is Bonduelle; "Wise
+    # Investments Ltd" is NOT the registrant "Wise" -- 'investments' is part of the
+    # name, and accepting it handed a UK micro-firm CIK 0002099039.
     for cand_key, cik in cmap.items():
-        if len(cand_key) > 3 and (key.startswith(cand_key + " ") or cand_key.startswith(key + " ")):
-            return cik
-    cik = resolve_cik(company)
-    return cik.zfill(10) if cik else None
+        if len(cand_key) > 3 and key.startswith(cand_key + " "):
+            extra = key[len(cand_key):].split()
+            if extra and all(w in _NAME_QUALIFIERS for w in extra):
+                return cik
+
+    # NO browse-edgar fallback. Removed 2026-08-05 for two independent reasons:
+    #
+    # 1. UNSAFE. The search is fuzzy with no similarity floor and returns whichever
+    #    registrant EDGAR ranks first, so "Wise Investments Ltd" (a UK micro-firm)
+    #    came back as CIK 0002099039. A wrong CIK silently scopes full-text search
+    #    to ANOTHER company's filings and attributes them as this company's
+    #    evidence -- strictly worse than returning None.
+    # 2. NEARLY PURE WASTE. Measured on the 193-company held-out corpus: 2 companies
+    #    resolve from the cached ticker map; the other 191 would each fire a live
+    #    EDGAR request that returns nothing usable. That burst is what tripped the
+    #    503 guard during testing on 2026-08-05.
+    #
+    # The ticker map covers ~18k registrants and is fetched once per process, so
+    # every genuine US filer resolves at zero request cost. Returning None for the
+    # rest is the correct outcome, not a gap -- most companies we score are not SEC
+    # registrants at all.
+    #
+    # resolve_cik() is retained for explicit, one-off callers who accept the fuzzy
+    # semantics; it is deliberately no longer on the automatic path.
+    return None
+
 
 
 def _find_latest_filing(cik: str, form_type: str) -> Optional[tuple[str, str]]:

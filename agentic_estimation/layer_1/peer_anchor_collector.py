@@ -28,6 +28,7 @@ CLI:
 
 import os
 import sys
+import threading
 from dataclasses import dataclass
 from statistics import median
 from typing import Optional
@@ -47,8 +48,54 @@ _MIN_PEERS_FOR_SECTOR_ONLY = 5      # below this, fall back to coarse bucket
 
 
 # ── DB connection (same URL handling used across the pipeline) ────────────────
+#
+# CACHED, not opened fresh per call. Measured live: each fresh psycopg2.connect()
+# to the remote Neon instance costs ~1.5s for the TCP/TLS handshake alone, before
+# any query runs. find_peers() is called once per pillar (up to 3x/company) with
+# multiple fallback tiers each potentially calling it again -- a 150-company
+# formula-only backtest (calibration/run_formula_only_150.py) measured ~60s/company
+# with a fresh connection every time, almost entirely connection overhead, not
+# query time (a trivial `SELECT 1` on an already-open connection took ~0.5s vs
+# ~1.5s to open a new one). One process-lifetime connection, reused across every
+# call, cuts that back to query time only.
+#
+# LIVENESS CHECKED, not just cached blindly: a network change mid-run (observed
+# live -- switching networks left a stale resolved connection whose DNS name no
+# longer resolved) must not wedge every subsequent call on a dead connection.
+# `conn.closed` catches an explicitly-closed connection; a stale-but-still-open
+# one is caught by the SELECT 1 probe, which raises and triggers a reconnect.
+#
+# ONE CONNECTION PER THREAD, not one shared module-level connection. Fixed
+# 2026-08-18 after a real, repeated bug under concurrent load: with a single
+# shared psycopg2 connection, thread A's liveness probe (SELECT 1) could fail
+# and call conn.close() while thread B was mid-query on the SAME connection
+# object -- B's cursor then raised "cursor already closed". Measured live in
+# the niche-10 production demo (3 concurrent workers): 3/10 companies lost
+# their formula score to this exact error (Slatto Value Add, Mali Lithium,
+# Strandberg Guitars). psycopg2 connections are not thread-safe for concurrent
+# use from multiple threads even with a lock around each call, because the
+# close-on-dead-probe path races with an in-flight query on another thread.
+# threading.local() keeps the original amortization goal (no ~1.5s handshake
+# per call) while giving each worker thread its own connection -- 3 workers
+# means 3 live connections instead of 1, a small, acceptable cost against a
+# real correctness bug.
+_thread_local = threading.local()
+
 
 def _db_conn():
+    conn = getattr(_thread_local, "conn", None)
+    if conn is not None and conn.closed == 0:
+        try:
+            with conn.cursor() as probe:
+                probe.execute("SELECT 1")
+            return conn
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            _thread_local.conn = None
+
     db_url = os.getenv("ASYNC_DB_URL", os.getenv("DB_URL", ""))
     db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
     parsed = urlparse(db_url)
@@ -57,7 +104,9 @@ def _db_conn():
     clean_qs = urlencode({k: v[0] for k, v in qs.items()})
     if sslmode:
         clean_qs = (clean_qs + "&" if clean_qs else "") + f"sslmode={sslmode}"
-    return psycopg2.connect(urlunparse(parsed._replace(query=clean_qs)))
+    conn = psycopg2.connect(urlunparse(parsed._replace(query=clean_qs)))
+    _thread_local.conn = conn
+    return conn
 
 
 # ── Peer record ────────────────────────────────────────────────────────────────
@@ -140,7 +189,7 @@ def _find_bcorp_peers(sector: Optional[str], country: Optional[str], size_bucket
         params,
     )
     rows = cur.fetchall()
-    conn.close()
+    # connection is process-cached (see _db_conn) -- do not close it here
 
     out = []
     for name, sasb, ctry, size, overall, env, gov, workers, community, customers in rows:
@@ -160,12 +209,10 @@ def bcorp_industry_category_labels() -> list[str]:
     yields real per-pillar E/S/G scores (not just a single total-impact
     percentile)."""
     conn = _db_conn()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT DISTINCT industry_category FROM bcorp_lookup WHERE industry_category IS NOT NULL")
-        return [r[0] for r in cur.fetchall()]
-    finally:
-        conn.close()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT industry_category FROM bcorp_lookup WHERE industry_category IS NOT NULL")
+    return [r[0] for r in cur.fetchall()]
+    # connection is process-cached (see _db_conn) -- do not close it here
 
 
 # ── upright_lookup peers ──────────────────────────────────────────────────────
@@ -203,7 +250,7 @@ def _find_upright_peers(sector: Optional[str], country: Optional[str],
         params,
     )
     rows = cur.fetchall()
-    conn.close()
+    # connection is process-cached (see _db_conn) -- do not close it here
 
     out = [
         PeerRecord(
@@ -267,7 +314,7 @@ def _find_real_metric_peers(metric_key: str, sector_hint: Optional[str],
         params,
     )
     rows = cur.fetchall()
-    conn.close()
+    # connection is process-cached (see _db_conn) -- do not close it here
 
     out = [
         PeerRecord(source="wikirate", name=name, sector=sector_hint, country=ctry, size_bucket=None,

@@ -88,6 +88,8 @@ class PillarFormulaScore:
     contributions: list[Contribution] = field(default_factory=list)
     peer_anchor: Optional[object] = None   # PeerAnchorVote, when a real peer group was used
     breakdown: Optional[object] = None     # SaturationBreakdown, when use_saturation=True (see saturation_score.py) -- carries evidence_mass/coverage/gate_fired for the QC gate
+    ladder: Optional[dict] = None          # set by graph.py's _apply_evidence_ladder when the low-evidence ladder fired -- audit trail (rung, prior_pct, w_claims)
+    controversy_overlay: Optional[dict] = None   # set by graph.py's _apply_evidence_ladder when a confirmed negative event pulled the score down
 
 
 def _claim_sort_key(c: ExtractedClaim):
@@ -155,7 +157,19 @@ def _contribution_for_factor(
     # recency is handled at the source (latest harvested year only).
     freshness = 1.0
     if (signals is not None and best.method == "extracted"
-            and factor.delta_shape == "event"):
+            and factor.delta_shape == "event"
+            and not (best.source_tag or "").startswith("report_pdf")):
+        # report_pdf_* is EXCLUDED from date-based freshness on purpose.
+        # freshness_multiplier_for_signal takes max() over every date it can
+        # parse in the cited text. That is sound for a news snippet, which
+        # carries one publication date, and wrong for a 200-page report, which
+        # carries hundreds -- historical comparison tables, GRI index
+        # references, and forward targets like "net zero by 2030". The max is
+        # therefore whatever the document's furthest-future mention happens to
+        # be, and _recency_decay clamps negative ages to 0, so a target year
+        # scores a perfect 1.0 for a report that may be years old.
+        # Rather than reward that, report claims keep freshness 1.0, matching
+        # how dataset_lookup claims are already handled above.
         from agentic_estimation.layer_2.evidence_freshness import freshness_multiplier_for_signal
         freshness = freshness_multiplier_for_signal(signals.get(best.source_tag))
         confidence *= freshness
@@ -177,6 +191,7 @@ def compute_formula_scores(
     use_saturation: bool = True,
     sat_params: Optional[dict] = None,
     peer_anchor_override: Optional[dict] = None,
+    truth_source: Optional[str] = None,
 ) -> dict[str, PillarFormulaScore]:
     """Pure, deterministic. No LLM. DB access is read-only, cached peer/country
     statistics (see peer_anchor.py, country_baseline_agent.py) -- no writes.
@@ -217,7 +232,15 @@ def compute_formula_scores(
     ablation/route-comparison harness (calibration/ablation_replay.py): peer
     tables mutate over time, so a live re-query at replay time would make
     "same dump, same variant" non-reproducible. None (the default) preserves
-    today's exact behavior -- live DB query."""
+    today's exact behavior -- live DB query.
+
+    truth_source: 'bcorp' | 'upright' | None (default) -- passed straight
+    through to peer_anchor_vote() to restrict which peer pool it draws from
+    (see that function's docstring for the contamination bug this fixes).
+    None preserves today's exact behavior: no restriction, both pools
+    eligible. Pass the real truth source during backtests/calibration; live
+    production scoring (a company with no ground truth row at all) has no
+    correct value to pass and should leave this None."""
     from agentic_estimation.layer_1.country_baseline_agent import get_country_baseline_with_fallback
     from agentic_estimation.layer_3.peer_anchor import peer_anchor_vote, PeerAnchorVote
 
@@ -266,7 +289,8 @@ def compute_formula_scores(
                 anchor = PeerAnchorVote(pillar=pillar, percentile=None, confidence=0.0,
                                          n_peers=0, tier="abstain", basis="peer_anchor_override: no vote")
         else:
-            anchor = peer_anchor_vote(pillar, company_name or "", sector, country)
+            anchor = peer_anchor_vote(pillar, company_name or "", sector, country,
+                                       truth_source=truth_source)
         if anchor.percentile is not None:
             anchor_delta = 2 * (anchor.percentile / 100.0) - 1   # -1..+1, same scale as claim deltas
             anchor_points = 10.0 * anchor.confidence * anchor_delta   # weight=10: comparable to a mid-strength factor

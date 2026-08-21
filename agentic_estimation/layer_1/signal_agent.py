@@ -33,6 +33,7 @@ Usage:
     # → {"gdelt": "...", "news_api": "...", "wikipedia": "...", ...}
 """
 
+import math
 import os
 import random
 import re
@@ -50,6 +51,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
+from agentic_estimation.layer_1 import http_cache as _http_cache
 from agentic_estimation.layer_1.evidence_filters import (
     dedup_and_filter_lines,
     filter_search_results,
@@ -89,28 +91,176 @@ def _newsapi_take_budget() -> bool:
 # Each limiter ensures a minimum gap between consecutive calls to that source,
 # even when multiple threads fire simultaneously.
 
-class _RateLimiter:
-    """Thread-safe minimum-gap enforcer with optional jitter."""
+# Adaptive-backoff tuning. A throttle doubles the offending limiter's gaps; the
+# multiplier decays back to normal over _PENALTY_DECAY_S so one bad minute does
+# not slow the rest of a multi-hour run forever.
+#
+# MEASURED COST of the pacing changes, on DDG (the busiest limiter, 9 sources
+# per company): mean gap 2.75s -> 2.98s from the log-normal draw, plus ~0.75s
+# per request once long pauses are amortised. That is ~34s per company against
+# ~25s before, i.e. roughly 36% slower on a COLD gather.
+#
+# It is not 36% slower in practice, because http_cache is consulted before the
+# limiter -- a warm gather costs 0.03s and skips pacing entirely. The slowdown
+# is paid only on genuinely new fetches, which is exactly where throttle risk
+# lives. Set ESG_LIMITER_PAUSES=0 to opt out for quick interactive runs.
+_PENALTY_MAX     = float(os.getenv("ESG_LIMITER_PENALTY_MAX", "8.0"))
+_PENALTY_DECAY_S = float(os.getenv("ESG_LIMITER_PENALTY_DECAY", "600"))
 
-    def __init__(self, min_gap: float, jitter: float = 0.0):
+# Long pauses can be disabled for quick interactive runs, where a 25s pause in
+# a 6-request script is pure cost with no throttle to avoid.
+_LONG_PAUSES = os.getenv("ESG_LIMITER_PAUSES", "1") != "0"
+
+class _RateLimiter:
+    """Thread-safe minimum-gap enforcer with optional jitter.
+
+    RESERVE-THEN-SLEEP. The obvious implementation sleeps while holding the
+    lock:
+
+        with self._lock:
+            if elapsed < gap:
+                time.sleep(gap - elapsed)     # lock held for the whole sleep
+            self._last = time.time()
+
+    That enforces the right rate but serialises the WAITING as well as the
+    requests: with N threads queued on one limiter, thread N blocks for the
+    sum of everyone else's sleeps before it can even compute its own. On
+    _DDG_LIMITER -- which 9 sources and 18 workers share -- that turned a 2.75s
+    average gap into a queue where late threads waited tens of seconds while
+    holding nothing useful.
+
+    Here each caller instead RESERVES the next slot under the lock (cheap,
+    no I/O) and sleeps outside it. Same emitted rate -- slots are still handed
+    out one gap apart -- but threads wait concurrently, and a thread that
+    arrives when the limiter is idle proceeds immediately.
+
+    self._next is the timestamp of the next free slot, not the time of the
+    last call; that is what makes the reservation safe against two threads
+    reading the same "last" value and both deciding they may go now.
+
+    PACING FEATURES (all process-wide, configured here so no call site has to
+    repeat them):
+
+      * LOG-NORMAL gaps, not uniform. A uniform jitter still produces a flat,
+        bounded distribution -- gaps never exceed min+jitter, which is itself a
+        signature. Log-normal gives mostly-short gaps with an occasional long
+        one, matching how request spacing actually varies, and it has no hard
+        upper bound.
+
+      * PERIODIC LONG PAUSES. Every _burst_len requests (itself randomised) the
+        limiter inserts a multi-second pause. Beyond looking less mechanical,
+        this genuinely helps: most throttles are enforced over a sliding
+        window, so a pause lets the window drain instead of riding the limit
+        continuously.
+
+      * ADAPTIVE BACKOFF. On a throttle, penalise() multiplies this limiter's
+        gaps and the multiplier decays back to 1.0 over time. This is the part
+        that most reduces repeat throttling -- reacting to the host's actual
+        signal beats any fixed schedule.
+
+    HONEST SCOPE: this makes TIMING less mechanical. It does not disguise the
+    traffic -- request ORDER, query shape, absent referrers and un-fetched page
+    assets all still read as automated. Treat it as throttle avoidance, not as
+    evasion; the real reduction in exposure came from caching (http_cache),
+    which removes requests entirely.
+    """
+
+    def __init__(self, min_gap: float, jitter: float = 0.0,
+                 name: str = "", pause_every: tuple = (14, 30),
+                 pause_len: tuple = (8.0, 25.0)):
         self._min_gap = min_gap
         self._jitter  = jitter
+        self._name    = name
         self._lock     = threading.Lock()
-        self._last     = 0.0
+        self._next     = 0.0
+        # Adaptive penalty, driven by penalise()/_decay.
+        self._penalty      = 1.0
+        self._penalty_set  = 0.0
+        # Long-pause scheduling.
+        self._pause_every = pause_every
+        self._pause_len   = pause_len
+        self._count       = 0
+        self._until_pause = random.randint(*pause_every)
+
+    def _sample_gap(self) -> float:
+        """Log-normal gap with mean ~= min_gap + jitter/2.
+
+        sigma=0.35 keeps the bulk within roughly +-40% of the mean while still
+        producing an occasional long tail. Clamped below at min_gap so the
+        configured floor -- which is what the host tolerance was tuned to -- is
+        never violated by a low sample.
+        """
+        centre = self._min_gap + self._jitter * 0.5
+        if centre <= 0:
+            return 0.0
+        gap = random.lognormvariate(math.log(max(centre, 1e-3)), 0.35)
+        return max(self._min_gap, min(gap, centre * 4.0))
+
+    def _current_penalty(self) -> float:
+        """Penalty multiplier, decaying linearly to 1.0 over _PENALTY_DECAY_S."""
+        if self._penalty <= 1.0:
+            return 1.0
+        age = time.time() - self._penalty_set
+        if age >= _PENALTY_DECAY_S:
+            self._penalty = 1.0
+            return 1.0
+        frac = 1.0 - (age / _PENALTY_DECAY_S)
+        return 1.0 + (self._penalty - 1.0) * frac
+
+    def penalise(self, factor: float = 2.0) -> None:
+        """Slow this limiter down after a throttle. Compounds, capped."""
+        with self._lock:
+            self._penalty = min(self._current_penalty() * factor, _PENALTY_MAX)
+            self._penalty_set = time.time()
+        log.warning("limiter[%s] backing off x%.1f after throttle",
+                    self._name or "?", self._penalty)
 
     def wait(self) -> None:
         with self._lock:
-            gap     = self._min_gap + random.uniform(0, self._jitter)
-            elapsed = time.time() - self._last
-            if elapsed < gap:
-                time.sleep(gap - elapsed)
-            self._last = time.time()
+            gap = self._sample_gap() * self._current_penalty()
+
+            # Long pause on a randomised schedule. Added to the reserved slot
+            # inside the lock so that concurrent callers queue behind it rather
+            # than all pausing independently.
+            self._count += 1
+            if _LONG_PAUSES and self._count >= self._until_pause:
+                self._count = 0
+                self._until_pause = random.randint(*self._pause_every)
+                pause = random.uniform(*self._pause_len)
+                gap += pause
+                log.debug("limiter[%s] long pause %.1fs (next in %d reqs)",
+                          self._name or "?", pause, self._until_pause)
+
+            now  = time.time()
+            slot = self._next if self._next > now else now
+            self._next = slot + gap
+        delay = slot - time.time()
+        if delay > 0:
+            time.sleep(delay)
 
 
 # DDG is the most sensitive — serialize ALL DDG calls through one limiter.
-# 2s base + up to 1.5s jitter keeps us well under DDG's ~1 req/s soft limit
-# and makes the request pattern look human rather than robotic.
-_DDG_LIMITER      = _RateLimiter(min_gap=2.0, jitter=1.5)
+#
+# RAISED 2026-08-06 from 2.0+1.5 after DDG stopped answering mid-run: the html
+# endpoint began returning HTTP 202 with an empty results shell, and it persisted
+# through a 90s cooldown. That is an anti-bot stall rather than a per-second rate
+# limit, so the fix is a slower, less regular cadence rather than a retry.
+#
+# RAISED AGAIN 2026-08-19 from 4.0+3.0 to 5.5+3.5 (~7.25s mean vs ~5.5s, ~0.14
+# req/s vs ~0.18) -- precautionary, not in response to a new DDG block (the
+# same-day BHRRC failures were traced to our OWN Wikipedia-bleed-through
+# filtering discarding real, correctly-fetched results, not to DDG itself --
+# see _render_ddg_results). Only ONE call site in this file (_bhrrc_signal)
+# still uses a site: restriction; every other DDG call is already a pure
+# keyword search with no site-native alternative to move to, so the real
+# lever left for reducing DDG exposure is pacing, not fewer/different
+# queries -- this is that lever, used a bit more conservatively.
+#
+# Overridable for runs that need to go slower still.
+_DDG_LIMITER      = _RateLimiter(name="ddg",
+    min_gap=float(os.getenv("ESG_DDG_MIN_GAP", "5.5")),
+    jitter=float(os.getenv("ESG_DDG_JITTER", "3.5")),
+)
 
 # Wikipedia REST API: polite crawling policy — 1 req/s is fine, add small jitter.
 # Wikipedia's REST API is the strictest host we touch. Measured during a
@@ -118,7 +268,7 @@ _DDG_LIMITER      = _RateLimiter(min_gap=2.0, jitter=1.5)
 # (Google News 3, EPA 2, DuckDuckGo 0). The old 1.0s gap looks safe per
 # thread, but _wikipedia_signal tries up to 5 slug variants per company, so
 # N workers burst up to 5N requests before any of them waits.
-_WIKIPEDIA_LIMITER = _RateLimiter(min_gap=3.0, jitter=1.5)
+_WIKIPEDIA_LIMITER = _RateLimiter(min_gap=3.0, jitter=1.5, name="wikipedia")
 
 # Google News RSS had NO limiter until an IP-level block proved it needs one.
 # Batching the keyword group (see _RSS_BATCH_SIZE) multiplied requests from
@@ -136,7 +286,7 @@ _WIKIPEDIA_LIMITER = _RateLimiter(min_gap=3.0, jitter=1.5)
 # throughput versus not fetching it at all, which is the price paid for
 # staying well back from a host that has issued two IP-level blocks.
 # Re-derive from that latency-bound figure rather than lowering it by feel.
-_GOOGLE_NEWS_LIMITER = _RateLimiter(min_gap=3.0, jitter=2.0)
+_GOOGLE_NEWS_LIMITER = _RateLimiter(min_gap=3.0, jitter=2.0, name="google_news")
 
 # KILL SWITCH -- currently ON. We tripped an IP-level Google News block, and
 # every further request EXTENDS it rather than waiting it out (a 3-company
@@ -179,8 +329,49 @@ _rate_limit_hits: Counter = Counter()
 _rate_limit_lock = threading.Lock()
 
 
+def _limiter_for_host(host: str):
+    """The limiter governing `host`, so a throttle can slow the right one.
+
+    Without this the backoff would be global: one DDG throttle would also slow
+    Wikipedia and SEC, which are unrelated hosts with their own budgets.
+    """
+    h = (host or "").lower()
+    if "duckduckgo" in h or h == "https://duckduckgo.com":
+        return _DDG_LIMITER
+    if "wikipedia" in h:
+        return _WIKIPEDIA_LIMITER
+    # Bing before Google: calibration.bing_search registers its limiter here at
+    # import time (it lives in calibration/, which this module must not import).
+    # Without this entry a Bing throttle would penalise nothing -- the lookup
+    # would fall through and return None -- and Bing is now the primary search
+    # source, so it is the host most worth reacting to.
+    if "bing" in h and _EXTRA_LIMITERS.get("bing") is not None:
+        return _EXTRA_LIMITERS["bing"]
+    if "google" in h:
+        return _GOOGLE_NEWS_LIMITER
+    return None
+
+
+# Limiters owned by modules this one cannot import (calibration/ depends on
+# agentic_estimation, never the reverse). register_limiter() lets those modules
+# opt into the same throttle-reaction path as the built-in hosts.
+_EXTRA_LIMITERS: dict = {}
+
+
+def register_limiter(key: str, limiter: "_RateLimiter") -> None:
+    """Route throttles for hosts matching `key` to `limiter`."""
+    _EXTRA_LIMITERS[key.lower()] = limiter
+
+
 def _note_rate_limit(url: str) -> None:
     host = urlparse(url).netloc or url
+    # ADAPTIVE BACKOFF: react to the host's own signal before anything else.
+    # A fixed schedule cannot know where a host's threshold sits; a throttle is
+    # the only direct evidence we ever get, so it is worth acting on
+    # immediately rather than only counting toward the abort threshold.
+    lim = _limiter_for_host(host)
+    if lim is not None:
+        lim.penalise()
     with _rate_limit_lock:
         _rate_limit_hits[host] += 1
         total = sum(_rate_limit_hits.values())
@@ -203,11 +394,52 @@ def rate_limit_report() -> dict:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _get(url: str, params: dict | None = None, timeout: int = _TIMEOUT) -> requests.Response | None:
+class _CachedResponse:
+    """Minimal stand-in for requests.Response on a cache hit.
+
+    Callers of _get use .content (XML/feed parsing), .text, .status_code and
+    .ok. Reconstructing a real Response is not worth it; this exposes exactly
+    that surface, so a cached fetch is indistinguishable at the call site.
+    """
+
+    __slots__ = ("text", "status_code", "url")
+
+    def __init__(self, text: str, url: str = ""):
+        self.text = text
+        self.status_code = 200
+        self.url = url
+
+    @property
+    def content(self) -> bytes:
+        return self.text.encode("utf-8", errors="replace")
+
+    @property
+    def ok(self) -> bool:
+        return True
+
+    def json(self):
+        import json as _json
+        return _json.loads(self.text)
+
+
+def _get(url: str, params: dict | None = None, timeout: int = _TIMEOUT,
+         cache: bool = True) -> requests.Response | None:
+    # Checked BEFORE any limiter the caller may have waited on is irrelevant --
+    # what matters is that a hit costs no request at all, so the host never
+    # sees it and the tripwire budget is untouched.
+    if cache:
+        hit = _http_cache.get("get", url, params)
+        if hit is not None:
+            log.debug("GET %s → cache hit (%d chars)", url, len(hit))
+            return _CachedResponse(hit, url)
     try:
         r = requests.get(url, headers=_HEADERS, params=params, timeout=timeout)
         r.raise_for_status()
         log.debug("GET %s → HTTP %s (%d bytes)", url, r.status_code, len(r.content))
+        if cache:
+            # Successes only. A cached 429 would turn a transient throttle into
+            # a permanent gap AND hide it from _note_rate_limit.
+            _http_cache.put("get", url, r.text, params)
         return r
     except requests.HTTPError as e:
         # A 404 means "resource doesn't exist" — an expected outcome when probing
@@ -859,6 +1091,115 @@ def _outlet_signal(company: str, domain: str, label: str) -> str:
     return f"{label} (via Google News RSS):\n" + hits
 
 
+# S-pillar labor/HR trade press, fetched DIRECTLY (their own real RSS
+# feeds), NOT via the Google News site: trick every _OUTLET_SOURCES entry
+# above uses. Added 2026-08-19: confirmed 6 of the 9 news-shaped sources in
+# this file (google_news_rss, reuters, bloomberg, financial_times,
+# esg_today, greenbiz) all route through the SAME _google_news_rss_query()
+# function -- one real dependency wearing six labels. Real S-evidence
+# motivation: measured live 2026-08-19 that a 100-company well-known-
+# public-firm sample got mostly-zero S-pillar claims -- the only S-specific
+# source that existed was BHRRC (incident-focused).
+#
+# search=True vs search=False -- checked live 2026-08-19, don't assume:
+#   Personnel Today: REAL search+RSS combo, WordPress-standard
+#     ?s=<query>&feed=rss2 -- confirmed genuinely filters (title literally
+#     reads "You searched for Kroger - Personnel Today", 2 real matching
+#     items, not the generic feed).
+#   HR Grapevine: rss?q=<query> returns HTTP 200 but is BYTE-IDENTICAL to
+#     the unfiltered feed -- confirmed the param is silently ignored, not a
+#     working filter. Kept as a passive latest-~20-articles snapshot.
+#   HR Dive: has a real search PAGE (/search/?q=, 200, real per-company
+#     results) but it's JS-rendered with no discoverable RSS/API combo from
+#     a plain fetch -- not worth reverse-engineering an undocumented XHR
+#     endpoint for one source. Kept passive, same as HR Grapevine.
+# A passive source only hits when a company happens to be in that outlet's
+# ~20-30 MOST RECENT articles at fetch time (confirmed: 5/100 companies hit
+# across all 3 sources in a one-time snapshot test) -- real, but low, single-
+# fetch coverage; the honest expectation is it accumulates across REPEATED
+# production runs over time, not that it saturates on one run. Personnel
+# Today's real search fixes this for itself; the other two remain
+# snapshot-only until/unless a similar real search+feed combo is found.
+_DIRECT_RSS_SOURCES = {
+    "hr_dive":         ("https://www.hrdive.com/feeds/news/", "HR Dive", False),
+    "hr_grapevine":    ("https://www.hrgrapevine.com/rss", "HR Grapevine", False),
+    "personnel_today": ("https://www.personneltoday.com/", "Personnel Today", True),
+}
+
+_DIRECT_RSS_LIMITER = _RateLimiter(name="direct_rss", min_gap=1.5, jitter=1.0)
+
+# Strips HTML/markup before company-name matching -- see the false-positive
+# bug this fixed, documented at the match site below.
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _direct_rss_signal(company: str, feed_url: str, label: str, search: bool = False) -> str:
+    """Fetch one outlet's RSS -- either a real per-company SEARCH+RSS
+    combo (search=True, feed_url is the site root, `?s=<company>&feed=rss2`
+    is appended) or the outlet's own latest-articles snapshot (search=False,
+    feed_url is the feed itself, filtered client-side for company mentions
+    since these feeds aren't company-scoped -- see _DIRECT_RSS_SOURCES for
+    which sources support real search, verified live, not assumed).
+    Shares _DIRECT_RSS_LIMITER across all three direct feeds (same host-
+    independence reasoning as _limiter_for_host: these are unrelated hosts
+    from Google/DDG/Bing, so a throttle here should not slow anything else,
+    and vice versa) -- NOT registered in _limiter_for_host since
+    RateLimitTripped propagation isn't needed here (see except block: a
+    429/parse failure on a low-volume trade feed degrades to "no evidence"
+    for this one source, not an abort)."""
+    if search:
+        from urllib.parse import quote_plus
+        feed_url = f"{feed_url.rstrip('/')}/?s={quote_plus(company)}&feed=rss2"
+        log.info("[%s] %s → fetching search-scoped RSS", company, label)
+    else:
+        log.info("[%s] %s → fetching direct RSS feed", company, label)
+    _DIRECT_RSS_LIMITER.wait()
+    try:
+        r = _get(feed_url, timeout=_TIMEOUT)
+        if not r or not r.ok:
+            log.info("[%s] %s → fetch failed or non-200", company, label)
+            return ""
+        items = ET.fromstring(r.content).findall(".//item")
+    except RateLimitTripped:
+        raise
+    except Exception as exc:
+        log.info("[%s] %s → fetch/parse error: %s", company, label, exc)
+        return ""
+
+    # Kept even for search=True: WordPress's own search can return loosely-
+    # relevant results (word-overlap matches, not just the exact company
+    # name), so this still guards against noise -- not redundant with the
+    # server-side search, a second real filter on top of it.
+    #
+    # REAL BUG FOUND AND FIXED 2026-08-19: matching against the raw
+    # <description> field directly was a false-positive generator, not a
+    # filter. HR Dive's description is CDN image-proxy markup + a short
+    # prose snippet (e.g. `<img src="https://imgproxy.divecdn.com/
+    # fjcQB3TBK.../g:ce/rs:fill:1600:900:1/Z3M6Ly9k...webp"/>`), and a short
+    # company name like "BP" matches as a substring INSIDE that base64/URL
+    # gibberish almost every time -- confirmed live: 100% of one feed's 20
+    # items "matched" a query for "BP" even though the real prose text in
+    # every one of them had nothing to do with BP. Strip HTML tags first
+    # (_HTML_TAG_RE, module-level) so only real prose is searched.
+    name_lower = company.lower()
+    matched = [
+        it for it in items
+        if name_lower in (it.findtext("title") or "").lower()
+        or name_lower in _HTML_TAG_RE.sub(" ", it.findtext("description") or "").lower()
+    ]
+    if not matched:
+        log.info("[%s] %s → 0/%d articles mention %s", company, label, len(items), company)
+        return ""
+
+    hits = _render_rss_items(_filter_items_by_recency(matched, when_days=730))
+    if not hits:
+        return ""
+    hits = dedup_and_filter_lines(hits, require_keyword=False)
+    mode = "search RSS" if search else "direct RSS"
+    log.info("[%s] %s → %d matching headlines", company, label, len(hits.splitlines()))
+    return f"{label} ({mode}):\n" + hits
+
+
 # ── Tier 2: Specialist ESG & corporate databases ─────────────────────────────
 
 def _bhrrc_signal(company: str) -> str:
@@ -874,48 +1215,29 @@ def _bhrrc_signal(company: str) -> str:
 
 
 
-def _sbti_signal(company: str) -> str:
-    """SBTi — Science Based Targets commitment via DDG site search."""
-    log.info("[%s] sbti → searching sciencebasedtargets.org via DDG", company)
-    result = _ddg_fallback(
-        f'site:sciencebasedtargets.org "{company}"',
-        prefix="SBTi", reject_wikipedia=True,
-        company=company,
-    )
-    log.info("[%s] sbti → %s", company, "hit" if result else "no result")
-    return result
-
-
-
-
-def _cdp_signal(company: str) -> str:
-    """CDP Climate Disclosure Project — scores and disclosure status via DDG."""
-    log.info("[%s] cdp → searching CDP disclosure data via DDG", company)
-    result = _ddg_fallback(
-        f'"{company}" CDP score climate disclosure carbon 2023 2024',
-        prefix="CDP Climate Disclosure", reject_wikipedia=True,
-        company=company,
-    )
-    log.info("[%s] cdp → %s", company, "hit" if result else "no result")
-    return result
-
-
-
-
+# REMOVED 2026-08-07: _sbti_signal, _cdp_signal, _gri_signal.
+#
+# All three were DuckDuckGo site: searches wearing the name of a database, not
+# reads of the database. That mattered in two ways:
+#
+#   1. When DDG blocked this IP they went silent -- returning "" for every
+#      company. That is indistinguishable in the output from "this company has
+#      no SBTi target", so an entire evidence category could vanish from a
+#      corpus run while every log line looked normal.
+#   2. Even unblocked, a search snippet is weak evidence for a binary fact that
+#      the source publishes authoritatively.
+#
+# Replacements, verified 2026-08-07:
+#   SBTi -- files.sciencebasedtargets.org/production/files/companies-excel.xlsx
+#           (2.2 MB, weekly refresh, no auth). A bulk join beats one search per
+#           company: complete coverage, zero ban surface, no silent zeros.
+#   CDP  -- company-level scores are license-only; no free source exists. Do not
+#           re-add a search-based stand-in.
+#   GRI  -- the Sustainability Disclosure Database is DISCONTINUED (last data
+#           2020). There is nothing to query; report discovery is handled by
+#           srn_report_source / report_collector instead.
 
 # ── Tier 3: Databases & reports ──────────────────────────────────────────────
-
-def _gri_signal(company: str) -> str:
-    """GRI Sustainability Disclosure Database — published sustainability reports via DDG."""
-    log.info("[%s] gri → searching globalreporting.org via DDG", company)
-    result = _ddg_fallback(
-        f'site:globalreporting.org "{company}" sustainability report',
-        prefix="GRI Database", min_len=60, reject_wikipedia=True,
-        company=company,
-    )
-    log.info("[%s] gri → %s", company, "hit" if result else "no result")
-    return result
-
 
 def _wikipedia_signal(company: str) -> str:
     """
@@ -989,25 +1311,129 @@ def _net_zero_signal(company: str) -> str:
 
 
 # ── DuckDuckGo fallback (used internally by several sources) ─────────────────
-
-# Phrases that indicate DDG returned a Wikipedia page instead of the intended source.
-# When a site: query returns no hits, DDG silently falls back to general results
-# and Wikipedia is almost always the top hit for company names.
-_WIKIPEDIA_BLEED = (
-    "may refer to:",
-    "is a german multinational engineering",
-    "is an american multinational",
-    "is a japanese multinational",
-    "commonly known as",  # Wikipedia intro boilerplate: "X, commonly known as Y, is a..."
-    "en.wikipedia.org",
-    "wikipedia",
-)
+#
+# Wikipedia-bleed-through detection lives in _render_ddg_results now, as a
+# PER-RESULT filter (drop the individual off-site/Wikipedia results, keep
+# the rest) rather than a whole-batch phrase match on the joined text --
+# see that function for why (a real bug: the old whole-text _WIKIPEDIA_BLEED
+# phrase list discarded an entire good result set because ONE unrelated
+# Wikipedia result in the batch happened to contain a trigger phrase).
 
 
 # Per-source character budget for DDG snippet text. Raised from the original
 # inline 1200 when source URLs began being appended inline, so adding links
 # doesn't silently evict snippet text the claim extractor previously saw.
 _DDG_TEXT_BUDGET = 1800
+
+
+def _render_ddg_results(
+    results: list,
+    query: str = "",
+    prefix: str = "",
+    min_len: int = 0,
+    reject_wikipedia: bool = False,
+    company: str = "",
+    require_entity: bool = True,
+) -> str:
+    """Filter + format raw DDG results into evidence text.
+
+    Split out of _ddg_fallback so the live path and the cache-hit path run the
+    IDENTICAL filtering. Keeping two copies would let the cached path drift --
+    and a drift here is invisible, because both return plausible-looking text.
+
+    Everything in here is ours (entity gate, leakage gate, Wikipedia
+    bleed-through, budget). Nothing in here touches the network, which is why
+    the cache stores the raw list and re-runs this each time.
+    """
+    if not results:
+        log.debug("DDG [%s] → 0 results", prefix)
+        return ""
+
+    # Check for Wikipedia bleed-through -- but only when the query was
+    # site:-restricted AND genuinely NONE of the results are on that site.
+    # REAL BUG FOUND AND FIXED 2026-08-19: the original check only looked at
+    # results[0] -- if the TOP-RANKED result happened to be Wikipedia, the
+    # ENTIRE result set was discarded, even when 9 of 10 other results were
+    # genuinely on-site. Confirmed live: `site:business-humanrights.org
+    # "Saudi Aramco"` returned 5 real business-humanrights.org hits about
+    # genuine labor-abuse stories (a real racism-against-a-migrant-worker
+    # case, a real exploitative-subcontracting report) alongside 2 unrelated
+    # Wikipedia pages that also matched the bare company-name query -- the
+    # OLD all-or-nothing checks (reject if results[0] is Wikipedia; reject
+    # if the phrase "wikipedia" appears ANYWHERE in the joined text) threw
+    # away all 5 real hits because of the 2 unrelated ones, returning "" --
+    # indistinguishable from "DDG found nothing" or "we're banned" from the
+    # caller's side, when DDG had answered correctly and our own logic
+    # discarded the real answer.
+    #
+    # THE FIX: drop off-site/Wikipedia results INDIVIDUALLY, before joining,
+    # rather than reject-or-keep the whole batch. This is strictly better
+    # than an all-or-nothing gate on either signal (top-result heuristic or
+    # whole-text phrase match) -- it removes exactly the bad results and
+    # keeps the good ones, rather than being held hostage by whichever one
+    # bad result happens to rank first or contribute a trigger phrase.
+    if reject_wikipedia:
+        site_match = re.search(r"site:([^\s\"]+)", query)
+        target_site = site_match.group(1).lower() if site_match else None
+
+        def _is_wikipedia_bleed(r: dict) -> bool:
+            url = (r.get("href") or "").lower()
+            if "wikipedia.org" in url:
+                return True
+            if target_site and target_site not in url:
+                # site:-restricted query, but this one result isn't on that
+                # site -- real bleed-through for THIS result specifically.
+                return True
+            return False
+
+        before = len(results)
+        results = [r for r in results if not _is_wikipedia_bleed(r)]
+        if before != len(results):
+            log.info("DDG [%s] → dropped %d/%d off-site/Wikipedia result(s)",
+                      prefix, before - len(results), before)
+        if not results:
+            log.info("DDG [%s] → 0 results left after Wikipedia/off-site filtering, discarding", prefix)
+            return ""
+
+    # Per-result gate BEFORE joining. A site: query that finds nothing
+    # falls back to general results, which for a small/private company
+    # are topic-generic pages ("an anti-bribery policy is a component
+    # of...") or another company entirely. Those look identical to real
+    # evidence once concatenated, so they must be dropped here.
+    if company:
+        results = filter_search_results(
+            results, company, prefix=prefix, require_entity=require_entity
+        )
+        if not results:
+            log.info("DDG [%s] → all results filtered out for '%s' (no on-entity evidence)",
+                     prefix, company)
+            return ""
+
+    # Each result carries its own source URL, appended inline after its
+    # snippet so a reviewer can open the exact page a claim came from.
+    # Previously only r["body"] was kept and r["href"] was discarded,
+    # leaving every DDG-sourced signal (CDP, SBTi, gov_*, facility,
+    # sustainability report) unauditable.
+    text = " ".join(
+        (r.get("body", "") + (f" <{r.get('href')}>" if r.get("href") else ""))
+        for r in results if r.get("body")
+    ).strip()
+
+    if len(text) < min_len:
+        log.debug("DDG [%s] → result too short (%d < %d chars), discarding", prefix, len(text), min_len)
+        return ""
+
+    log.debug("DDG [%s] → %d chars returned", prefix, len(text))
+    # Budget raised from 1200 to accommodate the appended <url> markers
+    # without evicting snippet text that previously fit. Truncation
+    # backs off to the last completed "<...>" marker so a cut never
+    # lands mid-URL and emits a broken, unopenable link.
+    if len(text) > _DDG_TEXT_BUDGET:
+        text = text[:_DDG_TEXT_BUDGET]
+        cut_open = text.rfind("<")
+        if cut_open > text.rfind(">"):
+            text = text[:cut_open].rstrip()
+    return f"{prefix}: {text}" if prefix else text
 
 
 def _ddg_fallback(
@@ -1038,71 +1464,55 @@ def _ddg_fallback(
                     regime lookups), where demanding the company name would
                     reject every legitimate result.
     """
+    import json as _json
+
     from ddgs import DDGS, exceptions as ddg_exc
 
     log.debug("DDG query [%s]: %s", prefix or "raw", query[:120])
+
+    # Cached on the QUERY ONLY, and on the RAW result list -- deliberately
+    # before entity/leakage filtering. Those filters are ours and change; the
+    # search results are the external thing worth not re-fetching. Caching the
+    # filtered string instead would freeze today's filter behaviour into the
+    # cache, so a later filter fix would appear to do nothing on a cached run.
+    #
+    # This is the highest-value cache entry in the pipeline: 9 sources share
+    # _DDG_LIMITER at a ~2.75s average gap, so every avoided query is ~2.75s of
+    # serialized wall-clock AND one less chance of a RatelimitException.
+    _cached = _http_cache.get("ddg", query)
+    if _cached is not None:
+        try:
+            results = _json.loads(_cached)
+            log.debug("DDG [%s] → cache hit (%d results)", prefix, len(results))
+            return _render_ddg_results(
+                results, query=query, prefix=prefix, min_len=min_len,
+                reject_wikipedia=reject_wikipedia, company=company,
+                require_entity=require_entity)
+        except RateLimitTripped:
+            # _render_ddg_results can reach _note_rate_limit via entity
+            # verification, which fetches. The broad handler below exists for
+            # corrupt cache entries and would otherwise swallow the abort and
+            # silently refetch -- the exact defect this file has shipped twice.
+            raise
+        except Exception:
+            pass                       # corrupt entry -> fall through and refetch
+
     for attempt in range(2):
         _DDG_LIMITER.wait()
         try:
             with DDGS() as ddg:
                 results = list(ddg.text(query, max_results=5))
 
-            if not results:
-                log.debug("DDG [%s] → 0 results", prefix)
-                return ""
+            if results:
+                try:
+                    _http_cache.put("ddg", query, _json.dumps(results))
+                except Exception:
+                    pass               # caching must never break a fetch
 
-            # Check if the top result is a Wikipedia URL — dead giveaway of bleed-through
-            top_url = (results[0].get("href") or "").lower()
-            if reject_wikipedia and "wikipedia.org" in top_url:
-                log.info("DDG [%s] → top result is Wikipedia, discarding (site query returned nothing)", prefix)
-                return ""
-
-            # Per-result gate BEFORE joining. A site: query that finds nothing
-            # falls back to general results, which for a small/private company
-            # are topic-generic pages ("an anti-bribery policy is a component
-            # of...") or another company entirely. Those look identical to real
-            # evidence once concatenated, so they must be dropped here.
-            if company:
-                results = filter_search_results(
-                    results, company, prefix=prefix, require_entity=require_entity
-                )
-                if not results:
-                    log.info("DDG [%s] → all results filtered out for '%s' (no on-entity evidence)",
-                             prefix, company)
-                    return ""
-
-            # Each result carries its own source URL, appended inline after its
-            # snippet so a reviewer can open the exact page a claim came from.
-            # Previously only r["body"] was kept and r["href"] was discarded,
-            # leaving every DDG-sourced signal (CDP, SBTi, gov_*, facility,
-            # sustainability report) unauditable.
-            text = " ".join(
-                (r.get("body", "") + (f" <{r.get('href')}>" if r.get("href") else ""))
-                for r in results if r.get("body")
-            ).strip()
-
-            # Secondary check: text body looks like a Wikipedia extract
-            if reject_wikipedia:
-                text_lower = text.lower()
-                if any(phrase in text_lower for phrase in _WIKIPEDIA_BLEED):
-                    log.info("DDG [%s] → result looks like Wikipedia bleed-through, discarding", prefix)
-                    return ""
-
-            if len(text) < min_len:
-                log.debug("DDG [%s] → result too short (%d < %d chars), discarding", prefix, len(text), min_len)
-                return ""
-
-            log.debug("DDG [%s] → %d chars returned", prefix, len(text))
-            # Budget raised from 1200 to accommodate the appended <url> markers
-            # without evicting snippet text that previously fit. Truncation
-            # backs off to the last completed "<...>" marker so a cut never
-            # lands mid-URL and emits a broken, unopenable link.
-            if len(text) > _DDG_TEXT_BUDGET:
-                text = text[:_DDG_TEXT_BUDGET]
-                cut_open = text.rfind("<")
-                if cut_open > text.rfind(">"):
-                    text = text[:cut_open].rstrip()
-            return f"{prefix}: {text}" if prefix else text
+            return _render_ddg_results(
+                results, query=query, prefix=prefix, min_len=min_len,
+                reject_wikipedia=reject_wikipedia, company=company,
+                require_entity=require_entity)
         except ddg_exc.RatelimitException:
             # Feed the SHARED tripwire. DDG raises its own exception type
             # rather than surfacing an HTTP status, so these throttles were
@@ -1166,10 +1576,20 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         "country_governance": lambda: _country_governance_signal(country, industry),
         # Tier 2 — specialist ESG & corporate
         "bhrrc":            lambda: _bhrrc_signal(company),
-        "sbti":             lambda: _sbti_signal(company),
-        "cdp":              lambda: _cdp_signal(company),
-        # Tier 3 — filings & databases
-        "gri":              lambda: _gri_signal(company),
+        # S-pillar labor/HR trade press -- direct RSS, NOT the Google News
+        # site: trick (see _DIRECT_RSS_SOURCES docstring for why that
+        # distinction matters). Added 2026-08-19 to close a measured gap:
+        # 32% of well-known public companies got zero S-pillar claims from
+        # the sources above.
+        "hr_dive":          lambda: _direct_rss_signal(company, *_DIRECT_RSS_SOURCES["hr_dive"]),
+        "hr_grapevine":     lambda: _direct_rss_signal(company, *_DIRECT_RSS_SOURCES["hr_grapevine"]),
+        "personnel_today":  lambda: _direct_rss_signal(company, *_DIRECT_RSS_SOURCES["personnel_today"]),
+        # "sbti"/"cdp"/"gri" REMOVED 2026-08-07 -- see the note where their
+        # functions were defined. They were DDG searches, not database reads:
+        # they returned "" for every company whenever DDG blocked us, which is
+        # indistinguishable from "no target/score/report exists". SBTi is now
+        # served by a bulk file; CDP is license-only; GRI's database is
+        # discontinued.
         # "wikipedia" DISABLED -- measured on the frozen corpus (tune+holdout,
         # n=393): 74 fetches produced 1 kept claim (0.01 claims/fetch), the
         # worst yield of any source. It also dominates our rate-limit exposure:
@@ -1201,13 +1621,51 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         ),
     }
 
+    # Multi-signal collectors -- unlike the single-string tasks above, each of
+    # these returns its OWN {signal_name: text} dict (enforcement_collector
+    # queries 3 sources, sec_fulltext_collector up to 15 phrases), so they run
+    # as their own futures and get merged in rather than assigned to one key.
+    # Both are read-only, adjudicated-fact sources (regulator/court records,
+    # SEC filings) -- the "risk events" signal this pipeline was missing:
+    # almost every other source here is company self-disclosure, which is
+    # ~97% positive-polarity on the frozen corpus and cannot separate a good
+    # company from a bad one. See enforcement_collector.py's module docstring.
+    #
+    # Imported locally, not at module level: both modules import back from
+    # THIS file (_get, RateLimitTripped, _RateLimiter), so a top-level import
+    # here would be circular.
+    from agentic_estimation.layer_1.enforcement_collector import fetch_enforcement_signals
+    from agentic_estimation.layer_1.sec_fulltext_collector import fetch_sec_fulltext_signals
+    from agentic_estimation.layer_1.report_collector import fetch_report_signals
+
+    # report_collector: REAL sustainability-report PDFs (SRN index, on-demand
+    # download + OpenDataLoader/pdfplumber parse), not the "sustainability_report"
+    # key above -- that one is a DuckDuckGo search snippet mislabeled as a
+    # report (confirmed live 2026-08-18: for Strandberg Guitars it returned a
+    # guitar-forum thread, not an actual disclosure document). Until this
+    # wiring, fetch_report_signals was ONLY ever called from
+    # calibration_harness.py -- the real production graph never fetched a
+    # single real PDF for any company, backtest or live. One company, at
+    # most 2 reports, on-demand only when this company is actually being
+    # scored (see fetch_report_signals docstring) -- bounded, not a bulk
+    # crawl. Never raises (report_collector.py's own discipline -- an
+    # unreachable publisher host is a missing signal, not a failed run).
+    multi_tasks: dict[str, callable] = {
+        "enforcement": lambda: fetch_enforcement_signals(company),
+        "sec_fulltext": lambda: fetch_sec_fulltext_signals(company),
+        "report_pdf": lambda: fetch_report_signals(company),
+    }
+
     signals: dict[str, str] = {}
 
-    log_header(log, "Signal Agent", company=company, industry=industry or "N/A", sources=len(tasks))
-    log.info("[%s] starting signal fetch (%d sources)", company, len(tasks))
+    log_header(log, "Signal Agent", company=company, industry=industry or "N/A",
+               sources=len(tasks) + len(multi_tasks))
+    log.info("[%s] starting signal fetch (%d sources)", company, len(tasks) + len(multi_tasks))
 
     with ThreadPoolExecutor(max_workers=18) as pool:
         futures = {pool.submit(fn): name for name, fn in tasks.items()}
+        multi_futures = {pool.submit(fn): name for name, fn in multi_tasks.items()}
+
         for fut in as_completed(futures):
             name = futures[fut]
             try:
@@ -1223,7 +1681,22 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
             except Exception as e:
                 log.warning("[%s] %s → exception: %s", company, name, e)
 
-    log.info("[%s] done — %d/%d sources returned data", company, len(signals), len(tasks))
+        for fut in as_completed(multi_futures):
+            group = multi_futures[fut]
+            try:
+                got = fut.result() or {}
+                for sub_name, text in got.items():
+                    signals[sub_name] = text
+                    log.info("[%s] %s → OK (%d chars)", company, sub_name, len(text))
+                if not got:
+                    log.info("[%s] %s → empty", company, group)
+            except RateLimitTripped:
+                raise   # never swallow the abort signal
+            except Exception as e:
+                log.warning("[%s] %s → exception: %s", company, group, e)
+
+    log.info("[%s] done — %d/%d sources returned data", company,
+              len(signals), len(tasks) + len(multi_tasks))
 
     # Cross-source fingerprint dedup: the same headline can independently
     # surface via google_news_rss, reuters, localized_esg, and news_api --

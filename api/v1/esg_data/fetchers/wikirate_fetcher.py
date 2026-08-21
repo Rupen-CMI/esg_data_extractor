@@ -15,7 +15,15 @@ _api: wikirate4py.API | None = None
 def _get_api() -> wikirate4py.API:
     global _api
     if _api is None:
+        # Never fall back to an anonymous client. Wikirate caps unauthenticated
+        # reads and returns HTTP 403 past the limit (measured), so a missing key
+        # degrades into truncated results rather than a visible failure.
         key = os.getenv("WIKIRATE_API_KEY", "")
+        if not key:
+            raise RuntimeError(
+                "WIKIRATE_API_KEY not set -- refusing to build an anonymous "
+                "Wikirate client (anonymous reads hit a hard cap and 403)."
+            )
         _api = wikirate4py.API(key)
     return _api
 

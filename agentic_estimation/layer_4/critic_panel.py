@@ -113,10 +113,12 @@ def _parse_critic_response(raw_text: str, critic_name: str, valid_factors: set) 
     return CriticVerdict(critic=critic_name, verdict=verdict, flagged_factor=flagged, objection=objection)
 
 
-def _run_one_critic(critic_name: str, prompt: str, valid_factors: set) -> CriticVerdict:
-    from zen_client import call_with_prompt
+def _run_one_critic(critic_name: str, prompt: str, valid_factors: set,
+                     model: Optional[str] = None) -> CriticVerdict:
+    from zen_client import call_with_prompt, DEFAULT_MODEL
     try:
-        resp = call_with_prompt(prompt, max_tokens=_CRITIC_MAX_TOKENS, timeout=_CRITIC_TIMEOUT,
+        resp = call_with_prompt(prompt, model=model or DEFAULT_MODEL,
+                                 max_tokens=_CRITIC_MAX_TOKENS, timeout=_CRITIC_TIMEOUT,
                                  system=_CRITIC_SYSTEM)
     except Exception as exc:
         log.warning("critic %s call raised: %s -- abstaining", critic_name, exc)
@@ -239,11 +241,15 @@ def run_critic_panel(
     claims,
     signals: dict,
     metadata: Optional[dict] = None,
+    model: Optional[str] = None,
 ) -> CriticPanelResult:
     """Runs all 3 critics sequentially (each call serializes through
     zen_client's process-wide rate limiter regardless of call order, so
     sequential vs threaded costs the same wall-clock here -- sequential is
-    simpler and keeps critic call order deterministic for logging)."""
+    simpler and keeps critic call order deterministic for logging).
+
+    model: optional override forwarded to every critic's call_with_prompt.
+    None (default) preserves today's exact behavior."""
     valid_factors = _valid_factors(formula_score)
 
     prompts = {
@@ -252,7 +258,7 @@ def run_critic_panel(
         "internal_consistency": _critic_c_prompt(pillar, company, reconciled, formula_score, holistic),
     }
 
-    verdicts = [_run_one_critic(name, prompt, valid_factors) for name, prompt in prompts.items()]
+    verdicts = [_run_one_critic(name, prompt, valid_factors, model=model) for name, prompt in prompts.items()]
 
     responders = [v for v in verdicts if v.verdict != "abstain"]
     if len(responders) < 2:

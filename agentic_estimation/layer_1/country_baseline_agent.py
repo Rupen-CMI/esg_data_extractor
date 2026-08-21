@@ -81,6 +81,16 @@ _E_INDICATORS: dict[str, int] = {
 }
 
 _S_INDICATORS: dict[str, int] = {
+    # NOT a World Bank code -- ILO fundamental-convention ratification count
+    # (0-10), injected into the pivot below before normalisation (see
+    # _inject_ilo_indicator). Added 2026-08-19: every other _S_INDICATORS
+    # entry measures general development (health/poverty/education/labor-
+    # force participation) -- none measures whether a country's LAWS
+    # actually protect workers (freedom of association, child/forced labor
+    # bans, equal pay). Genuinely global (~187 countries via ILO/NORMLEX,
+    # same coverage class as every real World Bank indicator here), unlike
+    # the RSS-based S-evidence sources (HR Dive etc.) which are US/UK-only.
+    "ILO.LABOR.RIGHTS": +1,  # fundamental conventions ratified (0-10) — higher better
     "EG.CFT.ACCS.ZS":    +1,  # Clean cooking access — higher better
     "EG.ELC.ACCS.ZS":    +1,  # Electricity access — higher better
     "SH.H2O.SMDW.ZS":    +1,  # Safe drinking water — higher better
@@ -198,6 +208,35 @@ def _get_engine():
 
 # ── Core computation ──────────────────────────────────────────────────────────
 
+def _inject_ilo_indicator(pivot: "pd.DataFrame") -> None:
+    """Add the ILO.LABOR.RIGHTS pseudo-column to `pivot` (ISO3-indexed,
+    mutated in place) from the cached ILO ratification data (see
+    ilo_ratification.py). Fail-open: if the cache doesn't exist yet
+    (ilo_ratification.py's `fetch` CLI was never run), this indicator is
+    simply absent from the pivot -- _S_INDICATORS' existing "need at least
+    half the indicators" floor means baselines still compute normally from
+    the World Bank indicators alone, same as before this was added."""
+    try:
+        from agentic_estimation.layer_1.ilo_ratification import load_cache, _build_iso3_index
+    except Exception as exc:
+        log.warning("ILO indicator injection skipped (import failed): %s", exc)
+        return
+
+    cache = load_cache()
+    if cache is None:
+        log.info("ILO indicator injection skipped: no cache (run `python -m "
+                  "agentic_estimation.layer_1.ilo_ratification fetch` first)")
+        return
+
+    scores = _build_iso3_index(cache)
+    if not scores:
+        log.warning("ILO indicator injection skipped: cache loaded but produced 0 ISO3 scores")
+        return
+
+    pivot["ILO.LABOR.RIGHTS"] = pd.Series(scores)
+    log.info("injected ILO.LABOR.RIGHTS for %d countries", len(scores))
+
+
 def _compute_baselines() -> dict[str, CountryBaseline]:
     """
     Read the Excel file, normalise each indicator per pillar, and return
@@ -227,6 +266,8 @@ def _compute_baselines() -> dict[str, CountryBaseline]:
     pivot = data.pivot_table(
         index="ISO3 code", columns="Indicator code", values="_val", aggfunc="first"
     )
+
+    _inject_ilo_indicator(pivot)
 
     # Keep only indicators we care about
     available = [c for c in _ALL_INDICATORS if c in pivot.columns]

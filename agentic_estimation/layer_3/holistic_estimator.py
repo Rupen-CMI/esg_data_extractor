@@ -42,17 +42,22 @@ def holistic_vote(
     country: Optional[str],
     signals: dict[str, str],
     metadata: Optional[dict] = None,
+    model: Optional[str] = None,
 ):
     """
     One holistic LLM vote, reusing scoring_agent.score_company_sync verbatim.
     Returns None on any LLM failure (missing vote -- caller/Reconcile must
     handle this, never fabricate a score in its place).
+
+    model: optional override forwarded to score_company_sync. None (default)
+    preserves today's exact behavior.
     """
     from agentic_estimation.layer_3.scoring_agent import score_company_sync
 
     try:
         result = score_company_sync(
             company, industry=industry, country=country, signals=signals, metadata=metadata,
+            model=model,
         )
         if result is None:
             log.warning("[%s] holistic vote failed (LLM call or parse error) -- missing vote", company)
