@@ -1503,7 +1503,31 @@ def _ddg_fallback(
             with DDGS() as ddg:
                 results = list(ddg.text(query, max_results=5))
 
-            if results:
+            # Don't cache a site:-restricted query's raw results forever if
+            # NONE of them actually landed on that site. Found live 2026-08-21:
+            # `site:business-humanrights.org "Samsung Electronics"` once
+            # returned Wikipedia + samsung.com + Yahoo Finance -- DDG's site:
+            # restriction not honored that one time -- and that got cached
+            # under this query key permanently. _render_ddg_results correctly
+            # drops all of them (none match the target site), so the caller
+            # sees "" and that becomes "no evidence" forever, even though a
+            # plain retry (confirmed live) returns 3 genuine on-site hits.
+            # Skipping the cache write here lets a later call re-fetch instead
+            # of replaying the same bad SERP -- errors already aren't cached
+            # (see module docstring); this is the same principle applied to a
+            # "technically 200, semantically empty" response.
+            should_cache = bool(results)
+            if should_cache and reject_wikipedia:
+                site_match = re.search(r"site:([^\s\"]+)", query)
+                target_site = site_match.group(1).lower() if site_match else None
+                if target_site and not any(
+                    target_site in (r.get("href") or "").lower() for r in results
+                ):
+                    should_cache = False
+                    log.info("DDG [%s] → 0/%d results on %s, not caching (likely transient)",
+                              prefix, len(results), target_site)
+
+            if should_cache:
                 try:
                     _http_cache.put("ddg", query, _json.dumps(results))
                 except Exception:
