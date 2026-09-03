@@ -13,7 +13,13 @@ so they need no credibility discount.
 
 Sources here are all free, key-free, and verified live (2026-08-01):
 
-  EPA ECHO        E  civil/criminal environmental cases WITH dollar penalties
+  EPA ECHO cases  E  civil/criminal environmental cases WITH dollar penalties
+  EPA ECHO facil. E  per-facility CURRENT compliance state (added 2026-09-02):
+                     how many of a company's facilities are in violation now,
+                     which is a different question from whether it was ever
+                     prosecuted. Measured 22% hit rate on US companies in the
+                     frozen held-out corpus, and it reaches single-facility
+                     firms that no other source in this pipeline covers.
   SEC litigation  G  federal securities enforcement actions
   SEC admin proc  G  administrative proceedings
   World Bank      G  cross-debarment (WB + ADB/EBRD/IDB/AfDB) -- the single
@@ -64,6 +70,15 @@ _ECHO_LIMITER = _RateLimiter(min_gap=4.0, jitter=2.0)
 _WB_LIMITER = _RateLimiter(min_gap=1.5, jitter=1.0)
 
 _ECHO_CASES_URL = "https://echodata.epa.gov/echo/case_rest_services.get_cases"
+# Facility COMPLIANCE summary -- a different endpoint from get_cases above and
+# a different question. get_cases answers "was this company prosecuted, and
+# for how much"; get_facilities answers "how many of its facilities are in
+# violation right now". Measured 2026-08-28 on the frozen held-out corpus:
+# get_facilities hit 4/18 US companies (22%) including single-facility firms
+# (L.A Brewery, North Coast Brewing) that no other source in this pipeline
+# has any evidence for at all. That long-tail reach is why it is worth a
+# second endpoint rather than folding into the cases signal.
+_ECHO_FACILITIES_URL = "https://echodata.epa.gov/echo/echo_rest_services.get_facilities"
 _SEC_LITIGATION_RSS = "https://www.sec.gov/enforcement-litigation/litigation-releases/rss"
 _SEC_ADMIN_RSS = "https://www.sec.gov/enforcement-litigation/administrative-proceedings/rss"
 # The apikey below is the one the World Bank's own public sanctions page sends.
@@ -189,6 +204,114 @@ def _echo_signal(company: str) -> Optional[str]:
     return f"EPA ECHO enforcement: {body} <https://echodata.epa.gov/echo/>"
 
 
+def _echo_money(val) -> float:
+    """'$13,000' -> 13000.0; 0.0 for None/''/'-'/unparseable."""
+    if val in (None, "", "-"):
+        return 0.0
+    try:
+        return float(str(val).replace("$", "").replace(",", "").strip())
+    except (ValueError, AttributeError):
+        return 0.0
+
+
+def _echo_facilities_signal(company: str) -> Optional[str]:
+    """EPA ECHO facility compliance summary -- how many of a company's
+    facilities are currently in violation.
+
+    DIFFERENT DATA FROM _echo_signal, not a duplicate: that one reports
+    prosecuted CASES with penalties, this one reports the current compliance
+    state of every facility EPA associates with the name. A company can have
+    zero cases and sixteen facilities in violation.
+
+    ENDPOINT SHAPE (verified live 2026-08-28, Cardinal Health -- and this cost
+    a wrong answer first time): get_facilities is a SUMMARY endpoint. It does
+    NOT return facility rows, it returns aggregate counts plus a QueryID that
+    a separate download call would consume. An implementation that iterates a
+    `Facilities` list finds nothing and reports 0 violations for a company
+    with 16. The counts below ARE the payload.
+
+        QueryRows      facilities matched
+        CVRows         currently in violation
+        SVRows         current SIGNIFICANT violation
+        V3Rows         violation in the last 3 years
+        FEARows        formal enforcement actions (5y)
+        InfFEARows     informal enforcement actions (5y)
+        INSPRows       inspections (5y)
+        TotalPenalties penalties, as a '$1,234' string
+
+    RATE LIMIT: shares _ECHO_LIMITER with _echo_signal deliberately. ECHO has
+    thrown 429s at this pipeline twice already (see the limiter's comment) and
+    is the least tolerant host we use, so the two ECHO calls queue behind one
+    another rather than each getting their own budget. This roughly doubles
+    per-company ECHO wall time; that is the accepted cost of not being
+    throttled a third time.
+
+    NAME MATCHING: `p_fn` is a facility-name substring search, so a match is
+    not proof of ownership -- "One Stone" returned 54 facilities. The signal
+    text therefore states the matched query verbatim and leaves attribution
+    to the extractor, exactly as the cases signal does.
+    """
+    _ECHO_LIMITER.wait()
+    r = _get(_ECHO_FACILITIES_URL, params={
+        "output": "JSON",
+        "p_fn": company[:40],
+    }, timeout=_TIMEOUT)
+    if not r:
+        return None
+    try:
+        results = (r.json() or {}).get("Results") or {}
+    except (ValueError, AttributeError):
+        return None
+
+    def _int(key: str) -> int:
+        try:
+            return int(results.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    n_fac = _int("QueryRows")
+    if not n_fac:
+        return None
+
+    curr_viol = _int("CVRows")
+    sig_viol = _int("SVRows")
+    viol_3yr = _int("V3Rows")
+    formal = _int("FEARows")
+    informal = _int("InfFEARows")
+    inspections = _int("INSPRows")
+    penalties = _echo_money(results.get("TotalPenalties"))
+
+    # A clean record is NOT reported. Absence of violations is not evidence of
+    # good conduct (same rule as fetch_enforcement_signals' docstring), and
+    # emitting "0 violations" would hand the extractor a positive-sounding
+    # line built from nothing.
+    if not any((curr_viol, sig_viol, viol_3yr, formal, informal, penalties)):
+        log.info("[%s] echo_facilities → %d facilities, no violations/actions — no signal",
+                 company, n_fac)
+        return None
+
+    bits = [f"{n_fac} EPA-regulated facilities matched on name '{company[:40]}'"]
+    if curr_viol:
+        bits.append(f"{curr_viol} currently in violation")
+    if sig_viol:
+        bits.append(f"{sig_viol} in SIGNIFICANT violation")
+    if viol_3yr:
+        bits.append(f"{viol_3yr} with a violation in the last 3 years")
+    if formal:
+        bits.append(f"{formal} formal enforcement action(s) in 5 years")
+    if informal:
+        bits.append(f"{informal} informal enforcement action(s) in 5 years")
+    if inspections:
+        bits.append(f"{inspections} inspection(s) in 5 years")
+    if penalties:
+        bits.append(f"${penalties:,.0f} total penalties")
+
+    log.info("[%s] echo_facilities → %d facilities, %d in violation (3y: %d)",
+             company, n_fac, curr_viol, viol_3yr)
+    return ("EPA ECHO facility compliance: " + "; ".join(bits)
+            + " <https://echodata.epa.gov/echo/>")
+
+
 def _load_sec_rss(url: str) -> list[dict]:
     """Fetch and parse one SEC enforcement RSS feed. Cached per process --
     the feed is corpus-wide, not per-company, so it is fetched once and
@@ -311,9 +434,10 @@ def fetch_enforcement_signals(company: str) -> dict[str, str]:
     conduct -- absence of an enforcement record must never be scored as a
     positive.
     """
-    log_header(log, "Enforcement", company=company, sources=3)
+    log_header(log, "Enforcement", company=company, sources=4)
     signals: dict[str, str] = {}
     for name, fn in (("echo_enforcement", _echo_signal),
+                     ("echo_facilities", _echo_facilities_signal),
                      ("sec_enforcement", _sec_enforcement_signal),
                      ("worldbank_debarment", _worldbank_signal)):
         try:
@@ -325,7 +449,7 @@ def fetch_enforcement_signals(company: str) -> dict[str, str]:
             continue
         if got:
             signals[name] = got
-    log.info("[%s] enforcement done — %d/3 sources hit", company, len(signals))
+    log.info("[%s] enforcement done — %d/4 sources hit", company, len(signals))
     return signals
 
 

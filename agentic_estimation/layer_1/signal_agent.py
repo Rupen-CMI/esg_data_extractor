@@ -1677,7 +1677,7 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
     multi_tasks: dict[str, callable] = {
         "enforcement": lambda: fetch_enforcement_signals(company),
         "sec_fulltext": lambda: fetch_sec_fulltext_signals(company),
-        "report_pdf": lambda: fetch_report_signals(company),
+        "report_pdf": lambda: fetch_report_signals(company, country=country),
     }
 
     signals: dict[str, str] = {}

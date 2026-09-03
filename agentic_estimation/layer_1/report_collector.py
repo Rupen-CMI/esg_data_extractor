@@ -128,12 +128,20 @@ _FETCH_MISSING = os.getenv("ESG_REPORT_FETCH", "1") != "0"
 _SEARCH_FALLBACK = os.getenv("ESG_REPORT_SEARCH", "1") != "0"
 
 
-def _fetch_via_search(company: str) -> Optional[str]:
+def _fetch_via_search(company: str, country: Optional[str] = None) -> Optional[str]:
     """One company, one search-discovered PDF, downloaded to the same
     directory the SRN path uses so find_reports() picks it up on the next
     call. Returns the local path, or None on no hit / any failure -- never
     raises (matches _fetch_from_srn's fail-open discipline: an unreachable
-    search engine or a rejected document is a missing signal, not a crash)."""
+    search engine or a rejected document is a missing signal, not a crash).
+
+    country: appended to the search query when known (2026-08-26). Confirmed
+    live: "Humana" (US health insurer) matched "Humana AB" -- a real,
+    unrelated, separately-listed Swedish care-services company with the
+    exact same bare name. No content-quality check can tell two genuine
+    self-authored ESG reports for two different real companies apart;
+    steering the search query itself toward the right country resolves the
+    ambiguity before a wrong candidate is even downloaded."""
     try:
         from calibration.discover_reports import from_search
         from calibration.report_coverage import _PDF_DIR
@@ -141,7 +149,7 @@ def _fetch_via_search(company: str) -> Optional[str]:
         log.info("search-fallback import failed for %s: %s", company, exc)
         return None
     try:
-        path = from_search(company, _PDF_DIR)
+        path = from_search(company, _PDF_DIR, country=country)
     except Exception as exc:
         log.info("search-fallback failed for %s: %s: %s", company, type(exc).__name__, exc)
         return None
@@ -340,6 +348,17 @@ def find_reports(company: str) -> list[str]:
     query or vice versa) because a loose match here attributes ANOTHER
     company's disclosures to this one -- the same failure mode that made
     company_site_resolver abstain on Dialog/Lion/BGF.
+
+    SUBSET GUARD (added 2026-08-26): the subset rule above still let "Bank of
+    China" match "Agricultural Bank of China" and "China Railway Construction"
+    match "China Railway" -- both real, distinct, separately-listed companies
+    whose full name happens to be a strict superset of another real
+    company's name. A generic corporate-suffix word ("bank", "group",
+    "holdings", "construction"...) being the only extra token is fine to
+    subset-match through (that's the case this rule exists FOR -- e.g. a
+    filing under "X Holdings" for query "X"); a DISTINGUISHING qualifier
+    word being the only extra token means the two names are almost
+    certainly different real companies that happen to share a common noun.
     """
     idx = _index()
     key = _norm(company)
@@ -354,9 +373,29 @@ def find_reports(company: str) -> list[str]:
         if not kt:
             continue
         if kt <= qt or qt <= kt:
+            extra = (kt | qt) - (kt & qt)
+            if extra and not extra <= _GENERIC_CORP_WORDS:
+                continue
             if len(best) < len(paths):
                 best = paths
     return best
+
+
+# Corporate-suffix words ONLY -- legal-entity-form words that never, by
+# themselves, distinguish one real company from another (a filing under
+# "X Holdings Ltd" for a query of "X" is the case the subset rule exists
+# for). Deliberately NOT industry/sector/business-line words: confirmed
+# live 2026-08-26 that "Bank of China" vs "Agricultural Bank of China" and
+# "China Railway" vs "China Railway Construction" are each two entirely
+# separate, independently-listed companies whose full name differs by
+# exactly one such word -- "construction"/"bank" must NOT be treated as
+# safe-to-ignore, or the subset rule silently misattributes one company's
+# disclosures to the other. When in doubt, leave a word OUT of this set --
+# that only costs a fresh search instead of a wrong document.
+_GENERIC_CORP_WORDS = {
+    "group", "holdings", "holding", "corporation", "corp", "company", "co",
+    "limited", "ltd", "inc", "plc",
+}
 
 
 # ── public collector ─────────────────────────────────────────────────────────
@@ -425,7 +464,8 @@ def report_tags_are_one_source() -> str:
 
 
 def fetch_report_signals(company: str, max_reports: int = 2,
-                         fetch_missing: bool = _FETCH_MISSING) -> dict[str, str]:
+                         fetch_missing: bool = _FETCH_MISSING,
+                         country: Optional[str] = None) -> dict[str, str]:
     """{tag: text} from this company's reports, or {}.
 
     Emits up to three small pillar-targeted tags rather than one oversized blob
@@ -435,6 +475,13 @@ def fetch_report_signals(company: str, max_reports: int = 2,
     fetch_missing=True (default) will download the report on demand when the
     company is in the SRN index but has nothing on disk yet. Set False -- or
     ESG_REPORT_FETCH=0 -- for a strictly offline run.
+
+    country: optional, forwarded to the search fallback ONLY (SRN is keyed
+    by LEI/ISIN, not name+country, so it needs no disambiguation help).
+    Disambiguates a bare company name that collides with a real, unrelated
+    company elsewhere (e.g. "Humana" the US insurer vs. "Humana AB", a
+    Swedish care-services company) -- see _fetch_via_search's docstring.
+    None (default) preserves prior behavior exactly.
     """
     paths = find_reports(company)
     if not paths and fetch_missing:
@@ -457,7 +504,7 @@ def fetch_report_signals(company: str, max_reports: int = 2,
         # concretely 2026-08-18: AVZ Minerals, an Australian mining company,
         # has a real ESG/financial report hosted on Squarespace -- SRN will
         # never index it, search finds it directly).
-        found_path = _fetch_via_search(company)
+        found_path = _fetch_via_search(company, country=country)
         if found_path:
             global _index_cache
             _index_cache = None

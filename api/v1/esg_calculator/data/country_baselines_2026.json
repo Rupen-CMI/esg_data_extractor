@@ -1,0 +1,1892 @@
+[
+ {
+  "iso3": "AFG",
+  "country": "Afghanistan",
+  "e_score": 71.64,
+  "s_score": 33.99,
+  "g_score": 17.3,
+  "indicator_count": 63,
+  "year": 2023
+ },
+ {
+  "iso3": "ALB",
+  "country": "Albania",
+  "e_score": 75.65,
+  "s_score": 69.44,
+  "g_score": 48.62,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "DZA",
+  "country": "Algeria",
+  "e_score": 69.77,
+  "s_score": 61.29,
+  "g_score": 31.93,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "ASM",
+  "country": "American Samoa",
+  "e_score": 72.22,
+  "s_score": 50.0,
+  "g_score": 64.32,
+  "indicator_count": 35,
+  "year": 2024
+ },
+ {
+  "iso3": "AND",
+  "country": "Andorra",
+  "e_score": 72.61,
+  "s_score": 50.0,
+  "g_score": 56.09,
+  "indicator_count": 43,
+  "year": 2024
+ },
+ {
+  "iso3": "AGO",
+  "country": "Angola",
+  "e_score": 75.67,
+  "s_score": 39.0,
+  "g_score": 33.28,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "ATG",
+  "country": "Antigua and Barbuda",
+  "e_score": 66.24,
+  "s_score": 59.84,
+  "g_score": 48.96,
+  "indicator_count": 55,
+  "year": 2024
+ },
+ {
+  "iso3": "ARG",
+  "country": "Argentina",
+  "e_score": 71.01,
+  "s_score": 65.93,
+  "g_score": 47.66,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "ARM",
+  "country": "Armenia",
+  "e_score": 71.11,
+  "s_score": 67.09,
+  "g_score": 46.57,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "ABW",
+  "country": "Aruba",
+  "e_score": 71.91,
+  "s_score": 50.0,
+  "g_score": 70.06,
+  "indicator_count": 40,
+  "year": 2024
+ },
+ {
+  "iso3": "AUS",
+  "country": "Australia",
+  "e_score": 68.94,
+  "s_score": 77.28,
+  "g_score": 65.88,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "AUT",
+  "country": "Austria",
+  "e_score": 77.46,
+  "s_score": 79.96,
+  "g_score": 62.86,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "AZE",
+  "country": "Azerbaijan",
+  "e_score": 71.62,
+  "s_score": 63.92,
+  "g_score": 43.76,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "BHS",
+  "country": "Bahamas, The",
+  "e_score": 69.07,
+  "s_score": 62.71,
+  "g_score": 54.68,
+  "indicator_count": 59,
+  "year": 2024
+ },
+ {
+  "iso3": "BHR",
+  "country": "Bahrain",
+  "e_score": 59.88,
+  "s_score": 68.28,
+  "g_score": 46.69,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "BGD",
+  "country": "Bangladesh",
+  "e_score": 67.89,
+  "s_score": 59.2,
+  "g_score": 32.83,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "BRB",
+  "country": "Barbados",
+  "e_score": 71.81,
+  "s_score": 71.37,
+  "g_score": 57.74,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "BLR",
+  "country": "Belarus",
+  "e_score": 72.08,
+  "s_score": 81.03,
+  "g_score": 40.4,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "BEL",
+  "country": "Belgium",
+  "e_score": 70.49,
+  "s_score": 80.47,
+  "g_score": 63.63,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "BLZ",
+  "country": "Belize",
+  "e_score": 76.13,
+  "s_score": 62.13,
+  "g_score": 49.11,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "BEN",
+  "country": "Benin",
+  "e_score": 70.07,
+  "s_score": 43.81,
+  "g_score": 40.72,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "BMU",
+  "country": "Bermuda",
+  "e_score": 75.16,
+  "s_score": 50.0,
+  "g_score": 64.66,
+  "indicator_count": 39,
+  "year": 2024
+ },
+ {
+  "iso3": "BTN",
+  "country": "Bhutan",
+  "e_score": 80.42,
+  "s_score": 69.28,
+  "g_score": 50.45,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "BOL",
+  "country": "Bolivia",
+  "e_score": 72.76,
+  "s_score": 62.02,
+  "g_score": 38.71,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "BIH",
+  "country": "Bosnia and Herzegovina",
+  "e_score": 72.21,
+  "s_score": 69.6,
+  "g_score": 39.54,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "BWA",
+  "country": "Botswana",
+  "e_score": 69.58,
+  "s_score": 48.23,
+  "g_score": 48.87,
+  "indicator_count": 70,
+  "year": 2023
+ },
+ {
+  "iso3": "BRA",
+  "country": "Brazil",
+  "e_score": 72.65,
+  "s_score": 63.88,
+  "g_score": 43.69,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "VGB",
+  "country": "British Virgin Islands",
+  "e_score": 65.05,
+  "s_score": 50.0,
+  "g_score": 50.0,
+  "indicator_count": 31,
+  "year": 2024
+ },
+ {
+  "iso3": "BRN",
+  "country": "Brunei Darussalam",
+  "e_score": 68.42,
+  "s_score": 63.12,
+  "g_score": 51.44,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "BGR",
+  "country": "Bulgaria",
+  "e_score": 71.81,
+  "s_score": 74.69,
+  "g_score": 46.08,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "BFA",
+  "country": "Burkina Faso",
+  "e_score": 67.71,
+  "s_score": 41.75,
+  "g_score": 32.76,
+  "indicator_count": 70,
+  "year": 2023
+ },
+ {
+  "iso3": "BDI",
+  "country": "Burundi",
+  "e_score": 69.07,
+  "s_score": 39.74,
+  "g_score": 34.93,
+  "indicator_count": 66,
+  "year": 2024
+ },
+ {
+  "iso3": "CPV",
+  "country": "Cabo Verde",
+  "e_score": 71.35,
+  "s_score": 59.58,
+  "g_score": 55.48,
+  "indicator_count": 66,
+  "year": 2023
+ },
+ {
+  "iso3": "KHM",
+  "country": "Cambodia",
+  "e_score": 69.73,
+  "s_score": 59.68,
+  "g_score": 36.96,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "CMR",
+  "country": "Cameroon",
+  "e_score": 72.65,
+  "s_score": 47.33,
+  "g_score": 34.49,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "CAN",
+  "country": "Canada",
+  "e_score": 73.1,
+  "s_score": 77.01,
+  "g_score": 63.39,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "CYM",
+  "country": "Cayman Islands",
+  "e_score": 68.63,
+  "s_score": 50.0,
+  "g_score": 67.86,
+  "indicator_count": 38,
+  "year": 2024
+ },
+ {
+  "iso3": "CAF",
+  "country": "Central African Republic",
+  "e_score": 77.34,
+  "s_score": 28.63,
+  "g_score": 28.08,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "TCD",
+  "country": "Chad",
+  "e_score": 67.63,
+  "s_score": 30.5,
+  "g_score": 23.06,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "CHL",
+  "country": "Chile",
+  "e_score": 73.97,
+  "s_score": 72.18,
+  "g_score": 55.22,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "CHN",
+  "country": "China",
+  "e_score": 59.57,
+  "s_score": 73.14,
+  "g_score": 59.5,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "COL",
+  "country": "Colombia",
+  "e_score": 74.29,
+  "s_score": 58.74,
+  "g_score": 43.36,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "COM",
+  "country": "Comoros",
+  "e_score": 69.97,
+  "s_score": 55.11,
+  "g_score": 33.69,
+  "indicator_count": 66,
+  "year": 2024
+ },
+ {
+  "iso3": "COD",
+  "country": "Congo, Dem. Rep.",
+  "e_score": 71.5,
+  "s_score": 27.66,
+  "g_score": 24.62,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "COG",
+  "country": "Congo, Rep.",
+  "e_score": 71.27,
+  "s_score": 42.9,
+  "g_score": 31.19,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "CRI",
+  "country": "Costa Rica",
+  "e_score": 78.25,
+  "s_score": 65.97,
+  "g_score": 55.76,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "CIV",
+  "country": "Cote d'Ivoire",
+  "e_score": 67.96,
+  "s_score": 50.3,
+  "g_score": 35.82,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "HRV",
+  "country": "Croatia",
+  "e_score": 76.17,
+  "s_score": 76.42,
+  "g_score": 53.27,
+  "indicator_count": 74,
+  "year": 2023
+ },
+ {
+  "iso3": "CUB",
+  "country": "Cuba",
+  "e_score": 68.52,
+  "s_score": 66.49,
+  "g_score": 38.83,
+  "indicator_count": 65,
+  "year": 2024
+ },
+ {
+  "iso3": "CUW",
+  "country": "Curacao",
+  "e_score": 54.34,
+  "s_score": 50.0,
+  "g_score": 50.0,
+  "indicator_count": 28,
+  "year": 2023
+ },
+ {
+  "iso3": "CYP",
+  "country": "Cyprus",
+  "e_score": 74.17,
+  "s_score": 77.92,
+  "g_score": 53.03,
+  "indicator_count": 74,
+  "year": 2023
+ },
+ {
+  "iso3": "CZE",
+  "country": "Czechia",
+  "e_score": 70.2,
+  "s_score": 80.58,
+  "g_score": 59.24,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "DNK",
+  "country": "Denmark",
+  "e_score": 72.82,
+  "s_score": 81.45,
+  "g_score": 69.19,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "DJI",
+  "country": "Djibouti",
+  "e_score": 69.87,
+  "s_score": 40.91,
+  "g_score": 36.04,
+  "indicator_count": 68,
+  "year": 2023
+ },
+ {
+  "iso3": "DMA",
+  "country": "Dominica",
+  "e_score": 73.66,
+  "s_score": 57.84,
+  "g_score": 55.56,
+  "indicator_count": 55,
+  "year": 2024
+ },
+ {
+  "iso3": "DOM",
+  "country": "Dominican Republic",
+  "e_score": 72.81,
+  "s_score": 63.0,
+  "g_score": 50.87,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "ECU",
+  "country": "Ecuador",
+  "e_score": 75.88,
+  "s_score": 61.27,
+  "g_score": 44.26,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "EGY",
+  "country": "Egypt, Arab Rep.",
+  "e_score": 68.43,
+  "s_score": 63.14,
+  "g_score": 36.73,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "SLV",
+  "country": "El Salvador",
+  "e_score": 73.23,
+  "s_score": 62.08,
+  "g_score": 38.4,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "GNQ",
+  "country": "Equatorial Guinea",
+  "e_score": 73.8,
+  "s_score": 47.62,
+  "g_score": 32.81,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "ERI",
+  "country": "Eritrea",
+  "e_score": 69.44,
+  "s_score": 48.14,
+  "g_score": 24.65,
+  "indicator_count": 56,
+  "year": 2024
+ },
+ {
+  "iso3": "EST",
+  "country": "Estonia",
+  "e_score": 73.42,
+  "s_score": 78.35,
+  "g_score": 61.56,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "SWZ",
+  "country": "Eswatini",
+  "e_score": 74.59,
+  "s_score": 42.96,
+  "g_score": 37.12,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "ETH",
+  "country": "Ethiopia",
+  "e_score": 71.99,
+  "s_score": 44.7,
+  "g_score": 28.92,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "FRO",
+  "country": "Faroe Islands",
+  "e_score": 65.36,
+  "s_score": 50.0,
+  "g_score": 50.0,
+  "indicator_count": 29,
+  "year": 2024
+ },
+ {
+  "iso3": "FJI",
+  "country": "Fiji",
+  "e_score": 78.02,
+  "s_score": 59.16,
+  "g_score": 53.35,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "FIN",
+  "country": "Finland",
+  "e_score": 75.92,
+  "s_score": 80.4,
+  "g_score": 69.27,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "FRA",
+  "country": "France",
+  "e_score": 75.05,
+  "s_score": 79.13,
+  "g_score": 59.11,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "PYF",
+  "country": "French Polynesia",
+  "e_score": 74.71,
+  "s_score": 50.0,
+  "g_score": 62.02,
+  "indicator_count": 42,
+  "year": 2024
+ },
+ {
+  "iso3": "GAB",
+  "country": "Gabon",
+  "e_score": 77.18,
+  "s_score": 55.76,
+  "g_score": 38.14,
+  "indicator_count": 68,
+  "year": 2023
+ },
+ {
+  "iso3": "GMB",
+  "country": "Gambia, The",
+  "e_score": 65.79,
+  "s_score": 42.91,
+  "g_score": 42.95,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "GEO",
+  "country": "Georgia",
+  "e_score": 76.93,
+  "s_score": 64.89,
+  "g_score": 46.51,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "DEU",
+  "country": "Germany",
+  "e_score": 72.77,
+  "s_score": 80.2,
+  "g_score": 62.95,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "GHA",
+  "country": "Ghana",
+  "e_score": 68.66,
+  "s_score": 45.32,
+  "g_score": 43.44,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "GIB",
+  "country": "Gibraltar",
+  "e_score": 70.06,
+  "s_score": 50.0,
+  "g_score": 50.0,
+  "indicator_count": 30,
+  "year": 2024
+ },
+ {
+  "iso3": "GRC",
+  "country": "Greece",
+  "e_score": 74.11,
+  "s_score": 75.21,
+  "g_score": 50.9,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "GRL",
+  "country": "Greenland",
+  "e_score": 71.93,
+  "s_score": 50.0,
+  "g_score": 64.97,
+  "indicator_count": 37,
+  "year": 2024
+ },
+ {
+  "iso3": "GRD",
+  "country": "Grenada",
+  "e_score": 69.12,
+  "s_score": 62.52,
+  "g_score": 55.29,
+  "indicator_count": 59,
+  "year": 2024
+ },
+ {
+  "iso3": "GUM",
+  "country": "Guam",
+  "e_score": 66.68,
+  "s_score": 50.0,
+  "g_score": 68.84,
+  "indicator_count": 39,
+  "year": 2024
+ },
+ {
+  "iso3": "GTM",
+  "country": "Guatemala",
+  "e_score": 75.6,
+  "s_score": 55.15,
+  "g_score": 34.34,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "GIN",
+  "country": "Guinea",
+  "e_score": 73.25,
+  "s_score": 45.46,
+  "g_score": 31.25,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "GNB",
+  "country": "Guinea-Bissau",
+  "e_score": 69.17,
+  "s_score": 42.88,
+  "g_score": 28.91,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "GUY",
+  "country": "Guyana",
+  "e_score": 72.16,
+  "s_score": 54.94,
+  "g_score": 50.74,
+  "indicator_count": 65,
+  "year": 2024
+ },
+ {
+  "iso3": "HTI",
+  "country": "Haiti",
+  "e_score": 71.19,
+  "s_score": 44.87,
+  "g_score": 24.84,
+  "indicator_count": 62,
+  "year": 2024
+ },
+ {
+  "iso3": "HND",
+  "country": "Honduras",
+  "e_score": 76.27,
+  "s_score": 54.04,
+  "g_score": 33.67,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "HUN",
+  "country": "Hungary",
+  "e_score": 69.32,
+  "s_score": 77.65,
+  "g_score": 49.51,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "ISL",
+  "country": "Iceland",
+  "e_score": 73.62,
+  "s_score": 81.22,
+  "g_score": 65.41,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "IND",
+  "country": "India",
+  "e_score": 58.49,
+  "s_score": 61.49,
+  "g_score": 40.22,
+  "indicator_count": 74,
+  "year": 2023
+ },
+ {
+  "iso3": "IDN",
+  "country": "Indonesia",
+  "e_score": 64.15,
+  "s_score": 61.28,
+  "g_score": 42.22,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "IRN",
+  "country": "Iran, Islamic Rep.",
+  "e_score": 66.92,
+  "s_score": 66.1,
+  "g_score": 30.62,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "IRQ",
+  "country": "Iraq",
+  "e_score": 70.27,
+  "s_score": 60.7,
+  "g_score": 28.46,
+  "indicator_count": 69,
+  "year": 2024
+ },
+ {
+  "iso3": "IRL",
+  "country": "Ireland",
+  "e_score": 71.55,
+  "s_score": 77.99,
+  "g_score": 61.11,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "ISR",
+  "country": "Israel",
+  "e_score": 70.12,
+  "s_score": 73.57,
+  "g_score": 58.53,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "ITA",
+  "country": "Italy",
+  "e_score": 74.24,
+  "s_score": 76.03,
+  "g_score": 55.05,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "JAM",
+  "country": "Jamaica",
+  "e_score": 71.37,
+  "s_score": 66.08,
+  "g_score": 49.89,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "JPN",
+  "country": "Japan",
+  "e_score": 73.64,
+  "s_score": 86.82,
+  "g_score": 63.55,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "JOR",
+  "country": "Jordan",
+  "e_score": 72.86,
+  "s_score": 57.54,
+  "g_score": 43.22,
+  "indicator_count": 69,
+  "year": 2024
+ },
+ {
+  "iso3": "KAZ",
+  "country": "Kazakhstan",
+  "e_score": 67.59,
+  "s_score": 75.15,
+  "g_score": 45.32,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "KEN",
+  "country": "Kenya",
+  "e_score": 70.09,
+  "s_score": 47.0,
+  "g_score": 32.84,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "KIR",
+  "country": "Kiribati",
+  "e_score": 68.23,
+  "s_score": 52.64,
+  "g_score": 51.06,
+  "indicator_count": 58,
+  "year": 2024
+ },
+ {
+  "iso3": "PRK",
+  "country": "Korea, Dem. People's Rep.",
+  "e_score": 71.71,
+  "s_score": 61.54,
+  "g_score": 25.98,
+  "indicator_count": 59,
+  "year": 2024
+ },
+ {
+  "iso3": "KOR",
+  "country": "Korea, Rep.",
+  "e_score": 70.85,
+  "s_score": 86.23,
+  "g_score": 62.17,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "XKX",
+  "country": "Kosovo",
+  "e_score": 50.0,
+  "s_score": 50.0,
+  "g_score": 46.23,
+  "indicator_count": 24,
+  "year": 2024
+ },
+ {
+  "iso3": "KWT",
+  "country": "Kuwait",
+  "e_score": 61.65,
+  "s_score": 70.22,
+  "g_score": 45.38,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "KGZ",
+  "country": "Kyrgyz Republic",
+  "e_score": 73.74,
+  "s_score": 67.19,
+  "g_score": 40.75,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "LAO",
+  "country": "Lao PDR",
+  "e_score": 75.22,
+  "s_score": 54.05,
+  "g_score": 40.64,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "LVA",
+  "country": "Latvia",
+  "e_score": 77.48,
+  "s_score": 76.77,
+  "g_score": 55.61,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "LBN",
+  "country": "Lebanon",
+  "e_score": 69.65,
+  "s_score": 56.0,
+  "g_score": 31.38,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "LSO",
+  "country": "Lesotho",
+  "e_score": 73.35,
+  "s_score": 40.61,
+  "g_score": 38.94,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "LBR",
+  "country": "Liberia",
+  "e_score": 70.26,
+  "s_score": 39.49,
+  "g_score": 36.28,
+  "indicator_count": 68,
+  "year": 2023
+ },
+ {
+  "iso3": "LBY",
+  "country": "Libya",
+  "e_score": 70.0,
+  "s_score": 50.56,
+  "g_score": 30.52,
+  "indicator_count": 60,
+  "year": 2024
+ },
+ {
+  "iso3": "LIE",
+  "country": "Liechtenstein",
+  "e_score": 50.0,
+  "s_score": 50.0,
+  "g_score": 72.71,
+  "indicator_count": 35,
+  "year": 2024
+ },
+ {
+  "iso3": "LTU",
+  "country": "Lithuania",
+  "e_score": 74.35,
+  "s_score": 76.03,
+  "g_score": 57.79,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "LUX",
+  "country": "Luxembourg",
+  "e_score": 73.96,
+  "s_score": 77.39,
+  "g_score": 64.52,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "MDG",
+  "country": "Madagascar",
+  "e_score": 69.9,
+  "s_score": 41.15,
+  "g_score": 30.47,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "MWI",
+  "country": "Malawi",
+  "e_score": 74.65,
+  "s_score": 42.16,
+  "g_score": 35.04,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "MYS",
+  "country": "Malaysia",
+  "e_score": 68.89,
+  "s_score": 70.03,
+  "g_score": 51.84,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "MDV",
+  "country": "Maldives",
+  "e_score": 73.29,
+  "s_score": 70.57,
+  "g_score": 47.11,
+  "indicator_count": 62,
+  "year": 2024
+ },
+ {
+  "iso3": "MLI",
+  "country": "Mali",
+  "e_score": 69.3,
+  "s_score": 40.09,
+  "g_score": 30.03,
+  "indicator_count": 69,
+  "year": 2024
+ },
+ {
+  "iso3": "MLT",
+  "country": "Malta",
+  "e_score": 68.61,
+  "s_score": 79.02,
+  "g_score": 54.61,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "MHL",
+  "country": "Marshall Islands",
+  "e_score": 64.87,
+  "s_score": 55.45,
+  "g_score": 51.97,
+  "indicator_count": 51,
+  "year": 2024
+ },
+ {
+  "iso3": "MRT",
+  "country": "Mauritania",
+  "e_score": 66.88,
+  "s_score": 52.85,
+  "g_score": 34.64,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "MUS",
+  "country": "Mauritius",
+  "e_score": 70.47,
+  "s_score": 71.02,
+  "g_score": 50.62,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "MEX",
+  "country": "Mexico",
+  "e_score": 72.48,
+  "s_score": 62.43,
+  "g_score": 42.55,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "FSM",
+  "country": "Micronesia, Fed. Sts.",
+  "e_score": 69.68,
+  "s_score": 50.0,
+  "g_score": 51.5,
+  "indicator_count": 50,
+  "year": 2024
+ },
+ {
+  "iso3": "MDA",
+  "country": "Moldova",
+  "e_score": 71.09,
+  "s_score": 73.21,
+  "g_score": 46.28,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "MCO",
+  "country": "Monaco",
+  "e_score": 50.0,
+  "s_score": 50.0,
+  "g_score": 62.83,
+  "indicator_count": 35,
+  "year": 2024
+ },
+ {
+  "iso3": "MNG",
+  "country": "Mongolia",
+  "e_score": 67.13,
+  "s_score": 66.62,
+  "g_score": 43.1,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "MNE",
+  "country": "Montenegro",
+  "e_score": 70.36,
+  "s_score": 70.2,
+  "g_score": 49.52,
+  "indicator_count": 65,
+  "year": 2023
+ },
+ {
+  "iso3": "MAR",
+  "country": "Morocco",
+  "e_score": 71.07,
+  "s_score": 59.18,
+  "g_score": 42.45,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "MOZ",
+  "country": "Mozambique",
+  "e_score": 75.42,
+  "s_score": 34.36,
+  "g_score": 33.92,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "MMR",
+  "country": "Myanmar",
+  "e_score": 71.63,
+  "s_score": 58.02,
+  "g_score": 26.48,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "NAM",
+  "country": "Namibia",
+  "e_score": 74.63,
+  "s_score": 46.99,
+  "g_score": 43.99,
+  "indicator_count": 69,
+  "year": 2023
+ },
+ {
+  "iso3": "NRU",
+  "country": "Nauru",
+  "e_score": 66.6,
+  "s_score": 50.0,
+  "g_score": 49.29,
+  "indicator_count": 47,
+  "year": 2024
+ },
+ {
+  "iso3": "NPL",
+  "country": "Nepal",
+  "e_score": 76.18,
+  "s_score": 55.13,
+  "g_score": 39.1,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "NLD",
+  "country": "Netherlands",
+  "e_score": 69.73,
+  "s_score": 83.01,
+  "g_score": 65.55,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "NCL",
+  "country": "New Caledonia",
+  "e_score": 70.95,
+  "s_score": 50.0,
+  "g_score": 61.3,
+  "indicator_count": 43,
+  "year": 2024
+ },
+ {
+  "iso3": "NZL",
+  "country": "New Zealand",
+  "e_score": 76.11,
+  "s_score": 73.88,
+  "g_score": 66.72,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "NIC",
+  "country": "Nicaragua",
+  "e_score": 75.7,
+  "s_score": 54.34,
+  "g_score": 35.62,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "NER",
+  "country": "Niger",
+  "e_score": 68.14,
+  "s_score": 36.53,
+  "g_score": 31.95,
+  "indicator_count": 69,
+  "year": 2023
+ },
+ {
+  "iso3": "NGA",
+  "country": "Nigeria",
+  "e_score": 67.22,
+  "s_score": 43.13,
+  "g_score": 29.59,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "MKD",
+  "country": "North Macedonia",
+  "e_score": 72.45,
+  "s_score": 68.02,
+  "g_score": 48.15,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "MNP",
+  "country": "Northern Mariana Islands",
+  "e_score": 71.53,
+  "s_score": 50.0,
+  "g_score": 50.0,
+  "indicator_count": 25,
+  "year": 2024
+ },
+ {
+  "iso3": "NOR",
+  "country": "Norway",
+  "e_score": 79.14,
+  "s_score": 80.86,
+  "g_score": 66.2,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "OMN",
+  "country": "Oman",
+  "e_score": 68.56,
+  "s_score": 62.69,
+  "g_score": 44.97,
+  "indicator_count": 66,
+  "year": 2024
+ },
+ {
+  "iso3": "PAK",
+  "country": "Pakistan",
+  "e_score": 64.88,
+  "s_score": 48.77,
+  "g_score": 25.31,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "PLW",
+  "country": "Palau",
+  "e_score": 65.69,
+  "s_score": 50.0,
+  "g_score": 60.37,
+  "indicator_count": 49,
+  "year": 2024
+ },
+ {
+  "iso3": "PAN",
+  "country": "Panama",
+  "e_score": 78.09,
+  "s_score": 62.54,
+  "g_score": 43.33,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "PNG",
+  "country": "Papua New Guinea",
+  "e_score": 74.62,
+  "s_score": 36.71,
+  "g_score": 29.09,
+  "indicator_count": 65,
+  "year": 2024
+ },
+ {
+  "iso3": "PRY",
+  "country": "Paraguay",
+  "e_score": 73.51,
+  "s_score": 59.67,
+  "g_score": 40.49,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "PER",
+  "country": "Peru",
+  "e_score": 74.74,
+  "s_score": 60.85,
+  "g_score": 43.24,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "PHL",
+  "country": "Philippines",
+  "e_score": 68.93,
+  "s_score": 61.66,
+  "g_score": 41.46,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "POL",
+  "country": "Poland",
+  "e_score": 71.26,
+  "s_score": 77.71,
+  "g_score": 54.49,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "PRT",
+  "country": "Portugal",
+  "e_score": 77.06,
+  "s_score": 78.19,
+  "g_score": 58.34,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "PRI",
+  "country": "Puerto Rico (US)",
+  "e_score": 72.31,
+  "s_score": 68.98,
+  "g_score": 53.89,
+  "indicator_count": 54,
+  "year": 2024
+ },
+ {
+  "iso3": "QAT",
+  "country": "Qatar",
+  "e_score": 61.57,
+  "s_score": 72.42,
+  "g_score": 49.58,
+  "indicator_count": 71,
+  "year": 2024
+ },
+ {
+  "iso3": "ROU",
+  "country": "Romania",
+  "e_score": 73.17,
+  "s_score": 73.56,
+  "g_score": 47.16,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "RUS",
+  "country": "Russian Federation",
+  "e_score": 71.33,
+  "s_score": 75.19,
+  "g_score": 37.61,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "RWA",
+  "country": "Rwanda",
+  "e_score": 71.7,
+  "s_score": 49.61,
+  "g_score": 49.45,
+  "indicator_count": 70,
+  "year": 2023
+ },
+ {
+  "iso3": "WSM",
+  "country": "Samoa",
+  "e_score": 72.58,
+  "s_score": 54.3,
+  "g_score": 51.88,
+  "indicator_count": 59,
+  "year": 2024
+ },
+ {
+  "iso3": "SMR",
+  "country": "San Marino",
+  "e_score": 50.0,
+  "s_score": 50.0,
+  "g_score": 60.9,
+  "indicator_count": 38,
+  "year": 2024
+ },
+ {
+  "iso3": "STP",
+  "country": "Sao Tome and Principe",
+  "e_score": 73.23,
+  "s_score": 47.49,
+  "g_score": 46.01,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "SAU",
+  "country": "Saudi Arabia",
+  "e_score": 64.65,
+  "s_score": 66.8,
+  "g_score": 46.96,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "SEN",
+  "country": "Senegal",
+  "e_score": 69.98,
+  "s_score": 49.74,
+  "g_score": 48.25,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "SRB",
+  "country": "Serbia",
+  "e_score": 64.36,
+  "s_score": 70.23,
+  "g_score": 47.47,
+  "indicator_count": 66,
+  "year": 2023
+ },
+ {
+  "iso3": "SYC",
+  "country": "Seychelles",
+  "e_score": 74.87,
+  "s_score": 67.24,
+  "g_score": 53.22,
+  "indicator_count": 62,
+  "year": 2023
+ },
+ {
+  "iso3": "SLE",
+  "country": "Sierra Leone",
+  "e_score": 71.17,
+  "s_score": 41.42,
+  "g_score": 37.45,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "SGP",
+  "country": "Singapore",
+  "e_score": 68.77,
+  "s_score": 74.87,
+  "g_score": 63.86,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "SVK",
+  "country": "Slovak Republic",
+  "e_score": 73.28,
+  "s_score": 78.02,
+  "g_score": 52.75,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "SVN",
+  "country": "Slovenia",
+  "e_score": 76.2,
+  "s_score": 80.54,
+  "g_score": 58.14,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "SLB",
+  "country": "Solomon Islands",
+  "e_score": 71.64,
+  "s_score": 56.69,
+  "g_score": 40.87,
+  "indicator_count": 57,
+  "year": 2024
+ },
+ {
+  "iso3": "SOM",
+  "country": "Somalia, Fed. Rep.",
+  "e_score": 67.48,
+  "s_score": 21.34,
+  "g_score": 23.89,
+  "indicator_count": 61,
+  "year": 2024
+ },
+ {
+  "iso3": "ZAF",
+  "country": "South Africa",
+  "e_score": 66.88,
+  "s_score": 53.54,
+  "g_score": 46.44,
+  "indicator_count": 73,
+  "year": 2023
+ },
+ {
+  "iso3": "SSD",
+  "country": "South Sudan",
+  "e_score": 66.15,
+  "s_score": 27.87,
+  "g_score": 18.64,
+  "indicator_count": 61,
+  "year": 2023
+ },
+ {
+  "iso3": "ESP",
+  "country": "Spain",
+  "e_score": 74.95,
+  "s_score": 77.11,
+  "g_score": 58.97,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "LKA",
+  "country": "Sri Lanka",
+  "e_score": 70.42,
+  "s_score": 62.22,
+  "g_score": 38.63,
+  "indicator_count": 72,
+  "year": 2023
+ },
+ {
+  "iso3": "KNA",
+  "country": "St. Kitts and Nevis",
+  "e_score": 71.38,
+  "s_score": 50.0,
+  "g_score": 56.47,
+  "indicator_count": 52,
+  "year": 2024
+ },
+ {
+  "iso3": "LCA",
+  "country": "St. Lucia",
+  "e_score": 69.56,
+  "s_score": 62.96,
+  "g_score": 50.67,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "VCT",
+  "country": "St. Vincent and the Grenadines",
+  "e_score": 72.71,
+  "s_score": 62.31,
+  "g_score": 55.28,
+  "indicator_count": 60,
+  "year": 2024
+ },
+ {
+  "iso3": "SDN",
+  "country": "Sudan",
+  "e_score": 70.58,
+  "s_score": 42.3,
+  "g_score": 18.99,
+  "indicator_count": 65,
+  "year": 2023
+ },
+ {
+  "iso3": "SUR",
+  "country": "Suriname",
+  "e_score": 73.41,
+  "s_score": 60.56,
+  "g_score": 51.13,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "SWE",
+  "country": "Sweden",
+  "e_score": 77.35,
+  "s_score": 80.24,
+  "g_score": 68.46,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "CHE",
+  "country": "Switzerland",
+  "e_score": 76.37,
+  "s_score": 80.21,
+  "g_score": 67.14,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "SYR",
+  "country": "Syrian Arab Republic",
+  "e_score": 65.27,
+  "s_score": 53.71,
+  "g_score": 13.02,
+  "indicator_count": 67,
+  "year": 2023
+ },
+ {
+  "iso3": "TJK",
+  "country": "Tajikistan",
+  "e_score": 76.11,
+  "s_score": 58.8,
+  "g_score": 32.91,
+  "indicator_count": 70,
+  "year": 2024
+ },
+ {
+  "iso3": "TZA",
+  "country": "Tanzania",
+  "e_score": 73.57,
+  "s_score": 43.02,
+  "g_score": 40.65,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "THA",
+  "country": "Thailand",
+  "e_score": 68.11,
+  "s_score": 69.52,
+  "g_score": 45.62,
+  "indicator_count": 73,
+  "year": 2024
+ },
+ {
+  "iso3": "TLS",
+  "country": "Timor-Leste",
+  "e_score": 70.99,
+  "s_score": 49.56,
+  "g_score": 44.04,
+  "indicator_count": 61,
+  "year": 2024
+ },
+ {
+  "iso3": "TGO",
+  "country": "Togo",
+  "e_score": 69.23,
+  "s_score": 43.59,
+  "g_score": 34.19,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "TON",
+  "country": "Tonga",
+  "e_score": 67.78,
+  "s_score": 60.4,
+  "g_score": 53.02,
+  "indicator_count": 63,
+  "year": 2024
+ },
+ {
+  "iso3": "TTO",
+  "country": "Trinidad and Tobago",
+  "e_score": 67.41,
+  "s_score": 63.45,
+  "g_score": 43.58,
+  "indicator_count": 67,
+  "year": 2024
+ },
+ {
+  "iso3": "TUN",
+  "country": "Tunisia",
+  "e_score": 70.72,
+  "s_score": 66.79,
+  "g_score": 39.96,
+  "indicator_count": 74,
+  "year": 2023
+ },
+ {
+  "iso3": "TUR",
+  "country": "Turkiye",
+  "e_score": 71.87,
+  "s_score": 67.79,
+  "g_score": 40.37,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "TKM",
+  "country": "Turkmenistan",
+  "e_score": 66.74,
+  "s_score": 63.16,
+  "g_score": 34.43,
+  "indicator_count": 65,
+  "year": 2024
+ },
+ {
+  "iso3": "TCA",
+  "country": "Turks and Caicos Islands",
+  "e_score": 70.94,
+  "s_score": 50.0,
+  "g_score": 50.0,
+  "indicator_count": 37,
+  "year": 2024
+ },
+ {
+  "iso3": "TUV",
+  "country": "Tuvalu",
+  "e_score": 66.91,
+  "s_score": 43.39,
+  "g_score": 50.0,
+  "indicator_count": 50,
+  "year": 2024
+ },
+ {
+  "iso3": "UGA",
+  "country": "Uganda",
+  "e_score": 70.72,
+  "s_score": 41.43,
+  "g_score": 31.77,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "UKR",
+  "country": "Ukraine",
+  "e_score": 68.69,
+  "s_score": 75.83,
+  "g_score": 44.5,
+  "indicator_count": 71,
+  "year": 2023
+ },
+ {
+  "iso3": "ARE",
+  "country": "United Arab Emirates",
+  "e_score": 65.64,
+  "s_score": 76.39,
+  "g_score": 56.66,
+  "indicator_count": 74,
+  "year": 2023
+ },
+ {
+  "iso3": "GBR",
+  "country": "United Kingdom",
+  "e_score": 71.67,
+  "s_score": 76.84,
+  "g_score": 64.02,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "USA",
+  "country": "United States",
+  "e_score": 65.76,
+  "s_score": 71.46,
+  "g_score": 66.52,
+  "indicator_count": 74,
+  "year": 2024
+ },
+ {
+  "iso3": "URY",
+  "country": "Uruguay",
+  "e_score": 74.31,
+  "s_score": 70.7,
+  "g_score": 58.2,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "UZB",
+  "country": "Uzbekistan",
+  "e_score": 68.75,
+  "s_score": 69.26,
+  "g_score": 42.8,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "VUT",
+  "country": "Vanuatu",
+  "e_score": 69.75,
+  "s_score": 53.58,
+  "g_score": 44.64,
+  "indicator_count": 64,
+  "year": 2024
+ },
+ {
+  "iso3": "VEN",
+  "country": "Venezuela, RB",
+  "e_score": 74.72,
+  "s_score": 60.09,
+  "g_score": 27.33,
+  "indicator_count": 61,
+  "year": 2024
+ },
+ {
+  "iso3": "VNM",
+  "country": "Viet Nam",
+  "e_score": 70.03,
+  "s_score": 69.66,
+  "g_score": 43.39,
+  "indicator_count": 72,
+  "year": 2024
+ },
+ {
+  "iso3": "VIR",
+  "country": "Virgin Islands (U.S.)",
+  "e_score": 71.47,
+  "s_score": 50.0,
+  "g_score": 62.01,
+  "indicator_count": 40,
+  "year": 2024
+ },
+ {
+  "iso3": "YEM",
+  "country": "Yemen, Rep.",
+  "e_score": 67.23,
+  "s_score": 39.57,
+  "g_score": 11.56,
+  "indicator_count": 64,
+  "year": 2023
+ },
+ {
+  "iso3": "ZMB",
+  "country": "Zambia",
+  "e_score": 78.21,
+  "s_score": 35.7,
+  "g_score": 33.6,
+  "indicator_count": 68,
+  "year": 2024
+ },
+ {
+  "iso3": "ZWE",
+  "country": "Zimbabwe",
+  "e_score": 74.8,
+  "s_score": 40.81,
+  "g_score": 30.48,
+  "indicator_count": 70,
+  "year": 2024
+ }
+]

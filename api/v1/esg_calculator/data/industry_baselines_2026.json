@@ -1,0 +1,229 @@
+[
+  {
+    "industry": "Manufacturing",
+    "e_score": 48.3,
+    "s_score": 57.3,
+    "g_score": 52.8,
+    "n_sectors_matched": 46,
+    "matched_sectors": [
+      "Aluminium production",
+      "Casting of metals",
+      "Chemicals nec",
+      "Copper production",
+      "Lead, zinc and tin production",
+      "Manufacture of basic iron and steel and of ferro-alloys and first products thereof",
+      "Manufacture of beverages",
+      "Manufacture of bricks, tiles and construction products, in baked clay",
+      "Manufacture of cement, lime and plaster",
+      "Manufacture of ceramic goods",
+      "Manufacture of coke oven products",
+      "Manufacture of electrical machinery and apparatus n.e.c. (31)",
+      "Manufacture of fabricated metal products, except machinery and equipment (28)",
+      "Manufacture of fish products",
+      "Manufacture of furniture; manufacturing n.e.c. (36)",
+      "Manufacture of gas; distribution of gaseous fuels through mains",
+      "Manufacture of glass and glass products",
+      "Manufacture of machinery and equipment n.e.c. (29)",
+      "Manufacture of medical, precision and optical instruments, watches and clocks (33)",
+      "Manufacture of motor vehicles, trailers and semi-trailers (34)",
+      "Manufacture of office machinery and computers (30)",
+      "Manufacture of other non-metallic mineral products n.e.c.",
+      "Manufacture of other transport equipment (35)",
+      "Manufacture of radio, television and communication equipment and apparatus (32)",
+      "Manufacture of rubber and plastic products (25)",
+      "Manufacture of textiles (17)",
+      "Manufacture of tobacco products (16)",
+      "Manufacture of wearing apparel; dressing and dyeing of fur (18)",
+      "Manufacture of wood and of products of wood and cork, except furniture; manufacture of articles of straw and plaiting materials (20)",
+      "N-fertiliser",
+      "Other non-ferrous metal production",
+      "P- and other fertiliser",
+      "Paper",
+      "Plastics, basic",
+      "Precious metals production",
+      "Processed rice",
+      "Processing of Food products nec",
+      "Processing of dairy products",
+      "Processing of meat cattle",
+      "Processing of meat pigs",
+      "Processing of meat poultry",
+      "Processing vegetable oils and fats",
+      "Production of meat products nec",
+      "Pulp",
+      "Sugar refining",
+      "Tanning and dressing of leather; manufacture of luggage, handbags, saddlery, harness and footwear (19)"
+    ]
+  },
+  {
+    "industry": "Technology",
+    "e_score": 82.3,
+    "s_score": 61.9,
+    "g_score": 72.1,
+    "n_sectors_matched": 5,
+    "matched_sectors": [
+      "Computer and related activities (72)",
+      "Manufacture of office machinery and computers (30)",
+      "Manufacture of radio, television and communication equipment and apparatus (32)",
+      "Post and telecommunications (64)",
+      "Research and development (73)"
+    ]
+  },
+  {
+    "industry": "Financial Services",
+    "e_score": 89.8,
+    "s_score": 54.2,
+    "g_score": 72.0,
+    "n_sectors_matched": 3,
+    "matched_sectors": [
+      "Activities auxiliary to financial intermediation (67)",
+      "Financial intermediation, except insurance and pension funding (65)",
+      "Insurance and pension funding, except compulsory social security (66)"
+    ]
+  },
+  {
+    "industry": "Retail",
+    "e_score": 64.3,
+    "s_score": 67.1,
+    "g_score": 65.7,
+    "n_sectors_matched": 4,
+    "matched_sectors": [
+      "Retail sale of automotive fuel",
+      "Retail trade, except of motor vehicles and motorcycles; repair of personal and household goods (52)",
+      "Sale, maintenance, repair of motor vehicles, motor vehicles parts, motorcycles, motor cycles parts and accessoiries",
+      "Wholesale trade and commission trade, except of motor vehicles and motorcycles (51)"
+    ]
+  },
+  {
+    "industry": "Healthcare",
+    "e_score": 83.0,
+    "s_score": 68.0,
+    "g_score": 75.5,
+    "n_sectors_matched": 1,
+    "matched_sectors": [
+      "Health and social work (85)"
+    ]
+  },
+  {
+    "industry": "Energy & Utilities",
+    "e_score": 36.7,
+    "s_score": 31.5,
+    "g_score": 34.1,
+    "n_sectors_matched": 21,
+    "matched_sectors": [
+      "Collection, purification and distribution of water (41)",
+      "Distribution and trade of electricity",
+      "Extraction of crude petroleum and services related to crude oil extraction, excluding surveying",
+      "Extraction of natural gas and services related to natural gas extraction, excluding surveying",
+      "Extraction, liquefaction, and regasification of other petroleum and gaseous materials",
+      "Manufacture of gas; distribution of gaseous fuels through mains",
+      "Mining of coal and lignite; extraction of peat (10)",
+      "Petroleum Refinery",
+      "Production of electricity by Geothermal",
+      "Production of electricity by biomass and waste",
+      "Production of electricity by coal",
+      "Production of electricity by gas",
+      "Production of electricity by hydro",
+      "Production of electricity by nuclear",
+      "Production of electricity by petroleum and other oil derivatives",
+      "Production of electricity by solar photovoltaic",
+      "Production of electricity by solar thermal",
+      "Production of electricity by wind",
+      "Production of electricity nec",
+      "Steam and hot water supply",
+      "Transmission of electricity"
+    ]
+  },
+  {
+    "industry": "Construction & Real Estate",
+    "e_score": 29.6,
+    "s_score": 61.1,
+    "g_score": 45.4,
+    "n_sectors_matched": 4,
+    "matched_sectors": [
+      "Construction (45)",
+      "Manufacture of bricks, tiles and construction products, in baked clay",
+      "Manufacture of cement, lime and plaster",
+      "Real estate activities (70)"
+    ]
+  },
+  {
+    "industry": "Transportation & Logistics",
+    "e_score": 31.3,
+    "s_score": 47.2,
+    "g_score": 39.2,
+    "n_sectors_matched": 8,
+    "matched_sectors": [
+      "Air transport (62)",
+      "Inland water transport",
+      "Manufacture of other transport equipment (35)",
+      "Other land transport",
+      "Sea and coastal water transport",
+      "Supporting and auxiliary transport activities; activities of travel agencies (63)",
+      "Transport via pipelines",
+      "Transport via railways"
+    ]
+  },
+  {
+    "industry": "Agriculture & Food",
+    "e_score": 28.6,
+    "s_score": 69.8,
+    "g_score": 49.2,
+    "n_sectors_matched": 27,
+    "matched_sectors": [
+      "Animal products nec",
+      "Cattle farming",
+      "Cultivation of cereal grains nec",
+      "Cultivation of crops nec",
+      "Cultivation of oil seeds",
+      "Cultivation of paddy rice",
+      "Cultivation of plant-based fibers",
+      "Cultivation of sugar cane, sugar beet",
+      "Cultivation of vegetables, fruit, nuts",
+      "Cultivation of wheat",
+      "Fishing, operating of fish hatcheries and fish farms; service activities incidental to fishing (05)",
+      "Forestry, logging and related service activities (02)",
+      "Manufacture of beverages",
+      "Manufacture of fish products",
+      "Meat animals nec",
+      "Pigs farming",
+      "Poultry farming",
+      "Processed rice",
+      "Processing of Food products nec",
+      "Processing of dairy products",
+      "Processing of meat cattle",
+      "Processing of meat pigs",
+      "Processing of meat poultry",
+      "Processing vegetable oils and fats",
+      "Production of meat products nec",
+      "Raw milk",
+      "Wool, silk-worm cocoons"
+    ]
+  },
+  {
+    "industry": "Professional Services",
+    "e_score": 77.6,
+    "s_score": 67.3,
+    "g_score": 72.4,
+    "n_sectors_matched": 5,
+    "matched_sectors": [
+      "Activities of membership organisation n.e.c. (91)",
+      "Education (80)",
+      "Other business activities (74)",
+      "Public administration and defence; compulsory social security (75)",
+      "Renting of machinery and equipment without operator and of personal and household goods (71)"
+    ]
+  },
+  {
+    "industry": "Other",
+    "e_score": 85.7,
+    "s_score": 96.6,
+    "g_score": 91.2,
+    "n_sectors_matched": 4,
+    "matched_sectors": [
+      "Hotels and restaurants (55)",
+      "Other service activities (93)",
+      "Private households with employed persons (95)",
+      "Recreational, cultural and sporting activities (92)"
+    ]
+  }
+]

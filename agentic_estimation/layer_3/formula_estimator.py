@@ -299,6 +299,35 @@ def compute_formula_scores(
                 points=anchor_points, claim_reasoning=anchor.basis, method="peer_anchor",
             ))
 
+        # EXIOBASE structural industry-median vote, added 2026-08-27. This is
+        # a DIFFERENT signal from _peer_anchor above: peer_anchor is a real
+        # bcorp/upright PEER median (other companies' disclosed/rated
+        # performance); this is the sector's own physical/structural profile
+        # (emissions/water/material intensity for E, workforce composition
+        # for S, an E/S-derived estimate for G -- see exio_lookup.py's
+        # module docstring for why G has no real EXIOBASE column). Was
+        # previously wired ONLY into evidence_ladder.py's low-evidence path
+        # (exio_structural rung) -- added here too so companies with plenty
+        # of evidence still get an industry-median contribution at all,
+        # which today's high-evidence formula had none of. E's exio_e_vote
+        # has a measured +0.615 Spearman on real holdout (see exio_lookup.py);
+        # S and G do not yet (exio_s_vote/exio_g_vote are unvalidated -- set
+        # to a lower weight/confidence ceiling than peer_anchor for that
+        # reason, same "smaller swing for a coarser/less-proven signal" rule
+        # evidence_ladder.py's a_prior already follows).
+        from agentic_estimation.layer_3.exio_lookup import exio_e_vote, exio_s_vote, exio_g_vote
+        _exio_vote_fn = {"E": exio_e_vote, "S": exio_s_vote, "G": exio_g_vote}[pillar]
+        exio_vote = _exio_vote_fn(sector)
+        if exio_vote is not None:
+            exio_delta = 2 * (exio_vote.percentile / 100.0) - 1   # -1..+1, same scale as claim deltas
+            exio_weight = 10.0 if pillar == "E" else 6.0   # E is measured; S/G are unvalidated -- smaller max swing
+            exio_points = exio_weight * exio_vote.confidence * exio_delta
+            contributions.append(Contribution(
+                factor="_industry_median", weight=exio_weight, confidence=exio_vote.confidence,
+                delta=exio_delta, points=exio_points, claim_reasoning=exio_vote.basis,
+                method="exio_structural",
+            ))
+
         breakdown = None
         if use_saturation:
             from agentic_estimation.layer_3.saturation_score import saturate_pillar
