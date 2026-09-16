@@ -43,3 +43,4 @@ scripts/
 PROBLEMS.md
 ruff-report.json*
 ruff-report.txt*
+*.json
