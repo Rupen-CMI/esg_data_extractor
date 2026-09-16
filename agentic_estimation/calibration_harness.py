@@ -435,7 +435,7 @@ def _estimate_one_via_graph(truth: TruthRecord, with_evaluator: bool, row: Backt
     True here since the graph's dry path always runs the evaluator node — this
     matches what the scaffold actually does end-to-end.
     """
-    from raw_esg_data.graph import run_company_dry_graph
+    from agentic_estimation.graph import run_company_dry_graph
 
     try:
         industry = truth.industry or ""
@@ -555,6 +555,16 @@ def _gather_and_score_formula(truth: TruthRecord, row: BacktestRow, capture: Opt
     if flags:
         _p(f"  [{truth.name}] Tier-0: {row.claims_dropped} claim(s) dropped, {row.claims_capped} capped")
 
+    # truth_source intentionally NOT passed here (see agentic_estimation/
+    # layer_3/peer_anchor.py's "BCORP REMOVAL" note) -- this harness can
+    # backtest against EITHER source (run_backtest(source=...)), and
+    # TruthRecord doesn't carry which one down to this function today. That
+    # used to mean a bcorp backtest could leak bcorp peer votes regardless
+    # of intent; it's now moot because find_peers()'s own include_bcorp
+    # default is False, so bcorp peers don't leak in here even without a
+    # truth_source restriction. If bcorp peer-anchor tiers are ever
+    # re-enabled, thread truth_source=source through estimate_one ->
+    # _estimate_one_via_formula/_estimate_one_via_ensemble -> here first.
     formula_scores = compute_formula_scores(
         claims, country, metadata, company_name=truth.name, sector=truth.peer_sector, signals=signals,
         use_saturation=_USE_SATURATION, sat_params=_SAT_PARAMS,

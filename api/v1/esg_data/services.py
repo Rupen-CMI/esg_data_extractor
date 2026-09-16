@@ -1,21 +1,31 @@
 import asyncio
 import random
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from database import db as engine
-from api.v1.models import Market, Company, ESGMetricDefinition, MarketMetricLink, MarketCompanyLink
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session, sessionmaker
+
+from api.v1.esg_data.fetchers.bcorp_fetcher import fetch_bcorp
+from api.v1.esg_data.fetchers.result_writer import (
+    save_fetch_results,
+    update_company_ticker,
+)
+from api.v1.esg_data.fetchers.upright_fetcher import fetch_upright
+from api.v1.esg_data.fetchers.wikirate_fetcher import fetch_wikirate
+from api.v1.esg_data.fetchers.yfinance_fetcher import fetch_yfinance
 from api.v1.esg_data.metric_catalog import (
     METRIC_DEFINITIONS,
-    SECTOR_METRICS,
     SASB_SECTORS,
+    SECTOR_METRICS,
 )
-from api.v1.esg_data.fetchers.yfinance_fetcher import fetch_yfinance
-from api.v1.esg_data.fetchers.wikirate_fetcher import fetch_wikirate
-from api.v1.esg_data.fetchers.bcorp_fetcher import fetch_bcorp
-from api.v1.esg_data.fetchers.upright_fetcher import fetch_upright
-from api.v1.esg_data.fetchers.result_writer import save_fetch_results, update_company_ticker
-from zen_client import call_with_prompt, DEFAULT_MODEL
+from api.v1.models import (
+    Company,
+    ESGMetricDefinition,
+    Market,
+    MarketCompanyLink,
+    MarketMetricLink,
+)
+from database import db as engine
+from zen_client import DEFAULT_MODEL, call_with_prompt
 
 SessionFactory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 

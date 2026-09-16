@@ -61,6 +61,59 @@ match, not fuzzy, so it out-ranks the bcorp-fuzzy and upright-fuzzy tiers
 below; those remain as fallback for sector strings the crosswalk doesn't
 recognize (e.g. a company's own free-text industry field that matches
 neither vocabulary's labels).
+
+BCORP REMOVAL (2026-09-16): bcorp_lookup is disabled as a peer-anchor source,
+per the pipeline's truth-source decision (see esg-truth-source-decision --
+bcorp and upright disagree at Spearman -0.538 on industry ordering, and only
+upright is used to calibrate). This did NOT require touching every file that
+ever mentioned bcorp -- most of the module docstring above still describes
+tiers 1-4 in the present tense as historical/architectural context for HOW
+they worked, not because they still run. What actually changed, and where to
+look to re-enable:
+
+  1. peer_anchor_collector.find_peers()'s `include_bcorp` default flipped
+     False -> this is the root switch; every call below that doesn't pass
+     include_bcorp=True now gets upright-only results.
+  2. Tier 1 (sector_country, line ~267) and Tier 2 (sector_only, line ~279)
+     are the two tiers still meant to actually query bcorp when reached
+     (they're gated by skip_bcorp_tiers / truth_source, not by this
+     change) -- they now pass include_bcorp=True, include_upright=False
+     explicitly, instead of relying on find_peers()'s old both-True
+     default. This keeps their real behavior unchanged when NOT skipped,
+     and stops paying for a wasted upright_lookup query every time they
+     run (the old unioned result's upright rows never populated the
+     bcorp-named field these tiers read, so upright was always dead
+     weight here, on or off).
+  3. Tier 3 (_crosswalk_vote) and Tier 4 (_bcorp_category_fuzzy_vote) are
+     ENTIRELY bcorp-sourced -- there is no upright-only version of "pool
+     bcorp peers by crosswalked category" or "fuzzy-match bcorp's 22
+     industry_category values." Both now short-circuit with `return None`
+     at the top of the function, each with its own comment. This is
+     deliberately NOT a deletion: the tier bodies, sector_crosswalk.py, and
+     bcorp_industry_category_labels() are all left intact and correct --
+     removing the short-circuit line re-enables the tier exactly as it was.
+  4. `truth_source="upright"` (the pre-existing mechanism, unchanged) was
+     ALREADY pinned by every live caller (graph.py, estimate_verifier.py,
+     evidence_ladder.py's _peer_upright_vote) before this change -- so the
+     live path was already 4/5 tiers bcorp-free by that route. This change
+     makes it true by default/construction instead of by every caller
+     happening to pass the right flag, and closes the one real gap that
+     accident missed: calibration_harness.py's compute_formula_scores()
+     call didn't pass truth_source at all, so a bcorp backtest could still
+     silently pull bcorp peer votes (see that file's own note).
+  5. _load_distribution() below (the bcorp_lookup percentile-normalization
+     cache) is now DEAD CODE in practice -- nothing calls _percentile_rank
+     against it once tiers 1-4 never run -- but it is left defined, not
+     deleted, since tiers 1/2/4 (which call it) are still fully wired and
+     only inert via the include_bcorp=False default, not removed.
+
+TO RE-ENABLE BCORP: flip peer_anchor_collector.find_peers()'s include_bcorp
+default back to True, remove the two `return None` short-circuits in
+_crosswalk_vote()/_bcorp_category_fuzzy_vote(), and decide deliberately
+whether truth_source should still gate tiers 1-4 or whether bcorp inclusion
+should get its own independent flag (see the mapping note this decision was
+based on: bcorp inclusion and truth-source-contamination avoidance are two
+different concerns that got coupled through one parameter).
 """
 
 import bisect
@@ -163,6 +216,12 @@ def _abstain(pillar: str, tier: str, n_peers: int, why: str) -> PeerAnchorVote:
 
 
 def _load_distribution(field: str) -> list[float]:
+    # BCORP REMOVAL (2026-09-16, see module docstring): this bcorp_lookup
+    # percentile-normalization cache is DEAD IN PRACTICE now -- tiers 1/2/4
+    # are the only callers of _percentile_rank against it, and 1/2 only run
+    # when NOT skip_bcorp_tiers while 4 is short-circuited. Left defined
+    # (not deleted) since 1/2 are still fully wired, just inert via
+    # find_peers()'s include_bcorp default.
     if field not in _distribution_cache:
         from agentic_estimation.layer_1.peer_anchor_collector import _db_conn
         col = {"e_score": "impact_area_environment", "s_score": None, "g_score": "impact_area_governance"}[field]
@@ -264,7 +323,8 @@ def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
         if skip_bcorp_tiers:
             break
         if country:
-            peers = find_peers(sector=cand, country=country, exclude_name=company_name)
+            peers = find_peers(sector=cand, country=country, exclude_name=company_name,
+                                include_bcorp=True, include_upright=False)
             n = peer_sample_size(peers, field)
             if n >= _MIN_PEERS_SECTOR_COUNTRY:
                 med = peer_median(peers, field)
@@ -276,7 +336,8 @@ def peer_anchor_vote(pillar: str, company_name: str, sector: Optional[str],
 
     if not skip_bcorp_tiers and not _suppressed(pillar, "sector_only"):
         for cand in candidates:
-            peers = find_peers(sector=cand, country=None, exclude_name=company_name)
+            peers = find_peers(sector=cand, country=None, exclude_name=company_name,
+                                include_bcorp=True, include_upright=False)
             n = peer_sample_size(peers, field)
             if n >= _MIN_PEERS_SECTOR_ONLY:
                 med = peer_median(peers, field)
@@ -337,6 +398,15 @@ def _crosswalk_vote(pillar: str, sector: Optional[str], country: Optional[str],
     step, still reported under its own (lower, proxy-only) confidence.
     Returns None (not an abstain vote) if `sector` isn't a recognized label
     in either vocabulary -- caller falls through to the fuzzy tiers."""
+    # BCORP REMOVAL (2026-09-16, see module docstring): this tier is 100%
+    # bcorp-sourced -- there is no upright-only version of "pool bcorp peers
+    # by crosswalked category" (see the NOTE above: upright can never
+    # populate `field`). Short-circuit rather than let it fall through to
+    # find_peers() and quietly return zero peers every time -- same end
+    # result, but this is honest about WHY instead of looking like a dead
+    # sector match. Remove this line to re-enable (the rest of the function
+    # is untouched and correct).
+    return None
     if not sector:
         return None
     from agentic_estimation.layer_1.peer_anchor_collector import find_peers, peer_median, peer_sample_size
@@ -377,6 +447,10 @@ def _bcorp_category_fuzzy_vote(pillar: str, sector: Optional[str], country: Opti
     E/S/G data -- a genuinely better-resolution version of the existing
     coarse sasb_sector tier, not a different data source. Returns None (not
     an abstain vote) on no fuzzy match or insufficient peers."""
+    # BCORP REMOVAL (2026-09-16, see module docstring): entirely bcorp-
+    # sourced, no upright equivalent. Short-circuit for the same reason as
+    # _crosswalk_vote above. Remove this line to re-enable.
+    return None
     if not sector:
         return None
     from agentic_estimation.layer_1.peer_anchor_collector import (
@@ -411,6 +485,56 @@ def _bcorp_category_fuzzy_vote(pillar: str, sector: Optional[str], country: Opti
     )
 
 
+# Per-(company, sector, country) cache of the upright peer-group LOOKUP --
+# NOT of the final vote. graph.py/formula_estimator.py call peer_anchor_vote()
+# once per pillar (E, S, G) for the SAME company in the same scoring pass, but
+# the peer group itself (fuzzy sector match + find_peers + sample-size check)
+# is pillar-independent -- only the aggregation step below (E/S proxy mean vs
+# G raw median) differs per pillar. Before this cache, each of the 3 pillar
+# calls redid the identical DB round-trip(s) for identical results -- e.g. a
+# thin-evidence company hitting the *_global fallback made 2 find_peers()
+# calls x 3 pillars = 6 network round-trips for ONE peer group. Cache is
+# unbounded for the life of one process/company-scoring-run's import of this
+# module; graph.py runs one company per call so this never accumulates across
+# companies in a way that matters (a fresh interpreter/thread per company in
+# practice -- see peer_anchor_collector.py's own connection-lifetime notes).
+_peer_group_cache: dict[tuple, Optional[tuple]] = {}
+
+
+def _upright_peer_group(sector: Optional[str], country: Optional[str],
+                         company_name: str) -> Optional[tuple]:
+    """The pillar-independent half of _upright_fuzzy_vote: fuzzy-match the
+    sector, fetch peers (country-scoped, falling back to global), and return
+    (peers, n, tier, match) once ALL THREE pillars can reuse -- or None if no
+    match/insufficient peers at any scope (mirrors the old function's early
+    returns, just without a pillar to attach them to yet)."""
+    if not sector:
+        return None
+    cache_key = (sector, country, company_name)
+    if cache_key in _peer_group_cache:
+        return _peer_group_cache[cache_key]
+
+    from agentic_estimation.layer_1.peer_anchor_collector import find_peers, peer_sample_size
+    from agentic_estimation.layer_1.sector_matcher import best_sector_match
+
+    result: Optional[tuple] = None
+    match = best_sector_match(sector, _upright_industry_labels())
+    if match and match.matched:
+        field = "net_impact_ratio_percentile"
+        peers = find_peers(sector=match.label, country=country, exclude_name=company_name) if country else []
+        n = peer_sample_size(peers, field)
+        tier = "upright_fuzzy_country"
+        if n < _MIN_PEERS_UPRIGHT_FUZZY:
+            peers = find_peers(sector=match.label, country=None, exclude_name=company_name)
+            n = peer_sample_size(peers, field)
+            tier = "upright_fuzzy_global"
+        if n >= _MIN_PEERS_UPRIGHT_FUZZY:
+            result = (peers, n, tier, match)
+
+    _peer_group_cache[cache_key] = result
+    return result
+
+
 def _upright_fuzzy_vote(pillar: str, sector: Optional[str], country: Optional[str],
                          company_name: str) -> Optional[PeerAnchorVote]:
     """Fuzzy-match `sector` against upright_lookup's 30 real industry labels
@@ -426,25 +550,12 @@ def _upright_fuzzy_vote(pillar: str, sector: Optional[str], country: Optional[st
     peers, so the caller's existing abstain path/message is used -- this
     function only ever adds a vote, never manufactures its own abstain
     reasoning."""
-    if not sector:
-        return None
-    from agentic_estimation.layer_1.peer_anchor_collector import find_peers, peer_median, peer_sample_size
-    from agentic_estimation.layer_1.sector_matcher import best_sector_match
+    from agentic_estimation.layer_1.peer_anchor_collector import peer_median
 
-    match = best_sector_match(sector, _upright_industry_labels())
-    if not match or not match.matched:
+    group = _upright_peer_group(sector, country, company_name)
+    if group is None:
         return None
-
-    field = "net_impact_ratio_percentile"
-    peers = find_peers(sector=match.label, country=country, exclude_name=company_name) if country else []
-    n = peer_sample_size(peers, field)
-    tier = "upright_fuzzy_country"
-    if n < _MIN_PEERS_UPRIGHT_FUZZY:
-        peers = find_peers(sector=match.label, country=None, exclude_name=company_name)
-        n = peer_sample_size(peers, field)
-        tier = "upright_fuzzy_global"
-    if n < _MIN_PEERS_UPRIGHT_FUZZY:
-        return None
+    peers, n, tier, match = group
 
     if pillar in ("E", "S"):
         from agentic_estimation.layer_1.upright_pillar_proxy import peer_group_pillar_proxy
@@ -459,7 +570,7 @@ def _upright_fuzzy_vote(pillar: str, sector: Optional[str], country: Optional[st
                    f"-- derived per-pillar proxy from Upright's raw impact sub-components"),
         )
 
-    pctile = peer_median(peers, field)  # already a 0-100 percentile, no rank conversion needed
+    pctile = peer_median(peers, "net_impact_ratio_percentile")  # already a 0-100 percentile, no rank conversion needed
     return PeerAnchorVote(
         pillar=pillar, percentile=pctile, confidence=0.25, n_peers=n, tier=tier,
         basis=(f"median net_impact_ratio_percentile={pctile:.1f} of {n} upright peers "

@@ -38,7 +38,7 @@ export iso3/country/e_score/s_score/g_score/indicator_count/year per
 country to country_baselines_2026.json. Done once on 2026-08-27, 210
 countries with usable scores (of ~214 in the World Bank file).
 
-USE IN THIS CALCULATOR: the country dropdown (GET /calculator/countries)
+USE IN THIS CALCULATOR: the country dropdown (GET /calculator/v2/countries)
 is generated FROM this file's iso3 list, so a user can only ever submit a
 country we actually have a real baseline for -- no silent "we don't
 recognise this ISO3 but we validated the format anyway" gap. The baseline

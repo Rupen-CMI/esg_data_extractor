@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from api.v1.esg_calculator.data.country_baselines import baseline_for
@@ -73,7 +74,7 @@ class CalculatorInput(BaseModel):
     # function -- see plans/ESG_CALCULATOR_PLAN.md for the field list
     # history. This also means EVERY field on this model is optional --
     # there is no longer any required field at all.
-    country: Optional[str] = Field(
+    country: str | None = Field(
         None, description="ISO3 code, e.g. 'USA', 'DEU', 'IND'. Must be a "
         "country with a real World Bank ESG baseline on file -- see "
         "GET /calculator/countries for the exact allowed list. Sets each "
@@ -82,70 +83,70 @@ class CalculatorInput(BaseModel):
         "electricity emissions still use one global grid factor for every "
         "country regardless (see data/emission_factors.py)."
     )
-    industry: Optional[str] = Field(
+    industry: str | None = Field(
         None, description="Must be one of INDUSTRY_OPTIONS (this module). "
         "Closed list, not free text. Contributes a real, sourced baseline "
         "vote to each pillar's starting point -- see data/industry_baselines.py "
         "(EXIOBASE sector structural intensity, median per matched sub-sectors)."
     )
-    annual_revenue_usd: Optional[float] = Field(
+    annual_revenue_usd: float | None = Field(
         None, gt=0, description="Used to revenue-normalise raw emissions into "
         "a kg-CO2e-per-$1000-revenue reading. Without it, emissions are "
         "computed but not benchmarked."
     )
 
     # ── E: Environmental (3 fields) ─────────────────────────────────────────
-    diesel_litres: Optional[float] = Field(
+    diesel_litres: float | None = Field(
         None, ge=0, description="Diesel consumed, litres. Multiplied by a "
         "DEFRA 2024 factor -- see data/emission_factors.py."
     )
-    petrol_litres: Optional[float] = Field(
+    petrol_litres: float | None = Field(
         None, ge=0, description="Petrol/gasoline consumed, litres. Multiplied "
         "by a DEFRA 2024 factor."
     )
-    electricity_kwh: Optional[float] = Field(
+    electricity_kwh: float | None = Field(
         None, ge=0, description="Purchased electricity, kWh. Multiplied by "
         "the IEA 2024 global average grid factor."
     )
-    renewable_energy_tier: Optional[RenewableTier] = Field(
+    renewable_energy_tier: RenewableTier | None = Field(
         None, description="Coarse self-assessed tier, not a precise percentage "
         "-- there is no honest benchmark to compare a precise % against yet."
     )
 
     # ── S: Social (4 fields) ────────────────────────────────────────────────
-    total_employee_count: Optional[int] = Field(
+    total_employee_count: int | None = Field(
         None, ge=0, description="Denominator for the female-employee ratio."
     )
-    female_employee_count: Optional[int] = Field(
+    female_employee_count: int | None = Field(
         None, ge=0, description="Used with total_employee_count to compute a "
         "female-employee percentage directly -- no external benchmark needed."
     )
-    had_fines_or_litigation_3y: Optional[bool] = Field(
+    had_fines_or_litigation_3y: bool | None = Field(
         None, description="Negative-disclosure signal (scored down if true)."
     )
-    missed_sustainability_target: Optional[bool] = Field(
+    missed_sustainability_target: bool | None = Field(
         None, description="Deliberately a 'safe to admit' negative signal -- "
         "missing a stated target is a smaller admission than misconduct, so "
         "it is more likely to be answered honestly."
     )
 
     # ── G: Governance (3 fields, all boolean) ───────────────────────────────
-    anti_corruption_policy: Optional[bool] = Field(
+    anti_corruption_policy: bool | None = Field(
         None, description="Does a written policy against bribery/corruption exist?"
     )
-    esg_responsibility_assigned: Optional[bool] = Field(
+    esg_responsibility_assigned: bool | None = Field(
         None, description="Does a named person (owner, manager, anyone) have "
         "explicit responsibility for ESG/compliance? The SME-appropriate "
         "substitute for 'board oversight' -- works for a 5-person company."
     )
-    whistleblower_mechanism: Optional[bool] = Field(
+    whistleblower_mechanism: bool | None = Field(
         None, description="Any way to report misconduct that isn't just "
         "'tell your manager' -- e.g. an anonymous inbox."
     )
 
     @field_validator("country")
     @classmethod
-    def _validate_country(cls, v: Optional[str]) -> Optional[str]:
+    def _validate_country(cls, v: str | None) -> str | None:
         if v is None:
             return v
         v = v.strip().upper()
@@ -160,7 +161,7 @@ class CalculatorInput(BaseModel):
 
     @field_validator("industry")
     @classmethod
-    def _validate_industry(cls, v: Optional[str]) -> Optional[str]:
+    def _validate_industry(cls, v: str | None) -> str | None:
         if v is None:
             return v
         v = v.strip()

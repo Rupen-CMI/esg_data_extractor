@@ -87,17 +87,40 @@ def _db_conn():
     return _conn()
 
 
-def _load_distribution(column: str) -> list[float]:
-    if column not in _distribution_cache:
-        conn = _db_conn()
-        try:
-            cur = conn.cursor()
-            cur.execute(f"SELECT {column} FROM upright_lookup WHERE {column} IS NOT NULL")
-            vals = sorted(float(r[0]) for r in cur.fetchall())
-        finally:
-            conn.close()
+_ALL_DIST_COLUMNS = list(E_COLUMNS) + list(S_COLUMNS)
+
+
+def _load_all_distributions() -> None:
+    """Loads every E/S column's distribution in ONE query, populating
+    _distribution_cache for all of them at once.
+
+    Was: one query PER COLUMN (10-16 separate round-trips). Measured live:
+    ~4-6s per single-column query on this DB regardless of row count (the
+    cost is per-query round-trip, not row volume -- confirmed by _db_conn()
+    below closing the shared thread-local connection after every call,
+    forcing a fresh connect on the next one), vs 5.95s for ALL 26 columns
+    combined in a single query. A cold peer_group_pillar_proxy() call over a
+    200-peer group was measured at ~43s for E alone (~90-100s+ for E+S
+    together) before this fix -- see calculator's scoring.py investigation,
+    2026-09-14. _db_conn() is a thread-local, explicitly reusable connection
+    (see peer_anchor_collector.py's own docstring); closing it here defeated
+    that entirely for every caller of this module, not just the one that
+    happened to surface it."""
+    conn = _db_conn()
+    cur = conn.cursor()
+    cur.execute(f"SELECT {', '.join(_ALL_DIST_COLUMNS)} FROM upright_lookup")
+    rows = cur.fetchall()
+    # connection is process-cached (see _db_conn) -- do not close it here,
+    # same discipline _all_company_values() below already follows correctly.
+    for i, column in enumerate(_ALL_DIST_COLUMNS):
+        vals = sorted(float(r[i]) for r in rows if r[i] is not None)
         _distribution_cache[column] = vals
         log.info("loaded upright %s distribution: %d real values", column, len(vals))
+
+
+def _load_distribution(column: str) -> list[float]:
+    if column not in _distribution_cache:
+        _load_all_distributions()
     return _distribution_cache[column]
 
 
@@ -116,12 +139,13 @@ def _all_company_values() -> dict[str, dict[str, float]]:
     if _company_values_cache is None:
         all_cols = list(E_COLUMNS) + list(S_COLUMNS)
         conn = _db_conn()
-        try:
-            cur = conn.cursor()
-            cur.execute(f"SELECT name, {', '.join(all_cols)} FROM upright_lookup")
-            rows = cur.fetchall()
-        finally:
-            conn.close()
+        cur = conn.cursor()
+        cur.execute(f"SELECT name, {', '.join(all_cols)} FROM upright_lookup")
+        rows = cur.fetchall()
+        # connection is process-cached (see _db_conn) -- do not close it here,
+        # same fix as _load_all_distributions() above (this call was closing
+        # the shared thread-local connection too, same bug, smaller blast
+        # radius since this one only runs once).
         cache: dict[str, dict[str, float]] = {}
         for row in rows:
             name = row[0]

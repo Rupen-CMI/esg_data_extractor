@@ -206,6 +206,117 @@ def _confidence_label(n_votes: int, spread: Optional[float]) -> str:
     return "medium"
 
 
+# ── EVIDENCE_ROUTE_PLAN.md sec4.2 width -- evidence + disagreement, not vote count alone ──
+#
+# Today's width (reconcile_pillar below) is derived from vote count/spread
+# ONLY: >=2 votes -> +-2 around [min,max]; 1 vote -> flat +-15. Measured
+# failure modes (plan sec4.2): two estimators splitting 45/70 on twenty solid
+# claims gets a +-25 (wide) band despite rich evidence; two estimators BOTH
+# defaulting to ~50 on zero evidence agree perfectly and get a +-2 (narrow)
+# band -- confident-looking output from nothing. And every thin pillar gets
+# the SAME flat +-15 regardless of which rung answered, so `industry_median`
+# (holdout rho +0.728) looks as precise as `country` (rho -0.061).
+#
+# This function is an ADDITIVE alternative -- reconcile_pillar()'s own
+# low/high computation is UNCHANGED by adding this; a caller opts in
+# explicitly (see agentic_estimation/graph.py's routing work) rather than this
+# silently becoming the default and risking the rich-route regression the
+# plan's sec6.1 verification step explicitly guards against.
+#
+# FIT (2026-09-08, dump_frozen150_upright_peer.json, VERIFIED Upright truth --
+# NOT the bcorp-contaminated heldout250/abl_final2_split_holdout corpora this
+# session initially and incorrectly fit against, caught by user review):
+#   thin route:  BASE_THIN=21.0 -> 79.8% of truth-percentiles inside the
+#                emitted band (target ~80%, LOW_EVIDENCE_LADDER_PLAN.md sec5.5)
+#   rich route:  UNFIT -- the verified corpus has only 3/300 rich pillar-rows,
+#                too few for any BASE_RICH value to be distinguishable (every
+#                value 10-40 showed identical 100% coverage, a sample-size
+#                artifact, not a fit). BASE_RICH=15.0 kept from the earlier
+#                (bcorp-corpus) fit as a REASONABLE DEFAULT, not a verified
+#                one -- the rich-route formula itself never touches
+#                bcorp/upright truth (no climb()/prior involved), so the
+#                fit's dependency on which truth source was used is expected
+#                to be weaker there than on the thin route, but this has not
+#                been independently confirmed against Upright truth on a
+#                richer-evidence population.
+_WIDTH_BASE_RICH = 15.0
+_WIDTH_BASE_THIN = 21.0
+_WIDTH_MIN_HALF = 2.0    # unchanged from today's existing +-2 vote-envelope floor
+_WIDTH_MAX_HALF = 15.0   # unchanged from today's existing flat +-15 ceiling
+
+
+def _width_disagreement_factor(spread: Optional[float]) -> float:
+    """spread=None (only 1 vote -- disagreement isn't even measurable) is
+    treated the SAME as spread=0 (perfect agreement): both mean "nothing
+    here argues for widening on disagreement grounds" in a multiplicative
+    formula, so this factor must not inject a value above the tight end.
+    BUG FOUND IN CALIBRATION (2026-09-07): an earlier version returned 1.0
+    for spread=None on the theory that evidence_factor would compensate --
+    wrong, because 1.0 is not neutral unless every other factor's typical
+    value is also ~1.0, which it is not. That version made a stronger rung
+    come out WIDER than a weaker one (backwards) purely because 1-vote and
+    2-vote companies happened to correlate with different rungs in the test
+    corpus. Fixed and reverified before this constant was adopted here."""
+    if spread is None:
+        return 0.2
+    return max(0.2, min(1.6, 0.2 + spread / 25.0))
+
+
+def _width_evidence_factor(evidence_mass: float, coverage: float) -> float:
+    """More evidence mass + registry coverage -> narrower. mass=0,
+    coverage=0 -> 1.3 (widest); mass>=15 (reconcile.py's own "~four solid
+    claims" trust-mass anchor, see _formula_confidence above), coverage=1.0
+    -> 0.4 (narrowest)."""
+    mass_term = max(0.0, min(1.0, evidence_mass / 15.0))
+    richness = 0.6 * mass_term + 0.4 * max(0.0, min(1.0, coverage))
+    return 1.3 - 0.9 * richness
+
+
+def _width_rung_factor(pillar: str, rung: Optional[str]) -> float:
+    """Stronger holdout rho (evidence_ladder.rung_holdout_rho) -> narrower.
+    rho<=0 or untested (None, e.g. every G rung) -> 1.3 (no better than
+    noise, the honest default). rho>=0.7 (near industry_median's measured
+    ceiling) -> 0.5."""
+    from agentic_estimation.layer_3.evidence_ladder import rung_holdout_rho
+    rho = rung_holdout_rho(pillar, rung) if rung else None
+    rho = max(0.0, rho) if rho is not None else 0.0
+    return 1.3 - 0.8 * min(1.0, rho / 0.7)
+
+
+def evidence_based_half_width(pillar: str, spread: Optional[float], evidence_mass: float,
+                               coverage: float, rung: Optional[str], is_thin: bool) -> float:
+    """half_width = clamp(BASE * disagreement * evidence * rung, MIN, MAX) --
+    EVIDENCE_ROUTE_PLAN.md sec4.2. `rung` only affects the result when
+    `is_thin` is True (a rich pillar's width is not rung-dependent -- rungs
+    only exist on the thin/ladder path). See the FIT note above this
+    function group for what is and is not verified about the two BASE
+    constants."""
+    d = _width_disagreement_factor(spread)
+    e = _width_evidence_factor(evidence_mass, coverage)
+    r = _width_rung_factor(pillar, rung) if is_thin else 1.0
+    base = _WIDTH_BASE_THIN if is_thin else _WIDTH_BASE_RICH
+    return max(_WIDTH_MIN_HALF, min(_WIDTH_MAX_HALF, base * d * e * r))
+
+
+def apply_evidence_based_width(rs: ReconciledScore, pillar: str, evidence_mass: float,
+                                coverage: float, rung: Optional[str], is_thin: bool) -> ReconciledScore:
+    """Override an already-built ReconciledScore's low/high with
+    evidence_based_half_width()'s band, centered on the SAME score --
+    this changes only the reported range, never the point estimate or any
+    other field. Opt-in: nothing calls this by default, so reconcile_pillar/
+    reconcile_all's existing behavior (and the rich-route bit-identical
+    regression guarantee, EVIDENCE_ROUTE_PLAN.md sec6.1) is unaffected
+    unless a caller (the routing work in agentic_estimation/graph.py) explicitly
+    invokes it."""
+    hw = evidence_based_half_width(pillar, rs.spread, evidence_mass, coverage, rung, is_thin)
+    return ReconciledScore(
+        pillar=rs.pillar, score=rs.score,
+        low=max(0.0, rs.score - hw), high=min(100.0, rs.score + hw),
+        spread=rs.spread, votes=rs.votes, weights_used=rs.weights_used,
+        n_votes=rs.n_votes, confidence=rs.confidence,
+    )
+
+
 def reconcile_pillar(pillar: str, formula_score, holistic_score: Optional[float]) -> ReconciledScore:
     """
     formula_score: PillarFormulaScore for this pillar (from formula_estimator.py),

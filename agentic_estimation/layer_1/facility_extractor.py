@@ -55,15 +55,53 @@ def _sec_10k_properties_signal(company: str) -> str:
 
 # ── Web search fallback (non-US-listed / private companies) ──────────────────
 
+_FACILITY_TOPIC_TERMS = (
+    "plant", "plants", "factory", "factories", "facility", "facilities",
+    "manufacturing site", "manufacturing sites", "production site",
+    "production sites", "square feet", "square foot", "square metres",
+    "square meters", "distribution center", "distribution centre",
+    "warehouse", "footprint",
+    # Widened alongside the query itself: a non-manufacturer's real facility
+    # footprint is offices/campuses/data centers, not "plants" -- these must
+    # stay in this topic list too or the widened query's own best results
+    # would fail the very filter meant to protect it.
+    "office", "offices", "campus", "campuses", "data center", "data centre",
+    "data centers", "data centres", "headquarters",
+)
+
+
 def _facility_web_signal(company: str, industry: str = "") -> str:
     """DDG fallback — manufacturing footprint mentions in sustainability
     reports / company sites. Lower reliability than the 10-K path; the
-    resulting claim's confidence should reflect that downstream (Layer 2)."""
+    resulting claim's confidence should reflect that downstream (Layer 2).
+
+    company= and topic_terms= both matter here, not just company=. Confirmed
+    live 2026-09-11: this was the one DDG-based collector in signal_agent.py
+    NOT passing company= to _ddg_fallback, so its results skipped even basic
+    entity filtering -- but entity filtering alone would not have been
+    enough anyway, since a YouTube video description ("A Day in the Life of
+    a Microsoft iOS Software Engineer") and an Outlook sign-in page both
+    genuinely mention "Microsoft" and would pass mentions_company() untouched.
+    topic_terms narrows further to "is this actually about a manufacturing
+    footprint," which neither the entity check nor the generic
+    _ESG_RELEVANCE_TERMS vocabulary (no plant/factory/facility terms) covers."""
     sector_hint = f" {industry}" if industry else ""
     log.info("[%s] facility_web -> searching manufacturing footprint", company)
+    # NOT industry-branched (e.g. "only search 'manufacturing plants' for
+    # manufacturers") -- that would need a separate manufacturing-vs-not
+    # classifier to decide which query to run, which is a new inference step
+    # with its own accuracy/failure surface, for a query string this small.
+    # company_metadata.py already computes a manufacturing_classification,
+    # but even Microsoft's own came back "mixed" at confidence 0.5 -- not
+    # reliable enough to safely branch on. Cheaper fix: keep ONE query, but
+    # widen the wording to cover BOTH shapes real facility evidence takes
+    # (physical plants for manufacturers, offices/campuses/data centers for
+    # everyone else) rather than assuming "manufacturing" fits every company.
     result = _ddg_fallback(
-        f'"{company}"{sector_hint} manufacturing plants factories facilities locations number of',
+        f'"{company}"{sector_hint} manufacturing plants factories facilities offices '
+        f'campuses data centers locations',
         prefix="Facility Footprint", min_len=60, reject_wikipedia=True,
+        company=company, topic_terms=_FACILITY_TOPIC_TERMS,
     )
     log.info("[%s] facility_web -> %s", company, "hit" if result else "no result")
     return result

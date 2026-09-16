@@ -35,7 +35,7 @@ CATEGORY_KEYWORDS/EXACT_MATCHES mapping against a live DB connection,
 see conversation history for the exact script) -- one-time, 2026-08-27,
 11 of 11 categories matched at least one EXIOBASE row.
 
-USE IN THIS CALCULATOR: the industry dropdown (GET /calculator/industries)
+USE IN THIS CALCULATOR: the industry dropdown (GET /calculator/v2/industries)
 already only ever offers these 11 values (schema.INDUSTRY_OPTIONS), so
 every submitted industry is guaranteed to have a baseline here -- no
 silent "valid string, no data" gap, same guarantee country_baselines.py

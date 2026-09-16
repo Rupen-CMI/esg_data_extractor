@@ -2,15 +2,17 @@ import asyncio
 import concurrent.futures
 import logging
 import threading
+from uuid import UUID
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from uuid import UUID
 
-from database import get_db
 from api.v1.models import Company
-from .services import seed_metric_definitions, seed_market_metrics, fetch_market_esg
 from build_esg_json import build_market_esg_json
+from database import get_db
+
+from .services import fetch_market_esg, seed_market_metrics, seed_metric_definitions
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ def health():
 def list_markets(db: Session = Depends(get_db)):
     """List markets for the UI dropdown, with linked company counts."""
     from sqlalchemy import func
+
     from api.v1.models import Market, MarketCompanyLink
 
     rows = (
@@ -182,9 +185,10 @@ def _ensure_estimates(specs: list[tuple[str, str]], market_name: str) -> None:
     _DDG_LIMITER, keeping us within safe rate limits across threads.
     """
     import os
-    from database import Sessionlocal
+
+    from agentic_estimation.graph import run_company_graph
     from agentic_estimation.orchestrator import run_metrics_only
-    from raw_esg_data.graph import run_company_graph
+    from database import Sessionlocal
 
     # Phase 6 cutover: full-pipeline runs go through the new ensemble scorer
     # (Tier-0 validators + v5 formula + v8 reconcile + Confidence Gate) via
@@ -257,7 +261,12 @@ def get_estimation_status(body: MarketRequest, db: Session = Depends(get_db)):
       1. POST /esg/market-esg         — triggers estimation/gap-fill in background
       2. POST /esg/estimation-status  — poll until all_ready is true
     """
-    from api.v1.models import Market, MarketCompanyLink, CompanyMetricValue, ESGMetricDefinition
+    from api.v1.models import (
+        CompanyMetricValue,
+        ESGMetricDefinition,
+        Market,
+        MarketCompanyLink,
+    )
 
     market_name = body.market_name
     market = db.query(Market).filter(Market.name == market_name).first()

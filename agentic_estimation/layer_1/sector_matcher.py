@@ -97,6 +97,39 @@ def _tokenize(text: str) -> list[str]:
     return [_stem(t) for t in raw]
 
 
+# Confirmed live 2026-09-12: "Industrial Manufacturing and Services" -- one
+# of upright_lookup's real 30 industry labels -- tokenizes to [] under
+# _tokenize(): every one of its words ("industrial"/"manufacturing"/"and"/
+# "services") is in _STOPWORDS, correctly, for every OTHER label (see that
+# constant's docstring on why "manufacturing" must be stopworded). A [] token
+# list means a zero TF-IDF vector, which has cosine similarity 0.0 against
+# EVERY possible query forever -- this real upright peer group (a genuine,
+# large industry bucket) is structurally unreachable, not just low-scoring.
+#
+# Tried first: keeping the label's raw, un-stopworded words instead of [].
+# Does NOT work -- a query is tokenized through the SAME _STOPWORDS list, so
+# "Industrial Machinery" strips "industrial" on the query side too, leaving
+# no shared token with the label's raw words either. Stripping is symmetric;
+# giving the label its words back without changing the query side achieves
+# nothing.
+#
+# Actual fix: a small, LABEL-SCOPED alias list of real, non-stopworded words
+# ("machinery", "factory", "industrial equipment"'s content words) that a
+# genuine query for this sector plausibly contains, appended to this one
+# label's tokens only. Every other label's tokenization/matching is
+# unaffected -- this is additive, not a change to the shared stopword list
+# or _tokenize() itself.
+_LABEL_ALIASES = {
+    "Industrial Manufacturing and Services": ["machinery", "factory", "equipment", "engineering"],
+}
+
+
+def _label_tokens(label: str) -> list[str]:
+    """_tokenize(label) plus this label's aliases (if any) -- see
+    _LABEL_ALIASES above for why this exists."""
+    return _tokenize(label) + [_stem(t) for t in _LABEL_ALIASES.get(label, [])]
+
+
 def _tf(tokens: list[str]) -> Counter:
     return Counter(tokens)
 
@@ -149,7 +182,7 @@ def best_sector_match(query_sector: Optional[str], candidate_labels: list[str]) 
     if not query_tokens:
         return None
 
-    label_tokens = [_tokenize(label) for label in candidate_labels]
+    label_tokens = [_label_tokens(label) for label in candidate_labels]
     idf = _idf(label_tokens + [query_tokens])
     query_vec = _tfidf_vector(query_tokens, idf)
 

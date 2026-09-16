@@ -15,9 +15,9 @@ full design rationale.
 
 from fastapi import APIRouter
 
-from api.v1.esg_calculator.schema import CalculatorInput, CalculatorResult
-from api.v1.esg_calculator.scoring import score, INDUSTRY_OPTIONS
 from api.v1.esg_calculator.data.country_baselines import country_options
+from api.v1.esg_calculator.schema import CalculatorInput, CalculatorResult
+from api.v1.esg_calculator.scoring import INDUSTRY_OPTIONS, score
 
 router = APIRouter(prefix="/calculator", tags=["ESG Calculator"])
 

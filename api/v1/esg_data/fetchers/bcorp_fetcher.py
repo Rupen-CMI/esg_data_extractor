@@ -14,6 +14,7 @@ Score mapping:
 """
 
 from difflib import SequenceMatcher
+
 from sqlalchemy.orm import Session
 
 from api.v1.models import BCorpLookup

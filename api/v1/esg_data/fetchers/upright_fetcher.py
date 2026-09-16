@@ -7,6 +7,7 @@ We store the raw value and use it as numeric_value directly.
 """
 
 from difflib import SequenceMatcher
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 

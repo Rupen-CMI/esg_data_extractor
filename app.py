@@ -1,3 +1,5 @@
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -7,8 +9,52 @@ from fastapi.staticfiles import StaticFiles
 from api.v1.key_players.routes import router as key_players_router
 from api.v1.esg_data.routes import router as esg_data_router
 from api.v1.esg_calculator.routes import router as esg_calculator_router
+from api.v1.esg_calculator_v2.routes import router as esg_calculator_v2_router
 
-app = FastAPI(title="ESG Data Extractor")
+log = logging.getLogger("app")
+
+
+# ESG Calculator v2's first /score call was paying ~2.6-2.8s TWICE
+# (country_baseline_agent's DB load + exio_lookup's DB load), each a
+# one-time psycopg2.connect() + SELECT that then caches in-process for
+# every later call. Traced live (2026-09-15): normally invisible after the
+# first request, but felt as "every edit is slow" under `uvicorn --reload`,
+# which respawns the worker (and every in-memory cache with it) on file
+# changes. Running both loads at startup instead moves that unavoidable
+# cost off the user's first real request onto server boot -- same total
+# work, better-timed. Each is best-effort: a prewarm failure must never
+# block the app from starting (the caches still lazy-load correctly on
+# first real use either way).
+def _prewarm_country_baseline_cache() -> None:
+    try:
+        from agentic_estimation.layer_1.country_baseline_agent import get_country_baseline_with_fallback
+        get_country_baseline_with_fallback("USA")  # any real country forces the one-time cache load
+    except Exception:
+        log.warning("country baseline pre-warm failed (non-fatal, lazy-loads on first use)", exc_info=True)
+
+
+def _prewarm_exio_cache() -> None:
+    try:
+        from agentic_estimation.layer_3.exio_lookup import exio_e_vote
+        exio_e_vote("Manufacturing")  # any real sector string forces the one-time cache load
+    except Exception:
+        log.warning("EXIOBASE pre-warm failed (non-fatal, lazy-loads on first use)", exc_info=True)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    import anyio
+    # Both loads are blocking DB calls (psycopg2, not asyncpg) -- run off
+    # the event loop thread so they don't block it, and in parallel with
+    # each other rather than serially (each is ~2.6-2.8s; run together
+    # startup only pays the slower of the two, not the sum).
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(anyio.to_thread.run_sync, _prewarm_country_baseline_cache)
+        tg.start_soon(anyio.to_thread.run_sync, _prewarm_exio_cache)
+    yield
+
+
+app = FastAPI(title="ESG Data Extractor", lifespan=_lifespan)
 
 # CORS -- demo_ui/frontend2.0.html's ESG Calculator tab calls /calculator/*
 # with a live fetch() from wherever that HTML file happens to be opened
@@ -22,6 +68,7 @@ app.add_middleware(
 app.include_router(key_players_router)
 app.include_router(esg_data_router)
 app.include_router(esg_calculator_router)
+app.include_router(esg_calculator_v2_router)
 
 # demo_ui/ -- the tabbed pipeline-walkthrough demo (frontend2.0.html, the
 # CURRENT design -- demo_ui/index.html is an older page, kept for now but

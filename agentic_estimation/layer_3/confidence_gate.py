@@ -45,13 +45,25 @@ class QCVerdict:
 @dataclass
 class GatedOutput:
     pillar: str
-    mode: str              # 'point' | 'range'
+    mode: str              # 'point' | 'range' -- see EVIDENCE_ROUTE_PLAN.md sec4/4.1:
+                            # under the (not-yet-flipped) range-always output contract this
+                            # field becomes a constant and carries no signal; `basis` is its
+                            # replacement. Kept computing exactly as before for now -- flipping
+                            # it to always 'range' is a separate step (re-keys 3 call sites
+                            # that branch on it, most importantly estimate_verifier.py's critic
+                            # skip, which would silently skip every pillar if flipped without
+                            # also re-keying that condition to basis=="prior" first).
     score: float
     low: float
     high: float
     confidence: str        # passthrough from ReconciledScore
     needs_review: bool
     reason: str
+    # New fields (EVIDENCE_ROUTE_PLAN.md sec4) -- additive, always populated,
+    # safe for existing callers that only read the fields above.
+    route: str = "rich"                  # 'rich' | 'thin' -- which path produced this pillar
+    basis: str = "evidence"              # 'evidence' | 'prior' -- what the score actually rests on
+    rung: Optional[str] = None           # ladder rung name, thin route only; None on rich
 
 
 def qc_assess(formula_scores: dict) -> dict[str, QCVerdict]:
@@ -86,9 +98,17 @@ def qc_assess(formula_scores: dict) -> dict[str, QCVerdict]:
     return out
 
 
-def gate(reconciled: dict, qc: dict[str, "QCVerdict"]) -> dict[str, GatedOutput]:
+def gate(reconciled: dict, qc: dict[str, "QCVerdict"],
+         routing: Optional[dict[str, dict]] = None) -> dict[str, GatedOutput]:
     """reconciled: dict[pillar, ReconciledScore] (from reconcile_all()).
     qc: dict[pillar, QCVerdict] (from qc_assess() above).
+    routing: optional dict[pillar, {"route": "rich"|"thin", "rung": str|None}]
+        from the evidence router (EVIDENCE_ROUTE_PLAN.md sec1.3/sec2) --
+        None (default) preserves today's exact output (route='rich',
+        basis='evidence', rung=None on every pillar, matching what every
+        existing caller already gets since GatedOutput's new fields default
+        to those values). Passing routing populates `route`/`basis`/`rung`
+        from the actual router decision instead of the defaults.
 
     Deterministic rule: emit a range (mode='range', needs_review=True) when
     EITHER reconcile's own confidence label is 'low' OR the QC verdict for
@@ -104,6 +124,11 @@ def gate(reconciled: dict, qc: dict[str, "QCVerdict"]) -> dict[str, GatedOutput]
         qc_thin = qc_verdict is not None and qc_verdict.verdict == _QC_VERDICT_THIN
         low_confidence = rs.confidence == "low"
 
+        route_info = (routing or {}).get(pillar, {})
+        route = route_info.get("route", "rich")
+        rung = route_info.get("rung")
+        basis = "prior" if route == "thin" else "evidence"
+
         if low_confidence or qc_thin:
             reasons = []
             if low_confidence:
@@ -113,11 +138,13 @@ def gate(reconciled: dict, qc: dict[str, "QCVerdict"]) -> dict[str, GatedOutput]
             out[pillar] = GatedOutput(
                 pillar=pillar, mode="range", score=rs.score, low=rs.low, high=rs.high,
                 confidence=rs.confidence, needs_review=True, reason="; ".join(reasons),
+                route=route, basis=basis, rung=rung,
             )
         else:
             out[pillar] = GatedOutput(
                 pillar=pillar, mode="point", score=rs.score, low=rs.low, high=rs.high,
                 confidence=rs.confidence, needs_review=False,
                 reason=f"reconcile confidence='{rs.confidence}', QC verdict='ok'",
+                route=route, basis=basis, rung=rung,
             )
     return out

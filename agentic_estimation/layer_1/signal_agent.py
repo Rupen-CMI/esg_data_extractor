@@ -1298,16 +1298,121 @@ def _wikipedia_signal(company: str) -> str:
     return ""
 
 
+# Confirmed live 2026-09-11: this is the exact claim TYPE (net_zero_pledge)
+# that the evidence classifier confidently mis-tagged from facility_web's
+# junk (a YouTube video description, an Outlook sign-in page) -- meaning if
+# THIS collector's own query pulls in a same-entity/off-topic page that
+# happens to reuse a bare year ("2030") or the word "target" in an unrelated
+# sense (a sales target, a launch-date target), it produces exactly the kind
+# of confident-but-wrong evidence already proven to fool downstream scoring.
+_NET_ZERO_TOPIC_TERMS = (
+    "net zero", "net-zero", "carbon neutral", "carbon neutrality",
+    "climate target", "climate targets", "science based target",
+    "science based targets", "sbti", "emissions reduction target",
+    "decarbonization", "decarbonisation", "carbon negative",
+)
+
+
 def _net_zero_signal(company: str) -> str:
     """Net-zero and carbon neutrality commitments via DDG."""
     log.info("[%s] net_zero → searching net-zero commitments via DDG", company)
     result = _ddg_fallback(
         f'"{company}" net zero carbon neutral 2030 2040 2050 pledge climate target',
         prefix="Net Zero Commitment", min_len=60, reject_wikipedia=True,
-        company=company,
+        company=company, topic_terms=_NET_ZERO_TOPIC_TERMS,
     )
     log.info("[%s] net_zero → %s", company, "hit" if result else "no result")
     return result
+
+
+# SBTi (Science Based Targets initiative) bulk dashboard -- structured,
+# dated, exact-scope climate-target data, replacing the old DDG-based SBTi
+# search removed 2026-08-07 (see the "sbti"/"cdp"/"gri" REMOVED comment near
+# the tasks dict below: that removal said "SBTi is now served by a bulk
+# file" but the bulk file was never actually connected until now).
+#
+# Confirmed live 2026-09-12: calibration/source_loaders.py::sbti_companies()
+# fetches the real, current SBTi target-dashboard XLSX (22,760 real rows
+# today) -- far higher quality than a search snippet: exact scope (1/2/3),
+# target percentage, base year, target year, and the organisation's own
+# submitted target language, for every company SBTi has validated.
+#
+# NAME MATCHING: SBTi's own dashboard keys on the FULL LEGAL NAME
+# ("Microsoft Corporation", "Apple, Inc.", "NIKE, Inc."), while this
+# pipeline's `company` argument is usually the bare/common name ("Microsoft",
+# "Apple", "Nike"). calibration/source_loaders.py's own _name_variants()
+# helper doesn't fix this -- it strips SUFFIXES off an already-long name
+# for Wikirate's literal search, but a bare "Apple" has no suffix to strip
+# and never matches "apple, inc." as a result (confirmed live: tried on
+# Apple/Nike/Microsoft, zero hits). What actually works, verified live
+# against the current dashboard: normalise punctuation on both sides and
+# accept a WHOLE-WORD PREFIX match ("apple" matches "apple inc" but not e.g.
+# "applegate farms") -- exact for companies already in legal-name form,
+# prefix for the common case. Checked for collisions on the sampled
+# companies (Apple/Nike/Microsoft/Shell/JPMorgan Chase): none: each
+# either matched exactly one row or zero.
+_sbti_cache: Optional[dict] = None
+_sbti_lock = threading.Lock()
+
+
+def _sbti_norm(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[,.]", "", (s or "").lower())).strip()
+
+
+def _load_sbti() -> dict:
+    global _sbti_cache
+    with _sbti_lock:
+        if _sbti_cache is None:
+            from calibration.source_loaders import sbti_companies
+            try:
+                _sbti_cache = sbti_companies()
+            except Exception as exc:
+                log.warning("SBTi dashboard load failed: %s -- treating as no coverage", exc)
+                _sbti_cache = {}
+        return _sbti_cache
+
+
+def _sbti_signal(company: str) -> str:
+    """SBTi validated climate target, if this company has submitted one.
+
+    Returns "" (not an error) when the company has no SBTi target -- true for
+    most companies, including large ones (Shell, JPMorgan Chase: verified
+    live neither is in the current dashboard) -- absence here is a real,
+    meaningful ESG signal in itself, not a fetch failure.
+    """
+    data = _load_sbti()
+    if not data:
+        return ""
+    key = _sbti_norm(company)
+    if not key:
+        return ""
+    row = data.get(key)
+    if row is None:
+        for k, v in data.items():
+            if ":" in k:            # skip the isin:/lei: alias keys
+                continue
+            nk = _sbti_norm(k)
+            if nk == key or nk.startswith(key + " "):
+                row = v
+                break
+    if row is None:
+        log.info("[%s] sbti → no SBTi target found", company)
+        return ""
+    parts = [f"SBTi validated target ({row.get('target', 'target')}, "
+             f"{row.get('company_temperature_alignment', 'n/a')} aligned)."]
+    lang = row.get("full_target_language")
+    if lang:
+        parts.append(str(lang).strip())
+    scope = row.get("scope")
+    if scope:
+        parts.append(f"Scope: {scope}.")
+    target_year = row.get("target_year")
+    base_year = row.get("base_year")
+    if target_year and target_year != "NA":
+        parts.append(f"Target year: {target_year}"
+                      + (f" (base year {base_year})." if base_year and base_year != "NA" else "."))
+    log.info("[%s] sbti → hit (%s)", company, row.get("company_name"))
+    return " ".join(parts)
 
 
 # ── DuckDuckGo fallback (used internally by several sources) ─────────────────
@@ -1334,6 +1439,7 @@ def _render_ddg_results(
     reject_wikipedia: bool = False,
     company: str = "",
     require_entity: bool = True,
+    topic_terms: Optional[tuple] = None,
 ) -> str:
     """Filter + format raw DDG results into evidence text.
 
@@ -1409,6 +1515,22 @@ def _render_ddg_results(
                      prefix, company)
             return ""
 
+    # Topical gate, separate from the entity gate above: a result can
+    # genuinely be about the right company and still be off-topic for what
+    # this specific query was trying to find (see topic_terms docstring).
+    if topic_terms:
+        from agentic_estimation.layer_1.evidence_filters import _compiled_patterns
+        patterns = _compiled_patterns(topic_terms)
+        before = len(results)
+        results = [r for r in results
+                   if any(p.search(r.get("body") or "") for p in patterns)]
+        if before != len(results):
+            log.info("DDG [%s] → dropped %d/%d result(s) with no topic-keyword match",
+                      prefix, before - len(results), before)
+        if not results:
+            log.info("DDG [%s] → all results filtered out (on-entity but off-topic)", prefix)
+            return ""
+
     # Each result carries its own source URL, appended inline after its
     # snippet so a reviewer can open the exact page a claim came from.
     # Previously only r["body"] was kept and r["href"] was discarded,
@@ -1443,6 +1565,7 @@ def _ddg_fallback(
     reject_wikipedia: bool = False,
     company: str = "",
     require_entity: bool = True,
+    topic_terms: Optional[tuple] = None,
 ) -> str:
     """
     DuckDuckGo search serialized through _DDG_LIMITER.
@@ -1463,6 +1586,19 @@ def _ddg_fallback(
                     rather than a named company (e.g. country-level governance
                     regime lookups), where demanding the company name would
                     reject every legitimate result.
+
+    topic_terms: optional keyword tuple: each result must contain at least one
+                 of these terms (in addition to passing the entity/leakage
+                 gates above) to be kept. mentions_company() only proves a
+                 result is ABOUT the right company, not that it is about the
+                 right SUBJECT -- confirmed live 2026-09-11 (Microsoft's
+                 facility_web signal): a YouTube video description ("A Day in
+                 the Life of a Microsoft iOS Software Engineer") and an
+                 Outlook sign-in page both genuinely mention "Microsoft" and
+                 passed entity filtering untouched, then fooled the evidence
+                 classifier into a confident but false net_zero_pledge tag.
+                 None (default) skips this gate -- every existing caller is
+                 unaffected unless it opts in.
     """
     import json as _json
 
@@ -1487,7 +1623,7 @@ def _ddg_fallback(
             return _render_ddg_results(
                 results, query=query, prefix=prefix, min_len=min_len,
                 reject_wikipedia=reject_wikipedia, company=company,
-                require_entity=require_entity)
+                require_entity=require_entity, topic_terms=topic_terms)
         except RateLimitTripped:
             # _render_ddg_results can reach _note_rate_limit via entity
             # verification, which fetches. The broad handler below exists for
@@ -1536,7 +1672,7 @@ def _ddg_fallback(
             return _render_ddg_results(
                 results, query=query, prefix=prefix, min_len=min_len,
                 reject_wikipedia=reject_wikipedia, company=company,
-                require_entity=require_entity)
+                require_entity=require_entity, topic_terms=topic_terms)
         except ddg_exc.RatelimitException:
             # Feed the SHARED tripwire. DDG raises its own exception type
             # rather than surfacing an HTTP status, so these throttles were
@@ -1554,6 +1690,26 @@ def _ddg_fallback(
             log.warning("DDG error on query [%s]: %s", prefix, e)
             break
     return ""
+
+
+# Topic terms for the two inline DDG lambdas below (sustainability_report,
+# controversies). sustainability_report's own gap is already documented in
+# this file (see the Strandberg Guitars comment near multi_tasks below) --
+# entity filtering alone let a guitar-forum thread through because it
+# genuinely mentioned the company, with nothing checking it was actually a
+# disclosure document. controversies' query wording is fairly specific
+# already (violation/scandal/fine are not generic words), but has the same
+# structural gap as every other collector fixed in this pass.
+_SUSTAINABILITY_REPORT_TOPIC_TERMS = (
+    "sustainability report", "esg report", "annual report",
+    "corporate responsibility report", "csr report", "integrated report",
+    "disclosure", "gri", "sasb", "tcfd", "scope 1", "scope 2", "scope 3",
+)
+_CONTROVERSIES_TOPIC_TERMS = (
+    "violation", "controversy", "scandal", "fine", "fined", "penalty",
+    "lawsuit", "investigation", "allegation", "allegations", "breach",
+    "spill", "recall", "boycott",
+)
 
 
 # ── Main entry point ─────────────────────────────────────────────────────────
@@ -1635,13 +1791,14 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         "sustainability_report": lambda: _ddg_fallback(
             f'"{company}"{sector_hint} sustainability report 2024 2025 ESG annual disclosure',
             prefix="Sustainability Report", min_len=80, reject_wikipedia=True,
-            company=company,
+            company=company, topic_terms=_SUSTAINABILITY_REPORT_TOPIC_TERMS,
         ),
         "net_zero":         lambda: _net_zero_signal(company),
+        "sbti":             lambda: _sbti_signal(company),
         "controversies":    lambda: _ddg_fallback(
             f'"{company}"{sector_hint} environmental violation labor controversy scandal fine 2023 2024 2025 -site:wikipedia.org',
             prefix="ESG Controversies", min_len=60, reject_wikipedia=True,
-            company=company,
+            company=company, topic_terms=_CONTROVERSIES_TOPIC_TERMS,
         ),
     }
 
@@ -1661,6 +1818,7 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
     from agentic_estimation.layer_1.enforcement_collector import fetch_enforcement_signals
     from agentic_estimation.layer_1.sec_fulltext_collector import fetch_sec_fulltext_signals
     from agentic_estimation.layer_1.report_collector import fetch_report_signals
+    from agentic_estimation.layer_1.esg_press_collector import fetch_esg_press_signals
 
     # report_collector: REAL sustainability-report PDFs (SRN index, on-demand
     # download + OpenDataLoader/pdfplumber parse), not the "sustainability_report"
@@ -1678,6 +1836,20 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         "enforcement": lambda: fetch_enforcement_signals(company),
         "sec_fulltext": lambda: fetch_sec_fulltext_signals(company),
         "report_pdf": lambda: fetch_report_signals(company, country=country),
+        # esg_press_collector: full-article-body ESG trade-press coverage
+        # (trellis.net, corporateknights.com, esgtoday.com, mongabay.com).
+        # Confirmed live 2026-09-12: built, validated (measured yield/traps
+        # documented in its own module docstring), same fetch_*_signals(company)
+        # -> {tag: text} shape as every sibling here -- but until now was ONLY
+        # ever called from calibration/fetch_audit.py, never the live graph.
+        # Same unwired-asset pattern as report_collector.py before its fix
+        # earlier this session. Corpus-wide feeds are fetched once per
+        # process and cached (esg_press_collector._feed_cache, thread-safe),
+        # so adding it here costs one extra dict lookup per company, not one
+        # extra network fetch -- safe to run on every company even though the
+        # module's own docstring is candid that most will get {} (low yield
+        # by design, not a bug).
+        "esg_press": lambda: fetch_esg_press_signals(company),
     }
 
     signals: dict[str, str] = {}

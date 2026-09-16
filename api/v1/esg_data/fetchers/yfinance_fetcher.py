@@ -7,8 +7,9 @@ whatever comes back. The main value here is confirming whether a
 company is publicly traded (has_public_esg flag) and finding its ticker.
 """
 
-import yfinance as yf
 from difflib import SequenceMatcher
+
+import yfinance as yf
 
 YFINANCE_TO_CATALOG: dict[str, str] = {
     "environmentScore":    "sustainalytics_environment_score",

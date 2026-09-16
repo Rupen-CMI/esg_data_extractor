@@ -3,10 +3,10 @@ Persists fetcher results into company_metric_values.
 Looks up esg_metric_definitions.id by key, then upserts rows.
 """
 
-from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 
-from api.v1.models import CompanyMetricValue, ESGMetricDefinition, Company
+from api.v1.models import Company, CompanyMetricValue, ESGMetricDefinition
 
 
 def _build_metric_key_map(db: Session) -> dict[str, object]:

@@ -36,11 +36,18 @@ THREE SCORING MECHANISMS, MATCHED TO WHAT EACH FIELD ACTUALLY IS
   3. TIER / BOOLEAN -- checklist facts. renewable_energy_tier is a coarse
      3-option tier rather than a precise percentage, because we have no
      honest benchmark to compare a precise % against -- a fake-precise
-     ratio undermines trust more than an honest coarse tier. The 5 boolean
-     fields (2 negative, 3 governance) each carry a fixed point weight WE
-     CHOOSE OURSELVES -- there is no external authority publishing "a
-     whistleblower policy is worth N points". This must stay visible, not
-     be dressed up as sourced.
+     ratio undermines trust more than an honest coarse tier. Its point
+     CEILING is no longer an arbitrary flat 15 -- see _score_e: it scales
+     with the submitted industry's own EXIOBASE emissions-intensity
+     headroom (100 - industry e_score), the same validated co2e_pct
+     signal (rho +0.615) the industry baseline vote already uses. The
+     none/some/mostly FRACTION split (0/0.5/1.0) is still unsourced --
+     no authority publishes what fraction of "fully renewable" a coarse
+     "some" represents -- only the ceiling it's multiplied by changed.
+     The 5 boolean fields (2 negative, 3 governance) each carry a fixed
+     point weight WE CHOOSE OURSELVES -- there is no external authority
+     publishing "a whistleblower policy is worth N points". This must
+     stay visible, not be dressed up as sourced.
 
   4. BASELINE VOTES (country + industry) -- real, sourced starting points
      for all three pillars, set BEFORE any company-specific field is
@@ -76,17 +83,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from api.v1.esg_calculator.data.emission_factors import (
-    FUEL_KG_CO2E_PER_LITRE, grid_factor_for_country,
-    DEFRA_SOURCE_URL, IEA_SOURCE_URL,
-)
 from api.v1.esg_calculator.data.country_baselines import baseline_for
+from api.v1.esg_calculator.data.emission_factors import (
+    DEFRA_SOURCE_URL,
+    FUEL_KG_CO2E_PER_LITRE,
+    IEA_SOURCE_URL,
+    grid_factor_for_country,
+)
 from api.v1.esg_calculator.data.industry_baselines import industry_baseline_for
 from api.v1.esg_calculator.schema import (
-    CalculatorInput, PillarResult, CalculatorResult, RenewableTier,
     INDUSTRY_OPTIONS,  # re-exported here for routes.py -- canonical
     # definition lives in schema.py so its own field_validator can use it
     # without a circular import (schema.py cannot import scoring.py).
+    CalculatorInput,
+    CalculatorResult,
+    PillarResult,
+    RenewableTier,
 )
 
 _WORLD_BANK_SOURCE_NOTE = (
@@ -108,7 +120,7 @@ _EXIOBASE_SOURCE_NOTE = (
 # the score the normal way, same weights as before -- this only changes
 # what the score defaults to before any company-specific field is
 # supplied, and narrows the default range accordingly (see to_result()).
-def _add_baseline_votes(acc: "_PillarAccumulator", inp: CalculatorInput, pillar_key: str, pillar_label: str):
+def _add_baseline_votes(acc: _PillarAccumulator, inp: CalculatorInput, pillar_key: str, pillar_label: str):
     parts: list[float] = []
 
     bl = baseline_for(inp.country)
@@ -152,14 +164,32 @@ def _add_baseline_votes(acc: "_PillarAccumulator", inp: CalculatorInput, pillar_
 # never presented as a peer comparison. See plan doc open decision #3.
 _CRUDE_EMISSIONS_BENCHMARK_KG_PER_1000USD = 50.0
 
-# Renewable tier point weights, as a fraction of the field's max weight.
-# NOT sourced -- there is no external authority for "mostly renewable is
-# worth X points". See plan doc open decision #1.
+# Renewable tier fractions -- still an unsourced 3-point split (no
+# authority publishes "mostly renewable = X% of the way from none to
+# fully renewable"), but the POINTS these fractions are multiplied by
+# are no longer an arbitrary flat 15. Instead they scale the real,
+# sourced EXIOBASE industry E-baseline's headroom: exio_lookup.exio_e_vote
+# is validated (rho +0.615) on co2e_pct, and industry_baseline_for()'s
+# e_score IS that same inverted co2e_pct, precomputed offline (see
+# data/industry_baselines.py). A heavy-emissions industry (Energy &
+# Utilities e_score=36.7) has far more headroom for "we went renewable"
+# to be a real deviation from peers than an already-clean one (Financial
+# Services e_score=89.8) -- same logic MSCI uses to scale management
+# credit by exposure, and Sustainalytics uses to scale a management
+# action's risk reduction by issue beta. See plan doc open decision #1
+# (superseded by this) and esg-rating-methodologies skill ch02.
 _RENEWABLE_TIER_FRACTION: dict[RenewableTier, float] = {
     RenewableTier.NONE: 0.0,
     RenewableTier.SOME: 0.5,
     RenewableTier.MOSTLY: 1.0,
 }
+# Ceiling on the renewable-tier swing, and the fallback weight used only
+# when no industry is on file (11/11 calculator industries always match
+# one, per data/industry_baselines.py -- this path is theoretical, kept
+# so the field still does SOMETHING for a future industry list change).
+# NOT sourced -- same admission as before, now scoped to the fallback only.
+_RENEWABLE_MAX_POINTS = 15.0
+_RENEWABLE_UNSOURCED_FALLBACK_POINTS = 15.0
 
 
 @dataclass
@@ -285,14 +315,34 @@ def _score_e(inp: CalculatorInput) -> PillarResult:
     elif any_fuel or inp.electricity_kwh is not None:
         acc.basis.append("Revenue not supplied -- raw emissions computed but not benchmarked.")
 
-    # -- Mechanism 3: renewable tier (coarse, not a precise %) --
+    # -- Mechanism 3: renewable tier, scaled by the industry's real
+    # EXIOBASE emissions-intensity headroom (see _RENEWABLE_TIER_FRACTION) --
+    ib = industry_baseline_for(inp.industry)
+    industry_e = ib["e_score"] if ib and ib.get("e_score") is not None else None
+    if industry_e is not None:
+        # headroom = how far this industry's OWN sourced baseline sits
+        # below a perfect 100 -- a heavy-emissions industry has more of
+        # its E-score gap plausibly explained by "went renewable or not"
+        # than an already-clean one. Floor at 15% of the ceiling so a
+        # near-100 industry (e.g. Financial Services) doesn't reduce the
+        # field to a no-op.
+        headroom_frac = max(0.15, (100.0 - industry_e) / 100.0)
+        renewable_max = _RENEWABLE_MAX_POINTS * headroom_frac
+        source_note = (f"scaled by {inp.industry}'s own EXIOBASE emissions-intensity "
+                        f"headroom ({industry_e:.1f}/100 baseline -> {headroom_frac * 100:.0f}% "
+                        f"of the {_RENEWABLE_MAX_POINTS:.0f}-pt ceiling, same source as the "
+                        f"industry baseline vote above)")
+    else:
+        renewable_max = _RENEWABLE_UNSOURCED_FALLBACK_POINTS
+        source_note = "no industry on file to scale against -- flat, unsourced weight"
+
     if inp.renewable_energy_tier is not None:
         frac = _RENEWABLE_TIER_FRACTION[inp.renewable_energy_tier]
-        acc.add(True, 15.0, frac * 15.0,
+        acc.add(True, renewable_max, frac * renewable_max,
                 f"Renewable energy: '{inp.renewable_energy_tier.value}' "
-                f"(self-reported tier, not independently verified)")
+                f"(self-reported tier, not independently verified; {source_note})")
     else:
-        acc.add(False, 15.0)
+        acc.add(False, renewable_max)
 
     return acc.to_result()
 

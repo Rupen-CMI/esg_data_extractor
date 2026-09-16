@@ -1,10 +1,21 @@
 from datetime import datetime
-from uuid import UUID
 from typing import List, Optional
-from sqlalchemy import String, Boolean, Float, ForeignKey, DateTime, Text, Integer, UniqueConstraint, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from database import Base
+from uuid import UUID
 
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from database import Base
 
 
 class MarketCompanyLink(Base):
@@ -41,18 +52,18 @@ class Market(Base):
         server_default=text("gen_random_uuid()")
     )
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    sector_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    sasb_sector: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    sector_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sasb_sector: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(50), default="pending", index=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()"))
 
-    companies: Mapped[List["Company"]] = relationship(
+    companies: Mapped[list["Company"]] = relationship(
         secondary="market_company_link",
         back_populates="markets"
     )
-    metrics: Mapped[List["ESGMetricDefinition"]] = relationship(
+    metrics: Mapped[list["ESGMetricDefinition"]] = relationship(
         secondary="market_metric_link",
         back_populates="markets"
     )
@@ -66,26 +77,26 @@ class Company(Base):
         server_default=text("gen_random_uuid()")
     )
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    country: Mapped[Optional[str]] = mapped_column(String(70), nullable=True)
-    ticker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(70), nullable=True)
+    ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
     has_public_esg: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    esg_scoring: Mapped[Optional[str]] = mapped_column(String(20), default="pending", nullable=True, index=True)
+    esg_scoring: Mapped[str | None] = mapped_column(String(20), default="pending", nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
-    markets: Mapped[List[Market]] = relationship(
+    markets: Mapped[list[Market]] = relationship(
         secondary="market_company_link",
         back_populates="companies"
     )
-    metric_values: Mapped[List["CompanyMetricValue"]] = relationship(
+    metric_values: Mapped[list["CompanyMetricValue"]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan"
     )
-    esg_signals: Mapped[List["CompanyESGSignals"]] = relationship(
+    esg_signals: Mapped[list["CompanyESGSignals"]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan"
     )
-    evidence_claims: Mapped[List["CompanyEvidenceClaim"]] = relationship(
+    evidence_claims: Mapped[list["CompanyEvidenceClaim"]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan"
     )
@@ -100,18 +111,18 @@ class ESGMetricDefinition(Base):
     )
     key: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
     category: Mapped[str] = mapped_column(String(1), nullable=False)       # E, S, or G
-    sasb_sector: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # null = universal
-    source_framework: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    sasb_sector: Mapped[str | None] = mapped_column(String(50), nullable=True)  # null = universal
+    source_framework: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_universal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    markets: Mapped[List[Market]] = relationship(
+    markets: Mapped[list[Market]] = relationship(
         secondary="market_metric_link",
         back_populates="metrics"
     )
-    company_values: Mapped[List["CompanyMetricValue"]] = relationship(
+    company_values: Mapped[list["CompanyMetricValue"]] = relationship(
         back_populates="metric",
         cascade="all, delete-orphan"
     )
@@ -134,20 +145,20 @@ class CompanyMetricValue(Base):
         nullable=False,
         index=True
     )
-    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    numeric_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    reporting_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # 0.0 – 1.0
-    reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)       # explainability text (ESG pillar scores only)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    numeric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reporting_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)   # 0.0 – 1.0
+    reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)       # explainability text (ESG pillar scores only)
     # Ensemble scorer uncertainty output (agentic_ensemble_v1 source only;
     # NULL for every other source -- see db_migrations/005_ensemble_cutover.sql
     # and agentic_estimation/layer_3/confidence_gate.py).
-    low_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    high_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    confidence_label: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # 'high'|'medium'|'low'
-    verdict: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)   # 'skipped'|'passed'|'passed_after_retry'|'refuted'
-    needs_review: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    low_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    high_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence_label: Mapped[str | None] = mapped_column(String(10), nullable=True)  # 'high'|'medium'|'low'
+    verdict: Mapped[str | None] = mapped_column(String(30), nullable=True)   # 'skipped'|'passed'|'passed_after_retry'|'refuted'
+    needs_review: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("company_id", "metric_id", "reporting_year", "source",
@@ -207,13 +218,13 @@ class CompanyEvidenceClaim(Base):
     polarity: Mapped[int] = mapped_column(Integer, nullable=False)           # -1, 0, +1
     strength: Mapped[float] = mapped_column(Float, nullable=False)           # 0-1
     confidence: Mapped[float] = mapped_column(Float, nullable=False)         # 0-1
-    value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    source_signal_id: Mapped[Optional[UUID]] = mapped_column(
+    source_signal_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("company_esg_signals.id", ondelete="SET NULL"), nullable=True
     )
-    source_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     produced_by: Mapped[str] = mapped_column(String(60), nullable=False)
     method: Mapped[str] = mapped_column(String(30), nullable=False, default="extracted")
@@ -247,24 +258,24 @@ class BCorpLookup(Base):
 
     company_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     company_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
-    state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    industry: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    industry_category: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    sasb_sector: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
-    size: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    website: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    ownership: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    current_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    assessment_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    overall_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    impact_area_environment: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    impact_area_governance: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    impact_area_workers: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    impact_area_community: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    impact_area_customers: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    industry_category: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sasb_sector: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    size: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ownership: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    current_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    assessment_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    impact_area_environment: Mapped[float | None] = mapped_column(Float, nullable=True)
+    impact_area_governance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    impact_area_workers: Mapped[float | None] = mapped_column(Float, nullable=True)
+    impact_area_community: Mapped[float | None] = mapped_column(Float, nullable=True)
+    impact_area_customers: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
@@ -293,20 +304,20 @@ class ClimateTraceOwnerEmissions(Base):
         ForeignKey("climate_trace_owners.owner_id", ondelete="CASCADE"), nullable=False, index=True
     )
     source_id: Mapped[int] = mapped_column(nullable=False)
-    source_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    country_iso3: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
-    sector: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
-    subsector: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    country_iso3: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    subsector: Mapped[str | None] = mapped_column(String(60), nullable=True)
     # TEXT, not String(60): some subsectors (e.g. pulp/paper) return long
     # descriptive asset_type strings, not short codes -- found live during
     # the full owner-emissions harvest and crashed a VARCHAR(60) column.
-    asset_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    asset_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     gas: Mapped[str] = mapped_column(String(20), nullable=False, default="co2e_100yr")
-    emissions_quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    activity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    activity_units: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    capacity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    capacity_units: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    emissions_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    activity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    activity_units: Mapped[str | None] = mapped_column(Text, nullable=True)
+    capacity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    capacity_units: Mapped[str | None] = mapped_column(Text, nullable=True)
     year: Mapped[int] = mapped_column(nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
@@ -332,11 +343,11 @@ class ClimateTraceCountryEmissions(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     country_iso3: Mapped[str] = mapped_column(String(3), nullable=False)
-    sector: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
-    subsector: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    subsector: Mapped[str | None] = mapped_column(String(60), nullable=True)
     gas: Mapped[str] = mapped_column(String(20), nullable=False, default="co2e_100yr")
     emissions_quantity: Mapped[float] = mapped_column(Float, nullable=False)
-    percentage_of_total: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    percentage_of_total: Mapped[float | None] = mapped_column(Float, nullable=True)
     year: Mapped[int] = mapped_column(nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 

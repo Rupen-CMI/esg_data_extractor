@@ -140,8 +140,24 @@ Respond with ONLY this JSON object (no markdown fences), after your reasoning:
 
 
 def _factor_list_block(pillar: str) -> str:
+    """Closed factor list injected into the LLM prompt.
+
+    weight == 0 factors (badge factors: net_zero_pledge, sbti_commitment,
+    cdp_disclosure, anti_corruption_policy, whistleblower_mechanism,
+    esg_report_published, third_party_esg_audit, compliance_certification --
+    see factor_registry.py's BADGE-FACTOR ZEROING note) are excluded here.
+    They stay in the registry itself (still a valid target for a dataset-
+    lookup claim, still auditable) -- this only stops the LLM from spending
+    prompt space and relevance-checking effort finding evidence for factors
+    that are mathematically guaranteed to contribute zero swing to the
+    score regardless of what's extracted. Confirmed live 2026-09-12: every
+    one of these factors was still being actively searched for and
+    extracted with no effect on any score.
+    """
     lines = []
     for f in factors_for_pillar(pillar):
+        if f.weight == 0:
+            continue
         lines.append(f"  - {f.key} ({f.description}) [{f.delta_shape}]")
     return "\n".join(lines)
 

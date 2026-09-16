@@ -1,4 +1,10 @@
-import os, asyncio, random, json, logging, time, re
+import asyncio
+import json
+import logging
+import os
+import random
+import re
+import time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -6,14 +12,16 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 log = logging.getLogger("pipeline")
-from sqlalchemy.orm import Session
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import select
-from ..models import Market, Company, MarketCompanyLink
-from dotenv import load_dotenv
 from ddgs import DDGS
-from zen_client import call_with_prompt, DEFAULT_MODEL
+from dotenv import load_dotenv
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session
+
+from zen_client import DEFAULT_MODEL, call_with_prompt
+
+from ..models import Company, Market, MarketCompanyLink
 
 load_dotenv()
 
@@ -269,8 +277,7 @@ def extract_key_players(market: str, context: str) -> list | None:
         raw = raw[7:]
     elif raw.startswith("```"):
         raw = raw[3:]
-    if raw.endswith("```"):
-        raw = raw[:-3]
+    raw = raw.removesuffix("```")
     raw = raw.strip()
 
     # Try direct parse first

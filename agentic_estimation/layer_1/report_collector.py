@@ -155,6 +155,31 @@ def _fetch_via_search(company: str, country: Optional[str] = None) -> Optional[s
         return None
     return path
 
+def _fetch_pillar_via_search(company: str, pillar: str,
+                              country: Optional[str] = None) -> Optional[str]:
+    """Like _fetch_via_search, but for a pillar-specific follow-up document
+    (see fetch_report_signals()'s MISSING-PILLAR FALLBACK). Downloaded to the
+    SAME directory _fetch_via_search uses -- find_reports()/build_index()
+    would otherwise never see it -- but this is a one-off lookup, not
+    persisted into the index under the company's normal key, since it is
+    consumed immediately by the caller and re-searching next run is cheap
+    and always fresh (a stale second-pillar document silently going stale
+    forever is worse than paying for a fresh search each time it's needed).
+    """
+    try:
+        from calibration.discover_reports import from_search
+        from calibration.report_coverage import _PDF_DIR
+    except Exception as exc:
+        log.info("pillar-search-fallback import failed for %s/%s: %s", company, pillar, exc)
+        return None
+    try:
+        return from_search(company, _PDF_DIR, country=country, pillar=pillar)
+    except Exception as exc:
+        log.info("pillar-search-fallback failed for %s/%s: %s: %s",
+                  company, pillar, type(exc).__name__, exc)
+        return None
+
+
 _PILLAR_TERMS = {
     "E": ("emission", "scope 1", "scope 2", "scope 3", "ghg", "carbon",
           "energy", "renewable", "water", "waste", "recycl", "biodiversity",
@@ -169,6 +194,110 @@ _PILLAR_TERMS = {
           "anti-corruption", "anti-bribery", "whistleblow", "compliance",
           "risk management", "tax", "data privacy", "code of conduct"),
 }
+
+# Phrases that mark a block as FINANCIAL-STATEMENT text rather than a real
+# ESG disclosure, even when it scores densely on a pillar's own keywords.
+# Confirmed live 2026-09-10: a 10-K's tax/compensation notes clear G's
+# density bar and its own cross-pillar dominance check cleanly (Apple:
+# density 10.26, E/S near zero) purely because "tax", "compliance" and
+# "shareholder" are legitimate G-adjacent words that ALSO appear constantly
+# in ordinary financial statements -- there is no density threshold that
+# separates the two, because the underlying vocabulary genuinely overlaps.
+# This is a SHAPE check, not a vocabulary check: real financial statements
+# are dense with these specific phrases in a way no genuine ESG narrative
+# (even a governance-heavy one) is.
+_FINANCIAL_STATEMENT_MARKERS = (
+    "income tax", "effective tax rate", "provision for income",
+    "stock option", "class b common stock", "repurchase of",
+    "share repurchase program", "repurchased", "non-gaap", "restructuring",
+    "income before income tax", "federal income tax rate",
+    "statutory tax rate", "deferred tax", "tax holiday", "transition tax",
+    "tax cuts and jobs act", "net income per share",
+    "diluted earnings per share", "weighted average shares",
+    "goodwill impairment", "% change fiscal", "fiscal 20",
+    "dollars in millions",
+)
+
+
+def _financial_hits(text: str) -> int:
+    """Count of financial-statement marker phrases in `text`. Used to demote
+    a pillar selection that is dense with G/S-adjacent words but is actually
+    an accounting note, not a real disclosure -- see _FINANCIAL_STATEMENT_MARKERS."""
+    low = text.lower()
+    return sum(low.count(m) for m in _FINANCIAL_STATEMENT_MARKERS)
+
+
+# Coverage verdict thresholds. Deliberately HIGHER than _MIN_PILLAR_DENSITY
+# (1.2, which only rejects near-zero content) -- this asks a stricter
+# question: is the document GENUINELY GOOD on this pillar, not just
+# non-empty? Set from the measured density of confirmed-real selections
+# (JPMorgan/Siemens/Samsung, all three pillars: 8.0-18.5) vs. confirmed-thin
+# ones (Nike's own E on its 10-K: 3.08) -- see verification notes 2026-09-10.
+_COVERAGE_STRONG_DENSITY = 5.0
+# 2+ financial-statement markers inside an already-selected, budget-limited
+# (3500-char) FINAL selection is a real signal, not noise -- a genuine ESG
+# narrative essentially never uses phrases like "effective tax rate" or
+# "diluted earnings per share" even once, let alone twice.
+_COVERAGE_FINANCIAL_VETO = 2
+# Lower bar for a single ~1200-char BLOCK (see _is_financial_statement):
+# confirmed live 2026-09-10 (Nike 10-K) that individual blocks like "In June
+# 2022, the Board of Directors approved a four-year, $18 billion share
+# repurchase program..." carry exactly ONE marker phrase each, never two,
+# simply because the block is too short to repeat itself -- requiring 2 at
+# block level let every one of these slip through scoring untouched. One
+# clear marker phrase in a single page-sized block is already conclusive.
+_BLOCK_FINANCIAL_VETO = 1
+
+
+def rate_pdf_coverage(text: str) -> dict[str, dict]:
+    """Score one already-downloaded, already-parsed document against all
+    three pillars' keyword sets and rate how well it covers each.
+
+    Returns {"E": {...}, "S": {...}, "G": {...}}, each with:
+      density        -- pillar-term hits per 1000 chars of that pillar's
+                         best-scoring selection from THIS document (same
+                         _select/_pillar_density used everywhere else in
+                         this module, so this rating means the same thing
+                         as every other density number already logged).
+      financial_hits -- count of financial-statement marker phrases found
+                         in that same selection.
+      verdict        -- "strong"  : dense AND not financial-statement-shaped
+                                     -- this document alone can supply real
+                                     evidence for this pillar.
+                        "weak"    : some relevant content, but either too
+                                    thin (below _MIN_PILLAR_DENSITY) or
+                                    dense only because it is financial-
+                                    statement text wearing this pillar's
+                                    vocabulary -- worth trying to replace.
+                        "none"    : no selectable content for this pillar
+                                    at all.
+
+    This is the "does one PDF cover all three pillars, or only one?" check:
+    call this once per freshly downloaded candidate, before committing to
+    it as the company's sole source. A document that rates "strong" on all
+    three needs no further searching. One that rates "weak"/"none" on one
+    or two pillars should trigger a pillar-specific re-search for exactly
+    those pillars (see fetch_report_signals's COVERAGE-DRIVEN RE-SEARCH) --
+    if that re-search also fails to find anything better, the pillar is
+    left as-is (or empty): genuinely irredeemable for this company.
+    """
+    out: dict[str, dict] = {}
+    for pillar in ("E", "S", "G"):
+        sel = _select(text, pillar)
+        if not sel or len(sel) <= 200:
+            out[pillar] = {"density": 0.0, "financial_hits": 0, "verdict": "none"}
+            continue
+        density = _pillar_density(sel, pillar)
+        fin_hits = _financial_hits(sel)
+        if density < _MIN_PILLAR_DENSITY:
+            verdict = "none"
+        elif density >= _COVERAGE_STRONG_DENSITY and fin_hits < _COVERAGE_FINANCIAL_VETO:
+            verdict = "strong"
+        else:
+            verdict = "weak"
+        out[pillar] = {"density": round(density, 2), "financial_hits": fin_hits,
+                        "verdict": verdict}
+    return out
 
 # A number that carries a UNIT, a decimal point, or a percent sign -- i.e. a
 # measurement rather than a page number. Bare integers are deliberately NOT
@@ -232,6 +361,30 @@ def _is_navigation(block: str) -> bool:
     return endnum >= max(4, len(lines) * 0.3) and short >= len(lines) * 0.7
 
 
+def _is_financial_statement(block: str) -> bool:
+    """Accounting text (10-K notes, tax/compensation tables), which must
+    never be selected regardless of how densely it happens to use a
+    pillar's own vocabulary.
+
+    REJECTED HERE, BEFORE SCORING -- not after, as an afterthought veto on
+    the already-built selection. Confirmed live 2026-09-10 (Apple, Nike,
+    Pfizer): scoring first and vetoing the FINAL 3500-char selection still
+    wastes the entire _select() pass building a selection out of blocks
+    that were always going to be thrown away, and (worse) if only some of a
+    document's blocks are financial, a selection built from a MIX of one
+    real block and several financial ones can dilute below the marker
+    threshold and slip through. Checking per-block, at the same point
+    _is_navigation already vetoes TOC pages, means a financial block never
+    enters the candidate pool at all -- the real blocks in the same
+    document (if any) are unaffected and still compete normally.
+
+    Signature: 1+ financial-statement marker phrase in a SINGLE ~1200-char
+    block -- see _BLOCK_FINANCIAL_VETO for why the bar is lower here than
+    on a full multi-block selection.
+    """
+    return _financial_hits(block) >= _BLOCK_FINANCIAL_VETO
+
+
 def _score_block(block: str, pillar: str) -> float:
     """Higher = more likely to carry an extractable ESG metric for `pillar`.
 
@@ -240,7 +393,7 @@ def _score_block(block: str, pillar: str) -> float:
     next to a pillar term, so units are scored separately from bare digits;
     page numbers and years carry no unit and no longer inflate the score.
     """
-    if _is_navigation(block):
+    if _is_navigation(block) or _is_financial_statement(block):
         return 0.0
     low = block.lower()
     terms = sum(low.count(t) for t in _PILLAR_TERMS[pillar])
@@ -537,25 +690,131 @@ def fetch_report_signals(company: str, max_reports: int = 2,
     if not texts:
         return {}
 
-    full = "\n\n".join(texts)
+    # PER-DOCUMENT SCORING, NEVER A JOINED BLOB. Confirmed live 2026-09-10:
+    # joining every cached document's text before selecting (the old
+    # `full = "\n\n".join(texts)`) meant a STALE candidate left on disk from
+    # an earlier, since-fixed search bug (e.g. Apple's real Environmental
+    # Progress Report sitting alongside a mis-fetched 10-K from a prior run)
+    # permanently contaminated every future fetch -- the 10-K's tax-rate and
+    # RSU-vesting text won the S/G pillar selections outright once merged
+    # into the same pool, even though the real report alone scores cleanly.
+    # Nothing on disk is ever cleaned up, so this bug compounds silently
+    # over time rather than self-correcting.
+    #
+    # Fix: when only one document exists, it is used for all three pillars
+    # (unchanged behaviour -- there is nothing to compare it against). When
+    # multiple documents exist, each pillar is scored SEPARATELY against
+    # EACH document, and only the single best-scoring document is used as
+    # that pillar's source -- different pillars may legitimately draw from
+    # different documents (this is exactly the shape the missing-pillar
+    # fallback below already produces; scoring per-document here makes the
+    # PRIMARY fetch behave the same way when disk already holds >1 candidate).
     out: dict[str, str] = {}
     for pillar in ("E", "S", "G"):
-        sel = _select(full, pillar)
-        if not sel or len(sel) <= 200:
+        if len(texts) == 1:
+            candidates = [texts[0]]
+        else:
+            candidates = texts
+
+        best_sel, best_density = None, 0.0
+        for text in candidates:
+            sel = _select(text, pillar)
+            if not sel or len(sel) <= 200:
+                continue
+            # Not every downloaded PDF is a sustainability report. Several are
+            # 10-Ks and annual financial reports, where the best-scoring blocks
+            # for a pillar can still be tax tables or non-GAAP reconciliations
+            # (measured on Cardinal Health's 10-K). Emitting those invites the
+            # extractor to invent ESG claims from accounting text, so require
+            # the selection to be genuinely about the pillar before shipping it.
+            own_density = _pillar_density(sel, pillar)
+            if own_density < _MIN_PILLAR_DENSITY:
+                continue
+            # CROSS-PILLAR DOMINANCE CHECK. Confirmed live 2026-09-09
+            # (Microsoft): the absolute floor above is not enough on its own
+            # -- Microsoft's S selection cleared it (density 2.84) purely
+            # from repeated hits of the single word "employee", every one of
+            # them actually part of "Employee Commuting", a Scope 3
+            # EMISSIONS category name, not a real S-pillar claim.
+            # Block-level bidding confirmed the same text is overwhelmingly
+            # E-dominant (E density on this selection: ~20, vs S's 2.84 on
+            # itself). An absolute floor asks "does this clear a low bar for
+            # MY pillar?"; this asks the question that actually matters:
+            # "is this text more about a DIFFERENT pillar than the one
+            # claiming it?"
+            other_densities = {p: _pillar_density(sel, p) for p in ("E", "S", "G") if p != pillar}
+            dominant_other = max(other_densities, key=other_densities.get)
+            if other_densities[dominant_other] > 2.0 * own_density:
+                continue
+            # FINANCIAL-STATEMENT VETO. Confirmed live 2026-09-10 (Apple,
+            # Nike, Pfizer): the two checks above are not enough for G
+            # specifically -- a 10-K's tax/compensation notes are genuinely
+            # G-dominant relative to their OWN E/S content (there is no
+            # E/S text to compete with inside a tax note), so they clear
+            # both the density floor and the cross-pillar dominance check
+            # while still being pure accounting text, not a real governance
+            # disclosure. See _financial_hits/_FINANCIAL_STATEMENT_MARKERS.
+            if _financial_hits(sel) >= _COVERAGE_FINANCIAL_VETO:
+                log.info("%s: %s selection looks like financial-statement "
+                         "text (%d marker hits), not a real disclosure -- "
+                         "rejecting", company, pillar, _financial_hits(sel))
+                continue
+            if own_density > best_density:
+                best_sel, best_density = sel, own_density
+
+        if best_sel is None:
+            log.info("%s: no document scored well enough for %s "
+                     "(checked %d candidate document(s))", company, pillar, len(candidates))
             continue
-        # Not every downloaded PDF is a sustainability report. Several are
-        # 10-Ks and annual financial reports, where the best-scoring blocks for
-        # a pillar can still be tax tables or non-GAAP reconciliations
-        # (measured on Cardinal Health's 10-K). Emitting those invites the
-        # extractor to invent ESG claims from accounting text, so require the
-        # selection to be genuinely about the pillar before shipping it.
-        if _pillar_density(sel, pillar) < _MIN_PILLAR_DENSITY:
-            log.info("%s: dropping %s selection -- too few pillar terms "
-                     "(likely a financial filing, not an ESG report)",
-                     company, pillar)
-            continue
-        out[f"{_SHARED_TAG_PREFIX}_{pillar.lower()}"] = sel
+        out[f"{_SHARED_TAG_PREFIX}_{pillar.lower()}"] = best_sel
+
+    # MISSING-PILLAR FALLBACK. Confirmed live 2026-09-09 (Microsoft): some
+    # companies do not publish one combined E+S+G report at all -- Microsoft's
+    # "Environmental Sustainability Report" is genuinely E-only (bidding-
+    # tested against the full 423-block document: 261 blocks won by E, 0 by
+    # G, 2 by S and both of those were content-free "Employee Commuting"
+    # table-header fragments, not real S evidence). No amount of better
+    # selection recovers a pillar that document structurally never covers.
+    # Microsoft's actual social-pillar content lives in a SEPARATE, standalone
+    # "Global Diversity & Inclusion Report" PDF; a generic "sustainability
+    # report" search just keeps finding the same E-only document, so the
+    # follow-up here uses a PILLAR-SPECIFIC query (see discover_reports.py's
+    # _PILLAR_QUERY_TEMPLATES) instead of retrying the same search.
+    #
+    # PROPORTIONAL BY DESIGN: fires at most once per missing pillar per
+    # company, and only when this run already found the company has SOME
+    # report but it's silent on a pillar -- a company with one good combined
+    # report never triggers this at all, so the common case pays zero extra
+    # search cost. Tagged report_pdf2_* (still under the shared report_pdf
+    # prefix so report_tags_are_one_source() keeps treating every report-
+    # derived tag as one corroboration source) to avoid colliding with the
+    # primary document's tags.
+    missing = [p for p in ("E", "S", "G") if f"{_SHARED_TAG_PREFIX}_{p.lower()}" not in out]
+    if missing and fetch_missing and _SEARCH_FALLBACK:
+        for pillar in missing:
+            extra_path = _fetch_pillar_via_search(company, pillar, country=country)
+            if not extra_path:
+                continue
+            res = parse_pdf(extra_path)
+            if not res.get("ok"):
+                continue
+            extra_sel = _select(res["text"], pillar)
+            if not extra_sel or len(extra_sel) <= 200:
+                continue
+            if _pillar_density(extra_sel, pillar) < _MIN_PILLAR_DENSITY:
+                log.info("%s: %s fallback search found a document but it's "
+                         "also too thin on %s -- dropping", company, pillar, pillar)
+                continue
+            if _financial_hits(extra_sel) >= _COVERAGE_FINANCIAL_VETO:
+                log.info("%s: %s fallback search found another financial-"
+                         "statement-shaped document -- dropping, pillar left "
+                         "unfilled (genuinely irredeemable for now)", company, pillar)
+                continue
+            out[f"{_SHARED_TAG_PREFIX}2_{pillar.lower()}"] = extra_sel
+            log.info("%s: recovered %s via pillar-specific fallback search", company, pillar)
+
     if out:
-        log.info("%s: report signals %s (from %d pdf, %d chars parsed)",
-                 company, {k: len(v) for k, v in out.items()}, len(texts), len(full))
+        log.info("%s: report signals %s (from %d pdf(s), %d chars total parsed)",
+                 company, {k: len(v) for k, v in out.items()}, len(texts),
+                 sum(len(t) for t in texts))
     return out

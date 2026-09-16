@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+
 from database import get_db
-from .services import seed_markets, process_batch, run_pipeline, fetch_by_market
-from ..models import Market
+
+from .services import fetch_by_market, process_batch, run_pipeline, seed_markets
 
 router = APIRouter(prefix="/key_players", tags=["KEY PLAYERS"])
 

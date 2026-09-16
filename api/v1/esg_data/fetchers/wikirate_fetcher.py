@@ -5,8 +5,9 @@ available metric answers, and maps them to our esg_metric_definitions catalog.
 
 import os
 from difflib import SequenceMatcher
-from dotenv import load_dotenv
+
 import wikirate4py
+from dotenv import load_dotenv
 
 load_dotenv()
 

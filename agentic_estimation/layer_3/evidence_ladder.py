@@ -83,6 +83,29 @@ class LadderResult:
     detail: dict = field(default_factory=dict)
 
 
+# Measured holdout Spearman per rung -- the exact table in this module's own
+# docstring above, exposed as data so EVIDENCE_ROUTE_PLAN.md sec4.2's
+# rung_factor (range width shrinks for a stronger rung) can read it without
+# re-deriving or hardcoding a second copy. Source: calibration/shoot_out_rungs.py,
+# disjoint holdout, zero circularity with any tuning corpus. G's peer_upright/
+# country rungs are UNTESTED (no G truth source to validate against -- Upright
+# carries no governance columns) -- reported as None, not a guessed value.
+RUNG_HOLDOUT_RHO: dict[str, dict[str, Optional[float]]] = {
+    "E": {"industry_median": 0.728, "exio_structural": 0.615, "peer_upright": 0.498, "country": -0.061, "none": None},
+    "S": {"industry_median": 0.634, "peer_upright": 0.273, "country": 0.071, "none": None},
+    "G": {"peer_upright": None, "country": None, "none": None},
+}
+
+
+def rung_holdout_rho(pillar: str, rung: str) -> Optional[float]:
+    """Measured holdout Spearman for one (pillar, rung) pair, or None if
+    untested (G's rungs) or the rung name is unrecognized. Callers computing
+    a confidence-width term from rung strength should treat None as "no
+    stronger than the weakest tested rung", not as zero -- zero is a real,
+    worse-than-noise measured value for E/country."""
+    return RUNG_HOLDOUT_RHO.get(pillar, {}).get(rung)
+
+
 # upright_industry_prior is tiny and static (56 rows: ~28 industries x 2
 # pillars, re-derived only by an explicit calibration re-run, never by live
 # traffic) -- loaded ONCE per process and cached, not re-queried per

@@ -335,7 +335,7 @@ def find_peers(
     limit: int = 200,
     bcorp_sector_column: str = "sasb_sector",
     include_upright: bool = True,
-    include_bcorp: bool = True,
+    include_bcorp: bool = False,
 ) -> list[PeerRecord]:
     """
     Find comparable companies for a given sector/country/size. If metric_key is
@@ -343,6 +343,13 @@ def find_peers(
     specific physical-unit metric. Returns the union across sources — callers
     (Ratio Estimator) decide which fields to use and compute medians themselves
     via peer_median().
+
+    BCORP DISABLED BY DEFAULT (2026-09-16): see the "BCORP REMOVAL" note at the
+    top of agentic_estimation/layer_3/peer_anchor.py for the full picture of
+    every place bcorp was wired in and why it's off. Pass include_bcorp=True
+    explicitly to opt back in for a specific call (e.g. a bcorp-truth backtest
+    that genuinely wants bcorp peers) — this default only governs callers that
+    don't ask for a source either way.
 
     KNOWN LIMITATION: `sector` is matched literally against bcorp_lookup.sasb_sector
     (coarse: apparel_retail/general/manufacturing/services) AND upright_lookup.industry

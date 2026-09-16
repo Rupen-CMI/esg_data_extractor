@@ -129,6 +129,7 @@ def verify_reconciled(
     metadata: Optional[dict],
     country: Optional[str],
     model: Optional[str] = None,
+    routing: Optional[dict] = None,
 ) -> dict:
     """Returns dict[pillar, VerifiedScore]. Composes qc_assess()/gate() (the
     already-built Confidence Gate) with the gated critic panel. Never
@@ -136,12 +137,17 @@ def verify_reconciled(
     gate output for that pillar, never a crash.
 
     model: optional override forwarded to run_critic_panel. None (default)
-    preserves today's exact behavior."""
+    preserves today's exact behavior.
+
+    routing: optional dict[pillar, {"route", "rung"}] from the evidence
+    router (EVIDENCE_ROUTE_PLAN.md sec1.3/sec2), forwarded to gate() so its
+    GatedOutput carries the real route/basis/rung instead of the rich/
+    evidence/None defaults. None (default) preserves today's exact output."""
     from agentic_estimation.layer_4.critic_panel import run_critic_panel
     from agentic_estimation.layer_3.reconcile import reconcile_all
 
     qc = qc_assess(formula_scores)
-    gated = gate(reconciled, qc)
+    gated = gate(reconciled, qc, routing=routing)
 
     results: dict[str, VerifiedScore] = {}
 
@@ -152,8 +158,16 @@ def verify_reconciled(
         # Skip cases: already-range (thin QC or low confidence) never
         # benefits from critics (a critic cannot upgrade a range -- see
         # PHASE_4_PLAN.md section 2, decision 1). High-confidence + QC-ok
-        # also skips (original locked decision, unchanged).
-        if gated_out.mode == "range":
+        # also skips (original locked decision, unchanged). basis=='prior'
+        # (EVIDENCE_ROUTE_PLAN.md sec4.1) is an ADDITIONAL, redundant-by-
+        # construction guard for the thin/ladder route -- a thin pillar's
+        # ReconciledScore already has n_votes<=1 (holistic suppressed per
+        # node_reconcile), so mode=='range' already fires for it via the
+        # low_confidence branch; this check exists so the skip stays
+        # correct even if `mode` is ever flipped to always emit 'range'
+        # (sec4.1 lists this exact re-key as required before that flip --
+        # not done yet, this is the re-keyed condition ready for when it is).
+        if gated_out.mode == "range" or gated_out.basis == "prior":
             results[pillar] = _wrap_gated(pillar, gated_out, verdict="skipped")
             continue
         if rs.confidence == "high":

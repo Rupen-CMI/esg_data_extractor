@@ -155,6 +155,42 @@ def _board_count_wikidata_signal(company: str) -> str:
 
 # ── Tier 2: DDG web search (broader coverage, lower reliability) ─────────────
 
+# One topic-term tuple per DDG function below, passed as topic_terms= to
+# _ddg_fallback. Fixes the KNOWN PRECISION ISSUE documented in this module's
+# own docstring (Blackmores/yoga-poses) plus its three sibling functions,
+# which share the identical gap: entity filtering (company=) only proves a
+# result is ABOUT the right company, never that it is about the SUBJECT this
+# specific query exists to find. Same root cause and same fix pattern as
+# facility_extractor.py's _FACILITY_TOPIC_TERMS (confirmed live 2026-09-11:
+# a YouTube video description and an Outlook sign-in page both genuinely
+# mentioned "Microsoft" and passed entity filtering while being pure noise).
+
+_BOARD_TOPIC_TERMS = (
+    "board of directors", "board composition", "independent director",
+    "independent directors", "audit committee", "proxy statement",
+    "board member", "board members", "director nominee", "chairman",
+    "chairperson", "non-executive director", "supervisory board",
+)
+
+_FINES_TOPIC_TERMS = (
+    "fine", "fined", "penalty", "penalties", "violation", "violations",
+    "settlement", "settled", "enforcement action", "regulatory action",
+    "consent decree", "cease and desist", "sanction", "sanctioned",
+)
+
+_COMPLIANCE_TOPIC_TERMS = (
+    "anti-corruption", "anti-bribery", "iso 37001", "compliance program",
+    "compliance certification", "whistleblower", "code of conduct",
+    "ethics policy", "ethics hotline", "ungc", "un global compact",
+)
+
+_LITIGATION_TOPIC_TERMS = (
+    "lawsuit", "lawsuits", "litigation", "legal dispute", "legal disputes",
+    "securities fraud", "shareholder suit", "shareholder lawsuit",
+    "class action", "court filing", "plaintiff", "defendant",
+)
+
+
 def _board_composition_signal(company: str) -> str:
     """
     Board composition / independence — via DDG. Queries proxy-statement /
@@ -170,7 +206,7 @@ def _board_composition_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" proxy statement independent directors board composition audit committee 2023 2024 2025',
         prefix="Board Composition", min_len=60, reject_wikipedia=True,
-        company=company,
+        company=company, topic_terms=_BOARD_TOPIC_TERMS,
     )
     log.info("[%s] gov_board -> %s", company, "hit" if result else "no result")
     return result
@@ -182,7 +218,7 @@ def _regulatory_fines_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" regulatory fine penalty violation settlement enforcement 2023 2024 2025 -site:wikipedia.org',
         prefix="Regulatory Fines/Violations", min_len=60, reject_wikipedia=True,
-        company=company,
+        company=company, topic_terms=_FINES_TOPIC_TERMS,
     )
     log.info("[%s] gov_fines -> %s", company, "hit" if result else "no result")
     return result
@@ -194,7 +230,7 @@ def _compliance_certs_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" anti-corruption policy ISO 37001 compliance certification whistleblower ethics',
         prefix="Compliance Certifications", min_len=60, reject_wikipedia=True,
-        company=company,
+        company=company, topic_terms=_COMPLIANCE_TOPIC_TERMS,
     )
     log.info("[%s] gov_compliance -> %s", company, "hit" if result else "no result")
     return result
@@ -206,7 +242,7 @@ def _litigation_signal(company: str) -> str:
     result = _ddg_fallback(
         f'"{company}" lawsuit litigation legal dispute securities fraud shareholder 2023 2024 2025 -site:wikipedia.org',
         prefix="Litigation Records", min_len=60, reject_wikipedia=True,
-        company=company,
+        company=company, topic_terms=_LITIGATION_TOPIC_TERMS,
     )
     log.info("[%s] gov_litigation -> %s", company, "hit" if result else "no result")
     return result

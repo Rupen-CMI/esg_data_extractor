@@ -10,10 +10,19 @@ fallback chain specified in the plan:
 
     1. sector+country peer median   (confidence ~0.3)
     2. sector-only peer median      (confidence ~0.2)
-    3. coarse size bucket           (confidence ~0.15)
-    4. absent                       (confidence 0, no claim written)
+    3. absent                       (confidence 0, no claim written)
 
-Every filled value in steps 1-3 is a REAL STATISTIC over real comparable
+UPRIGHT-ONLY (2026-09-12): peers come from upright_lookup exclusively --
+bcorp_lookup is never queried here, per this pipeline's own truth-source
+decision (bcorp disagrees with Upright at Spearman -0.538 on overall score,
+already rejected as a ground-truth/calibration source elsewhere; using it to
+estimate a missing value here would quietly reintroduce a source the
+pipeline doesn't otherwise trust). This removed the old step 3 (coarse
+size-bucket fallback) entirely -- it was a bcorp_lookup.size-only mechanism
+(upright_lookup has no size-bucket column, only continuous revenue_usd), so
+there was no Upright equivalent to keep it alive.
+
+Every filled value in steps 1-2 is a REAL STATISTIC over real comparable
 companies already in the DB (via peer_anchor_collector), NEVER a value
 invented by an LLM. This is the load-bearing distinction that keeps the
 "no fabricated numbers" property true even when Layer 1 collection fails.
@@ -24,35 +33,36 @@ every step leaves them absent (step 4) rather than forcing a weaker
 estimate through — they never block or degrade the rest of the estimate.
 
 Every filled value writes a company_evidence_claims row (method=
-'peer_ratio_fallback' or 'coarse_bucket', source_note describing the peer
-group) — satisfying the DB-level "no source, no claim" constraint via
-source_note rather than source_signal_id, exactly as that constraint was
-designed to allow (see db_migrations/002_evidence_claims.sql).
+'peer_ratio_fallback', source_note describing the peer group) — satisfying
+the DB-level "no source, no claim" constraint via source_note rather than
+source_signal_id, exactly as that constraint was designed to allow (see
+db_migrations/002_evidence_claims.sql).
 
 CLI:
     python -m agentic_estimation.ratio_estimator "Kitchen Bath Ventures SL" --sector manufacturing --country Spain
 """
 
-import sys
 from dataclasses import dataclass
-from typing import Optional
+from statistics import median
 
+from agentic_estimation.layer_1.peer_anchor_collector import find_peers
 from agentic_estimation.shared.pipeline_logger import get_logger, log_header
-from agentic_estimation.layer_1.peer_anchor_collector import find_peers, peer_median, peer_sample_size
 
 log = get_logger("ratio_estimator")
 
-# Minimum peer-group size before a median is trusted. bcorp/upright peer
-# groups are commonly 50-200+ companies (see Phase 1 verification: 205
-# manufacturing-sector peers found for one test case), so 3 is workable
-# there. The wikirate-backed real-metric path (used for employee_count,
-# annual_revenue) is known to be extremely sparse (5 total rows in the
-# entire DB as of Phase 1 build) AND noisy — verified directly: a 5-point
-# sample of [0, 0.84, 1, 1000, 402614] produces a median of 1.0, a
-# nonsensical real-world estimate despite the sample nominally clearing a
-# naive n>=3 bar. A larger floor for this specific path is a deliberate,
-# data-driven guard, not an arbitrary number.
-_MIN_PEERS_BCORP_UPRIGHT = 3
+# Minimum peer-group size before a median is trusted. Upright peer groups
+# are commonly 50-200+ companies (see Phase 1 verification: 205
+# manufacturing-sector peers found for one test case, across bcorp+upright
+# combined at the time -- Upright alone is smaller but still comfortably
+# above this floor for common sectors), so 3 is workable there. The
+# wikirate-backed real-metric path (used for employee_count, annual_revenue)
+# is known to be extremely sparse (5 total rows in the entire DB as of
+# Phase 1 build) AND noisy — verified directly: a 5-point sample of
+# [0, 0.84, 1, 1000, 402614] produces a median of 1.0, a nonsensical
+# real-world estimate despite the sample nominally clearing a naive n>=3
+# bar. A larger floor for this specific path is a deliberate, data-driven
+# guard, not an arbitrary number.
+_MIN_PEERS_UPRIGHT = 3
 _MIN_PEERS_REAL_METRIC = 15
 
 # Factors that are REQUIRED to attempt the full fallback chain (the formula
@@ -64,9 +74,10 @@ REQUIRED_FACTORS = ("employee_count", "annual_revenue", "factory_count")
 # miss at every step is fine and expected, not a failure.
 OPTIONAL_FACTORS = ("factory_workforce_share", "female_employees_pct")
 
-# Field name each factor maps to on bcorp/upright peer records, where applicable.
-# Factors with no direct peer field (e.g. factory_count — neither bcorp nor
-# upright track this) fall through to the coarse-bucket step only.
+# Field name each factor maps to on upright_lookup peer records, where
+# applicable. Factors with no direct peer field (e.g. factory_count --
+# upright doesn't track this) stay absent -- there is no lower fallback
+# step anymore (see UPRIGHT-ONLY note above).
 #
 # HONEST CURRENT COVERAGE (verified during Phase 1 build, not aspirational):
 #   employee_count  -- ONLY resolvable via the wikirate real-metric path
@@ -75,121 +86,150 @@ OPTIONAL_FACTORS = ("factory_workforce_share", "female_employees_pct")
 #                       median -- so this factor will realistically come
 #                       back ABSENT for most companies until more real
 #                       employee-count disclosures are ingested.
-#   annual_revenue  -- ONLY resolvable via upright_lookup.revenue_usd, which
-#                       requires an upright-vocabulary sector string. Since
-#                       Ratio Estimator callers pass bcorp-style sector
-#                       strings (e.g. "manufacturing"), and upright uses a
-#                       different, finer-grained vocabulary (e.g. "Industrial
-#                       Manufacturing and Services"), this path currently
-#                       NEVER matches through find_peers(sector=...) -- see
-#                       the KNOWN LIMITATION note in peer_anchor_collector.py.
-#                       Fixing this needs a sector-vocabulary mapping table,
-#                       intentionally deferred rather than guessed at here.
-#   factory_count, factory_workforce_share, female_employees_pct -- no bcorp/
-#                       upright field exists at all; these only ever resolve
-#                       via step 3 (coarse bucket) if peer_field is added
-#                       later, or stay absent, which is the correct behavior
-#                       for data that genuinely isn't tracked by either source.
+#   annual_revenue  -- resolvable via upright_lookup.revenue_usd, but
+#                       requires an upright-vocabulary sector string
+#                       ("Industrial Manufacturing and Services", not
+#                       "manufacturing") -- see the KNOWN LIMITATION note in
+#                       peer_anchor_collector.py. Fixing this needs a
+#                       sector-vocabulary mapping table, intentionally
+#                       deferred rather than guessed at here.
+#   factory_count, factory_workforce_share, female_employees_pct -- no
+#                       upright field exists at all; these stay absent,
+#                       which is the correct behavior for data that
+#                       genuinely isn't tracked by this source.
 _PEER_FIELD_MAP = {
     "employee_count": None,       # via metric_key on the real-metric path only
-    "annual_revenue": "revenue_usd",   # upright only, blocked by sector-vocab mismatch today
+    "annual_revenue": "revenue_usd",   # blocked by sector-vocab mismatch today
     "factory_count": None,        # no peer source tracks this at all
     "factory_workforce_share": None,
-    "female_employees_pct": None,  # no direct bcorp/upright field; left for Phase 2 wikirate expansion
+    "female_employees_pct": None,  # no direct upright field; left for Phase 2 wikirate expansion
 }
 
 
 @dataclass
 class RatioEstimate:
     factor: str
-    value: Optional[float]
+    value: float | None
     confidence: float
-    method: str            # 'peer_ratio_fallback' | 'coarse_bucket' | 'absent'
-    source_note: Optional[str]
+    method: str            # 'peer_ratio_fallback' | 'absent'
+    source_note: str | None
     n_peers: int = 0
 
 
-def _size_bucket_from_employees(employees: Optional[float]) -> Optional[str]:
-    """Map a raw employee count to bcorp_lookup's size-bucket vocabulary."""
-    if employees is None:
-        return None
-    if employees < 1:
-        return "0"
-    if employees < 10:
-        return "1-9"
-    if employees < 50:
-        return "10-49"
-    if employees < 250:
-        return "50-249"
-    if employees < 1000:
-        return "250-999"
-    return "1000+"
+def _combined_sample(peers: list, upright_field: str | None,
+                      metric_field: str | None) -> list[float]:
+    """Values for one logical factor across a MIXED peer list, where upright
+    and the wikirate real-metric path store it under DIFFERENT field names
+    (e.g. upright's revenue_usd vs. the metric_key 'annual_revenue' used on
+    company_metric_values rows).
+
+    REAL BUG FOUND AND FIXED 2026-09-12: estimate_factor() used to check only
+    ONE field name (metric_key when given, else peer_field), so passing
+    metric_key="annual_revenue" for annual_revenue silently searched for a
+    field literally named "annual_revenue" on EVERY peer, including upright
+    ones -- but upright peers only ever carry the value under "revenue_usd"
+    (see _PEER_FIELD_MAP). Confirmed live: find_peers(sector="Retail",
+    metric_key="annual_revenue") returned 200 real upright peers, 0 of which
+    had a truthy .fields.get("annual_revenue"), while all 200 had a real
+    .fields.get("revenue_usd") -- the exact data this step exists to use was
+    silently discarded every time metric_key was set for a field upright
+    tracks under a different name. This is WHY the module's own comment
+    said annual_revenue "currently NEVER matches" -- it blamed the sector-
+    vocabulary mismatch, which is real too, but this field-name mismatch was
+    ALSO independently zeroing the sample even on a sector match.
+
+    Collects both field names (whichever exist) and returns the union of
+    values, so upright's plentiful data and the sparser real-metric rows
+    both count."""
+    fields = {f for f in (upright_field, metric_field) if f}
+    values: list[float] = []
+    for p in peers:
+        for f in fields:
+            v = p.fields.get(f)
+            if v is not None:
+                values.append(v)
+                break   # one peer contributes at most one value per factor
+    return values
 
 
 def estimate_factor(
     factor: str,
-    sector: Optional[str],
-    country: Optional[str],
-    size_bucket: Optional[str] = None,
-    exclude_name: Optional[str] = None,
-    metric_key: Optional[str] = None,
+    sector: str | None,
+    country: str | None,
+    exclude_name: str | None = None,
+    metric_key: str | None = None,
 ) -> RatioEstimate:
     """
     Run the ordered fallback chain for ONE factor. metric_key, if given,
     also searches real (non-agentic) company_metric_values via
     peer_anchor_collector's wikirate-backed path — needed for physical-unit
-    factors like employee_count that bcorp/upright don't carry directly.
+    factors like employee_count that upright doesn't carry directly.
     """
     peer_field = _PEER_FIELD_MAP.get(factor)
 
-    # Real-metric peers (wikirate-backed, e.g. employee_count/annual_revenue)
-    # are known sparse+noisy — require a much larger sample before trusting
-    # the median. bcorp/upright-backed fields use the normal, lower floor.
-    min_peers = _MIN_PEERS_REAL_METRIC if metric_key else _MIN_PEERS_BCORP_UPRIGHT
+    # If NEITHER an upright field nor a wikirate metric_key exists for this
+    # factor, there is nothing to search for at any step -- go straight to
+    # absent (avoids a same-shape-as-before false "0 peers" log for factors
+    # that were never resolvable in the first place, e.g. factory_count).
+    if not peer_field and not metric_key:
+        log.info("[%s] no peer field or metric_key mapped -- absent", factor)
+        return RatioEstimate(factor=factor, value=None, confidence=0.0, method="absent", source_note=None)
+
+    # Upright contributes real, plentiful data whenever peer_field exists --
+    # use the normal, lower floor even if the sparser wikirate path also
+    # contributes to the same combined sample (a few noisy wikirate rows
+    # mixed into 50+ real upright ones don't meaningfully skew a median).
+    # ONLY when peer_field is None (no upright equivalent at all, e.g.
+    # employee_count) is the WHOLE sample wikirate-sourced -- keep the
+    # higher, data-driven floor for that case, per this module's own
+    # measured noise example ([0, 0.84, 1, 1000, 402614] at n=5).
+    min_peers = _MIN_PEERS_UPRIGHT if peer_field else _MIN_PEERS_REAL_METRIC
+
+    # UPRIGHT-ONLY (2026-09-12): bcorp is excluded from every step here, per
+    # the pipeline's own truth-source decision -- bcorp disagrees with Upright
+    # at Spearman -0.538 on overall score, so it was already rejected as a
+    # calibration/ground-truth source elsewhere; using it to peer-estimate a
+    # missing value would let a source the pipeline itself doesn't trust
+    # quietly set real numbers. This costs the old step 3 (coarse size-bucket
+    # fallback) entirely -- confirmed live: upright_lookup has NO size-bucket
+    # column at all (revenue_usd is its only continuous size signal), so
+    # size-bucket peer-matching is a bcorp-only mechanism with no Upright
+    # equivalent to fall back to, not just a weaker one. Accepted rather than
+    # worked around -- a 3-step chain (sector+country, sector-only, absent)
+    # that only ever estimates from a trusted source beats a 4-step chain
+    # whose last rung quietly reintroduces the source everything else here
+    # was built to avoid.
 
     # Step 1: sector + country peer median
     if sector and country:
-        peers = find_peers(sector=sector, country=country, exclude_name=exclude_name, metric_key=metric_key)
-        field = metric_key if metric_key else peer_field
-        if field:
-            n = peer_sample_size(peers, field)  # NOT len(peers) -- see peer_sample_size docstring
-            if n >= min_peers:
-                val = peer_median(peers, field)
-                log.info("[%s] step1 sector+country median = %.2f (n=%d)", factor, val, n)
-                return RatioEstimate(
-                    factor=factor, value=val, confidence=0.3, method="peer_ratio_fallback",
-                    source_note=f"sector+country peer median (sector={sector}, country={country}, n={n})",
-                    n_peers=n,
-                )
+        peers = find_peers(sector=sector, country=country, exclude_name=exclude_name,
+                            metric_key=metric_key, include_bcorp=False)
+        values = _combined_sample(peers, peer_field, metric_key)
+        if len(values) >= min_peers:
+            val = float(median(values))
+            log.info("[%s] step1 sector+country median = %.2f (n=%d)", factor, val, len(values))
+            return RatioEstimate(
+                factor=factor, value=val, confidence=0.3, method="peer_ratio_fallback",
+                source_note=f"sector+country peer median (sector={sector}, country={country}, n={len(values)})",
+                n_peers=len(values),
+            )
 
     # Step 2: sector-only peer median (country dropped)
     if sector:
-        peers = find_peers(sector=sector, country=None, exclude_name=exclude_name, metric_key=metric_key)
-        field = metric_key if metric_key else peer_field
-        if field:
-            n = peer_sample_size(peers, field)
-            if n >= min_peers:
-                val = peer_median(peers, field)
-                log.info("[%s] step2 sector-only median = %.2f (n=%d)", factor, val, n)
-                return RatioEstimate(
-                    factor=factor, value=val, confidence=0.2, method="peer_ratio_fallback",
-                    source_note=f"sector-only peer median (sector={sector}, n={n})",
-                    n_peers=n,
-                )
+        peers = find_peers(sector=sector, country=None, exclude_name=exclude_name,
+                            metric_key=metric_key, include_bcorp=False)
+        values = _combined_sample(peers, peer_field, metric_key)
+        if len(values) >= min_peers:
+            val = float(median(values))
+            log.info("[%s] step2 sector-only median = %.2f (n=%d)", factor, val, len(values))
+            return RatioEstimate(
+                factor=factor, value=val, confidence=0.2, method="peer_ratio_fallback",
+                source_note=f"sector-only peer median (sector={sector}, n={len(values)})",
+                n_peers=len(values),
+            )
 
-    # Step 3: coarse size bucket (bcorp_lookup.size, matched on sector+bucket only)
-    if sector and size_bucket:
-        peers = find_peers(sector=sector, size_bucket=size_bucket, exclude_name=exclude_name)
-        if peer_field:
-            n = peer_sample_size(peers, peer_field)
-            if n >= 1:
-                val = peer_median(peers, peer_field)
-                log.info("[%s] step3 coarse bucket median = %.2f (n=%d)", factor, val, n)
-                return RatioEstimate(
-                    factor=factor, value=val, confidence=0.15, method="coarse_bucket",
-                    source_note=f"coarse size-bucket median (sector={sector}, size={size_bucket}, n={n})",
-                    n_peers=n,
-                )
+    # Step 3 (coarse bcorp size-bucket fallback) REMOVED -- see UPRIGHT-ONLY
+    # note above. Falls straight through to absent if steps 1-2 miss.
 
     # Step 4: absent — no fabricated value, honest terminal state.
     log.info("[%s] step4 absent -- no peer data available at any fallback level", factor)
@@ -197,20 +237,16 @@ def estimate_factor(
 
 
 def estimate_missing_factors(
-    known_factors: dict[str, Optional[float]],
-    sector: Optional[str],
-    country: Optional[str],
-    exclude_name: Optional[str] = None,
+    known_factors: dict[str, float | None],
+    sector: str | None,
+    country: str | None,
+    exclude_name: str | None = None,
 ) -> dict[str, RatioEstimate]:
     """
     Given a dict of {factor: value_or_None} already collected in Layer 1,
     run the fallback chain for every REQUIRED factor that's missing, and
     every OPTIONAL factor that's missing (best-effort, absence is fine).
-
-    known_factors should include 'employee_count' if available (used to
-    derive the coarse size bucket for step 3 of other factors).
     """
-    size_bucket = _size_bucket_from_employees(known_factors.get("employee_count"))
     results: dict[str, RatioEstimate] = {}
 
     for factor in REQUIRED_FACTORS + OPTIONAL_FACTORS:
@@ -218,7 +254,7 @@ def estimate_missing_factors(
             continue  # already have a real value, no back-fill needed
         metric_key = factor if factor in ("employee_count", "annual_revenue") else None
         results[factor] = estimate_factor(
-            factor, sector, country, size_bucket=size_bucket,
+            factor, sector, country,
             exclude_name=exclude_name, metric_key=metric_key,
         )
 
@@ -244,6 +280,7 @@ async def save_ratio_estimates(company_id, pillar_map: dict[str, str], estimates
     Returns the number of rows written.
     """
     import os
+
     import asyncpg
 
     db_url = os.environ.get("ASYNC_DB_URL", "").replace("postgresql+asyncpg://", "postgresql://")
