@@ -517,6 +517,81 @@ def get_all_baselines() -> dict[str, CountryBaseline]:
 # This is a lookup problem, not a fuzzy-matching problem: country identity is
 # binary (Iran and Iraq are NOT "80% the same country"), so this is an exact
 # alias/code table, not a string-similarity score.
+#
+# TYPO TOLERANCE, added 2026-09-18: the above is still the right rule for
+# ALIASES ("Britain" -> "United Kingdom" is a real, deliberate mapping
+# choice, not a similarity score). But a genuine KEYBOARD TYPO ("Untied
+# States", "Grmany") is a different failure mode -- the string is close to
+# exactly one real country, not ambiguous between two real countries -- and
+# today it falls all the way through resolve_country_name to None, landing
+# the company on the global_average baseline instead of its own real one.
+# _fuzzy_typo_match() below adds ONE more stage, deliberately narrow:
+#   - ratio() >= 0.90 only. Measured against every geographically-confusable
+#     WB economy pair (Iran/Iraq 0.750, Niger/Nigeria 0.833 -- the worst
+#     case found -- Mali/Malawi 0.800, Guinea/Guinea-Bissau 0.632, Congo
+#     variants 0.815, Chad/Chile 0.444) -- none reach 0.90, while real
+#     single-character typos do (United States/Untied States 0.923,
+#     Germany/Grmany 0.923, Brazil/Brasil 0.833 -- kept above the danger
+#     ceiling despite being a genuine typo shape).
+#   - the match must be UNIQUE at that threshold: if two different real
+#     countries both score >=0.90 against the input, this is ambiguous by
+#     definition and must return None (global_average), never guess.
+#   - _TYPO_BLOCKLIST is a second, independent safety net: named pairs that
+#     must NEVER fuzzy-match each other regardless of computed ratio, in
+#     case a country pair not covered by the 0.90 analysis above turns out
+#     to score higher than expected.
+_TYPO_BLOCKLIST: set[frozenset] = {
+    frozenset({"iran, islamic rep.", "iraq"}),
+    frozenset({"niger", "nigeria"}),
+    frozenset({"mali", "malawi"}),
+    frozenset({"chad", "chile"}),
+    frozenset({"guinea", "guinea-bissau"}),
+    frozenset({"guinea", "equatorial guinea"}),
+    frozenset({"guinea-bissau", "equatorial guinea"}),
+    frozenset({"dominica", "dominican republic"}),
+    frozenset({"sudan", "south sudan"}),
+    frozenset({"congo, dem. rep.", "congo, rep."}),
+    frozenset({"slovak republic", "slovenia"}),
+}
+_FUZZY_TYPO_THRESHOLD = 0.90
+
+
+def _fuzzy_typo_match(raw: str) -> Optional[str]:
+    """Last-resort typo tolerance for resolve_country_name -- see the module
+    note above this function for the safety reasoning and threshold
+    calibration. Returns the single real Economy name the input is almost
+    certainly a typo of, or None if there's no match, the match isn't
+    unique, or the pair is on the blocklist."""
+    import difflib
+
+    _ensure_cache()
+    target = raw.strip().lower()
+    if not target:
+        return None
+
+    best_name: Optional[str] = None
+    best_ratio = 0.0
+    runner_up_ratio = 0.0
+    for name in _cache:
+        ratio = difflib.SequenceMatcher(None, target, name.lower()).ratio()
+        if ratio > best_ratio:
+            runner_up_ratio = best_ratio
+            best_ratio, best_name = ratio, name
+        elif ratio > runner_up_ratio:
+            runner_up_ratio = ratio
+
+    if best_name is None or best_ratio < _FUZZY_TYPO_THRESHOLD:
+        return None
+    if runner_up_ratio >= _FUZZY_TYPO_THRESHOLD:
+        log.warning("fuzzy typo match for %r ambiguous (top two both >=%.2f) -- refusing to guess",
+                    raw, _FUZZY_TYPO_THRESHOLD)
+        return None
+    if frozenset({target, best_name.lower()}) in _TYPO_BLOCKLIST:
+        log.warning("fuzzy typo match for %r -> %r blocked (known-confusable pair)", raw, best_name)
+        return None
+
+    log.info("resolve_country_name: %r -> %r via typo tolerance (ratio=%.3f)", raw, best_name, best_ratio)
+    return best_name
 
 _iso3_lookup_cache: Optional[dict[str, str]] = None  # ISO3 (upper) -> Economy name
 _economy_to_iso3_cache: Optional[dict[str, str]] = None  # Economy name -> ISO3 (upper)
@@ -578,7 +653,11 @@ def resolve_country_name(raw: str) -> Optional[str]:
     Resolve an arbitrary incoming country string (ISO3 code, colloquial name,
     or already-correct World Bank Economy name) to the exact Economy name
     used by this dataset's cache keys, or None if it can't be resolved.
-    Exact/alias/code lookup only -- no fuzzy scoring (see module note above).
+    Exact/alias/code lookup first (see module note above for why country
+    identity is a lookup problem, not a similarity score); a narrow, guarded
+    typo-tolerance stage (_fuzzy_typo_match) runs ONLY as the final fallback,
+    after every exact path has already failed -- see _TYPO_BLOCKLIST's
+    module note for the threshold/safety reasoning.
     """
     if not raw:
         return None
@@ -622,6 +701,14 @@ def resolve_country_name(raw: str) -> Optional[str]:
         # gap is visible rather than silent.
         log.debug("resolve_country_name: %r -> ISO3 %s has no WB economy baseline",
                   raw, iso3)
+
+    # Last resort: genuine keyboard-typo tolerance -- see _fuzzy_typo_match's
+    # own docstring and the module note above _TYPO_BLOCKLIST for the safety
+    # reasoning. Stays last so every exact/alias/ISO3 path above (bit-
+    # identical behaviour for already-working inputs) is tried first.
+    typo_match = _fuzzy_typo_match(stripped)
+    if typo_match:
+        return typo_match
 
     return None
 

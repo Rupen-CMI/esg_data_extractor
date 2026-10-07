@@ -34,7 +34,7 @@ CLI:
 import asyncio
 import sys
 import time
-from typing import TypedDict
+from typing import Optional, TypedDict
 from uuid import UUID
 
 from langgraph.graph import END, StateGraph
@@ -107,6 +107,14 @@ class PipelineState(TypedDict, total=False):
     # rendering in that case.
     verify: bool              # opt-in flag, mirrors calibration_harness.py's _VERIFY
     verified: dict            # {'E'|'S'|'G': VerifiedScore}
+
+    # Layer 4's 4th, non-adversarial critic (public_company_uplift.py) --
+    # {'E'|'S'|'G': UpliftResult}, only for pillars that were both below 60
+    # AND belong to a company confirmed publicly traded (live yfinance
+    # ticker match). Empty dict when nothing qualified. Applied on TOP of
+    # `verified`/`reconciled`, never replacing them -- see
+    # node_public_company_uplift.
+    public_uplift: dict
 
     # Control
     error: str | None
@@ -338,14 +346,19 @@ def _fill_missing_revenue(metadata: dict, sector: str | None, country: str | Non
     real E-pillar metrics (scope_1/2/3_emissions, total_energy_consumption,
     water_withdrawal, total_waste_generated -- every CORE_METRICS entry with
     intensity="annual_revenue") by metadata['revenue'] to normalise them
-    onto their benchmark bands. Without it, EVERY ONE of those metrics
-    silently degrades to a weak, half-confidence "event shape" contribution
-    instead of a real benchmarked delta (see formula_estimator.py's
-    _benchmark_delta, the `if not revenue_musd` branch) -- even when the
-    company disclosed a perfectly good, specific emissions figure. Wikidata
-    coverage for revenue is exactly the gap ratio_estimator.py was built for
-    (small/private companies: 0/5 hit rate in the Company Profiler
-    reliability finding its own docstring cites).
+    onto their benchmark bands. Without it, 5 of those 6 metrics silently
+    degrade to a weak, half-confidence "event shape" contribution instead
+    of a real benchmarked delta (see formula_estimator.py's _benchmark_delta,
+    the `if not revenue_musd` branch) -- even when the company disclosed a
+    perfectly good, specific figure. scope_1_emissions is the one exception
+    (fixed 2026-09-18): a Climate TRACE dataset_lookup claim for it instead
+    normalises against the country's own total harvested emissions, since
+    that claim type carries no meaningful polarity/strength for the event
+    fallback to fall back on. Wikidata coverage for revenue is exactly the
+    gap ratio_estimator.py was built for (small/private companies: 0/5 hit
+    rate in the Company Profiler reliability finding its own docstring
+    cites), and this fallback still matters for LLM-extracted scope_1
+    claims and the other 5 metrics.
 
     ratio_estimator's own output feeds a CONTEXT field here (like
     metadata['revenue'] itself), never a new ExtractedClaim -- annual_revenue
@@ -533,6 +546,65 @@ def node_verify_estimate(state: PipelineState) -> dict:
         return {}
 
 
+def _settled_pillar_score(pillar: str, reconciled: dict, verified: dict) -> float:
+    """The FINAL, post-verification score for one pillar -- verified's
+    score when Phase 4 ran, reconciled's raw score otherwise. Same
+    precedence _final_pillar_score/_pillar_score already use elsewhere in
+    this file (graph.py's own long-standing rule: verified always
+    supersedes the pre-verification number when present) -- pulled out
+    here so node_public_company_uplift can apply to whatever the pipeline
+    actually settled on, dry or persist, without duplicating that rule a
+    third time."""
+    vs = (verified or {}).get(pillar)
+    return vs.score if vs is not None else reconciled[pillar].score
+
+
+def node_public_company_uplift(state: PipelineState) -> dict:
+    """Layer 4's 4th, non-adversarial critic (see public_company_uplift.py's
+    module docstring) -- runs after verify_estimate has fully settled, for
+    BOTH dry and persist runs (this node sits before the dry/persist fork
+    below), so a dry-run preview and a real run agree on whether/how much
+    a public company's low pillar got corrected.
+
+    Mutates neither `reconciled` nor `verified` in place -- returns a new
+    `public_uplift` state key that node_persist_ensemble_scores /
+    _populate_result_from_ensemble both read and apply on top of whatever
+    score they would otherwise have used, the same "additional override"
+    shape `verified` itself already has over `reconciled`."""
+    if state.get("error"):
+        return {}
+    reconciled = state.get("reconciled")
+    if not reconciled:
+        return {}
+    log.info("=== Node: public_company_uplift (Layer 4, non-adversarial) ===")
+    from agentic_estimation.layer_4.public_company_uplift import apply_public_company_uplift
+
+    verified = state.get("verified") or {}
+    # reconcile_all() always returns all 3 pillars together when it runs
+    # at all, but guard the read anyway -- a partial `reconciled` (e.g. a
+    # hand-built test fixture, or a future upstream change) must skip a
+    # missing pillar rather than KeyError the whole node.
+    final_scores = {p: _settled_pillar_score(p, reconciled, verified) for p in ("E", "S", "G") if p in reconciled}
+    final_reasonings = {
+        p: (verified[p].reason if p in verified else "") for p in final_scores
+    }
+
+    try:
+        uplift = apply_public_company_uplift(
+            state["company_name"], state.get("industry", ""), state.get("country"),
+            final_scores, final_reasonings, model=state.get("model"),
+        )
+    except Exception as exc:
+        log.warning("[%s] public_company_uplift raised: %s -- no uplift applied", state["company_name"], exc)
+        return {}
+
+    if uplift:
+        log.info("[%s] public-company uplift applied to: %s",
+                  state["company_name"],
+                  {p: r.corrected_score for p, r in uplift.items() if r.applied})
+    return {"public_uplift": uplift}
+
+
 def node_scoring(state: PipelineState) -> dict:
     if state.get("error"):
         return {}
@@ -595,7 +667,11 @@ def node_explainability(state: PipelineState) -> dict:
         return {}
     log.info("=== Node: explainability ===")
     try:
-        expl = _run_explainability(state["final_score"], state["industry"])
+        expl = _run_explainability(
+            state["final_score"], state["industry"],
+            evidence_by_pillar=_evidence_by_pillar(state.get("formula_scores", {})),
+            routing_by_pillar=_routing_by_pillar(state.get("pillar_routing")),
+        )
         if expl is None:
             log.warning("Explainability returned None — summary skipped")
             return {"summary": None}
@@ -680,6 +756,8 @@ async def node_explainability_persist(state: PipelineState) -> dict:
         from agentic_estimation.layer_4.explainability_agent import explain_company
         expl = await explain_company(
             score=state["final_score"], company_id=state["company_id"], industry=state["industry"],
+            evidence_by_pillar=_evidence_by_pillar(state.get("formula_scores", {})),
+            routing_by_pillar=_routing_by_pillar(state.get("pillar_routing")),
         )
         if expl is None:
             log.warning("Explainability returned None — summary skipped")
@@ -702,13 +780,88 @@ def _ensemble_render(rs, gated_out, vscore) -> str:
             f"(spread={spread_str}, confidence={rs.confidence})")
     if vscore is not None:
         base += f" -- VERIFIED: {vscore.verdict}"
-        if vscore.mode == "range":
-            base += f", RANGE [{vscore.low:.1f}, {vscore.high:.1f}], needs review ({vscore.reason})"
+        # Keyed off needs_review directly, not mode=='range' -- the
+        # 'inconclusive' verdict (both the <2-responder fail-open and the
+        # panel-exception fallback) keeps mode='point' (the panel only
+        # ever runs on an already-point pillar) while still needing this
+        # explanation surfaced; re-deriving from mode alone silently
+        # dropped it for those two cases. Found 2026-09-21.
+        if vscore.needs_review:
+            base += f", needs review ({vscore.reason})"
+            if vscore.mode == "range":
+                base += f", RANGE [{vscore.low:.1f}, {vscore.high:.1f}]"
+        elif "uplifted" in vscore.verdict:
+            # public_company_uplift's correction is RESOLVED, not a
+            # needs_review case -- but its `reason` is the whole point
+            # (why the score moved), so it must still surface even though
+            # the needs_review branch above is skipped. Found 2026-09-22.
+            base += f" ({vscore.reason})"
         if vscore.objections:
             base += f" | objections: {'; '.join(vscore.objections)}"
     elif gated_out is not None and gated_out.mode == "range":
         base += f" -- RANGE [{gated_out.low:.1f}, {gated_out.high:.1f}], needs review ({gated_out.reason})"
     return base
+
+
+def _evidence_by_pillar(formula_scores: dict) -> dict:
+    """{"E"|"S"|"G": [claim_reasoning, ...]} from each pillar's real
+    Contribution list -- the same claim_reasoning text formula_estimator.py
+    computed the score from and critic_panel.py's peer_plausibility/
+    internal_consistency lenses already read (see _critic_b_prompt/
+    _critic_c_prompt). Passed to explain_company(_sync) so the summary is
+    grounded in actual cited evidence, not only the compressed vote-
+    breakdown string in e/s/g_reasoning. Skips contributions with no real
+    text (e.g. a bare baseline has none)."""
+    out: dict = {}
+    for pillar, fs in (formula_scores or {}).items():
+        out[pillar] = [c.claim_reasoning for c in (fs.contributions or []) if c.claim_reasoning]
+    return out
+
+
+def _routing_by_pillar(pillar_routing: Optional[dict]) -> dict:
+    """{"E"|"S"|"G": "rich"|"thin"} from graph.py's own pillar_routing
+    state -- see EVIDENCE_ROUTE_PLAN.md. Passed to explain_company(_sync)
+    so it can hedge a thin pillar's language even when the number alone
+    doesn't signal that."""
+    return {p: r.get("route") for p, r in (pillar_routing or {}).items() if r.get("route")}
+
+
+def _apply_public_uplift_to_verified(reconciled: dict, verified: dict, public_uplift: dict) -> dict:
+    """Merges node_public_company_uplift's output ON TOP of `verified`
+    (never mutates the input dicts), producing a new dict[pillar,
+    VerifiedScore] every downstream consumer (the DB write in
+    persist_ensemble_scores, _ensemble_render's reasoning text, the final
+    ESGScore object) can use exactly as if it were verify_estimate's own
+    output -- this is the ONE merge point; nothing downstream needs its
+    own uplift-awareness. A pillar with no VerifiedScore yet (verify=False)
+    gets a synthesized point-mode one so the uplifted score has somewhere
+    to live; an unuplifted pillar's existing VerifiedScore (or absence of
+    one) passes through completely unchanged."""
+    from agentic_estimation.layer_4.estimate_verifier import VerifiedScore
+
+    merged = dict(verified or {})
+    for pillar, result in (public_uplift or {}).items():
+        if not result.applied:
+            continue
+        base = merged.get(pillar)
+        note = f"public-company uplift: {result.original_score:.1f} -> {result.corrected_score:.1f} ({result.reasoning})"
+        if base is not None:
+            merged[pillar] = VerifiedScore(
+                pillar=pillar, mode="point", score=result.corrected_score,
+                low=result.corrected_score, high=result.corrected_score,
+                confidence=base.confidence, needs_review=False,
+                verdict=f"{base.verdict}+uplifted", retried=base.retried,
+                objections=base.objections, reason=note, critic_calls=base.critic_calls,
+            )
+        else:
+            rs = reconciled[pillar]
+            merged[pillar] = VerifiedScore(
+                pillar=pillar, mode="point", score=result.corrected_score,
+                low=result.corrected_score, high=result.corrected_score,
+                confidence=rs.confidence, needs_review=False,
+                verdict="uplifted", reason=note,
+            )
+    return merged
 
 
 async def node_persist_ensemble_scores(state: PipelineState) -> dict:
@@ -732,7 +885,8 @@ async def node_persist_ensemble_scores(state: PipelineState) -> dict:
     formula_scores = state.get("formula_scores", {})
     qc = qc_assess(formula_scores) if formula_scores else {}
     gated = gate(reconciled, qc, routing=state.get("pillar_routing")) if qc else {}
-    verified = state.get("verified") or {}
+    verified = _apply_public_uplift_to_verified(reconciled, state.get("verified") or {},
+                                                 state.get("public_uplift"))
 
     reasonings = {
         p: _ensemble_render(reconciled[p], gated.get(p), verified.get(p)) for p in ("E", "S", "G")
@@ -746,12 +900,39 @@ async def node_persist_ensemble_scores(state: PipelineState) -> dict:
     except Exception as exc:
         return {"error": f"Ensemble score persistence failed: {exc}"}
 
+    # Score fields MUST reflect verify_estimate's outcome when it ran, not
+    # the raw pre-verification reconciled score -- found 2026-09-18: this
+    # previously always read reconciled[p].score even though `verified` was
+    # in scope, so a refuted-and-downgraded pillar's DB row (correctly
+    # verified-score, via persist_ensemble_scores above) and this object's
+    # numeric field could disagree, while the reasoning text alongside it
+    # DID already say "VERIFIED: refuted... needs review" -- a summary built
+    # from this object could describe a score that isn't the one actually
+    # persisted. Same fallback rule ensemble_persistence.py already uses:
+    # verified score when Phase 4 ran, reconciled score otherwise.
+    def _final_pillar_score(pillar: str) -> float:
+        vs = verified.get(pillar)
+        return vs.score if vs is not None else reconciled[pillar].score
+
+    # Same "verified overrides gate" precedence persist_ensemble_scores uses
+    # for needs_review, so explain_company_sync (via e/s/g_needs_review) can
+    # flag an unresolved pillar structurally instead of only through prose.
+    def _final_needs_review(pillar: str) -> bool:
+        vs = verified.get(pillar)
+        if vs is not None:
+            return bool(vs.needs_review)
+        gs = gated.get(pillar) if gated else None
+        return bool(gs.needs_review) if gs is not None else False
+
     from agentic_estimation.layer_3.scoring_agent import ESGScore
     final_score = ESGScore(
         company=state["company_name"],
-        e_score=reconciled["E"].score, s_score=reconciled["S"].score, g_score=reconciled["G"].score,
+        e_score=_final_pillar_score("E"), s_score=_final_pillar_score("S"),
+        g_score=_final_pillar_score("G"),
         e_reasoning=reasonings["E"], s_reasoning=reasonings["S"], g_reasoning=reasonings["G"],
         country=state.get("country"), signals_used=len(state.get("signals", {})),
+        e_needs_review=_final_needs_review("E"), s_needs_review=_final_needs_review("S"),
+        g_needs_review=_final_needs_review("G"),
     )
     return {"final_score": final_score}
 
@@ -824,6 +1005,7 @@ def build_graph():
     g.add_node("holistic_llm", node_holistic_llm)
     g.add_node("reconcile", node_reconcile)
     g.add_node("verify_estimate", node_verify_estimate)
+    g.add_node("public_company_uplift", node_public_company_uplift)
     g.add_node("persist_ensemble_scores", node_persist_ensemble_scores)
 
     # metadata runs BEFORE signals (PHASE_5_PLAN.md 0.3 / DEFECT_FIX_PLAN.md 1.4):
@@ -849,11 +1031,16 @@ def build_graph():
 
     g.add_edge("holistic_llm", "reconcile")
     g.add_edge("reconcile", "verify_estimate")
+    # public_company_uplift runs for BOTH dry and persist (same reasoning
+    # as verify_estimate itself -- it writes nothing to the DB, so there's
+    # no persist-only boundary to respect), which is why it sits BEFORE
+    # this fork rather than being duplicated on both branches.
+    g.add_edge("verify_estimate", "public_company_uplift")
     # Full runs continue on to persist scores + metrics + explainability
     # (mirroring the LLM path's evaluator->metrics->explainability chain);
     # dry runs never persist anything, same as every other dry branch.
     g.add_conditional_edges(
-        "verify_estimate",
+        "public_company_uplift",
         lambda state: "persist_ensemble_scores" if not state.get("dry_run", True) else "end",
         {"persist_ensemble_scores": "persist_ensemble_scores", "end": END},
     )
@@ -950,17 +1137,7 @@ def _populate_result_from_ensemble(result: PipelineResult, final_state: dict) ->
         # -- fall back to whatever formula_scores exist, same as scorer='formula'.
         _populate_result_from_formula(result, final_state)
         return
-    result.e_score, result.s_score, result.g_score = (
-        reconciled["E"].score, reconciled["S"].score, reconciled["G"].score,
-    )
-
     # Confidence Gate (confidence_gate.py): point score vs range + needs_review.
-    # Numeric score fields above are unchanged either way -- PipelineResult
-    # (the in-memory dataclass) still has no band fields; the gate's verdict
-    # is rendered into the reasoning string instead. Ranges/verdicts ARE now
-    # persisted to the DB (company_metric_values.low_value/high_value/verdict
-    # -- see ensemble_persistence.py, node_persist_ensemble_scores), so this
-    # is only a display-object limitation, not a data-loss one.
     gated = {}
     formula_scores = final_state.get("formula_scores")
     if formula_scores:
@@ -977,7 +1154,28 @@ def _populate_result_from_ensemble(result: PipelineResult, final_state: dict) ->
     # rendering purposes when present -- e.g. a successful critic retry can
     # change the routing (range -> point) relative to the pre-verification
     # gate snapshot. Falls back to `gated` when verification didn't run.
-    verified = final_state.get("verified") or {}
+    verified = _apply_public_uplift_to_verified(reconciled, final_state.get("verified") or {},
+                                                 final_state.get("public_uplift"))
+
+    # Numeric score fields MUST come from `verified` when it ran, not the
+    # raw pre-verification `reconciled` score. Found 2026-09-18: this used
+    # to unconditionally read reconciled[p].score while the reasoning
+    # string built two lines below (_ensemble_render) already rendered
+    # verified's outcome (e.g. "VERIFIED: refuted... needs review") -- a
+    # caller reading result.e_score alongside result.e_reasoning could see
+    # a number and a caption that disagree whenever a pillar was refuted
+    # and its score changed. The comment previously here argued this was
+    # "only a display-object limitation, not a data-loss one" -- true for
+    # the range/point-mode framing (PipelineResult has no low/high fields),
+    # false for the number itself, which this fixes. Same fallback
+    # ensemble_persistence.py's DB write already uses.
+    def _pillar_score(pillar: str) -> float:
+        vs = verified.get(pillar)
+        return vs.score if vs is not None else reconciled[pillar].score
+
+    result.e_score, result.s_score, result.g_score = (
+        _pillar_score("E"), _pillar_score("S"), _pillar_score("G"),
+    )
 
     result.e_reasoning, result.s_reasoning, result.g_reasoning = (
         _ensemble_render(reconciled["E"], gated.get("E"), verified.get("E")),

@@ -44,20 +44,32 @@ _EXPLAIN_PROMPT = """You are an ESG communications expert writing for a business
 Write a single paragraph (4-6 sentences) summarising the ESG performance of the company below.
 The paragraph should:
 - Open with the company name and an overall ESG characterisation (strong / average / weak)
-- Mention all three pillar scores and what drives them (use the reasoning provided)
+- Mention all three pillar scores and what drives them (use the reasoning and cited evidence provided)
 - Compare to the country peer group where relevant
 - Close with the single biggest ESG risk or strength to watch
+- For any pillar marked "UNRESOLVED" below, say so plainly (e.g. "the Governance \
+score is still under review and should be treated as provisional") rather than \
+presenting it with the same confidence as a resolved pillar
+- For any pillar marked "THIN EVIDENCE" below, hedge accordingly (e.g. "little public \
+disclosure exists, so this is closer to an industry/country estimate than a measured \
+score") -- do NOT write about a thin-evidence pillar with the same certainty as a \
+RICH EVIDENCE one, even if the numeric scores look similarly confident
 
 COMPANY:  {company}
 INDUSTRY: {industry}
 COUNTRY:  {country}
 
 SCORES (0-100, 50 = country average):
-  Environment : {e_score:.1f}/100 — {e_reasoning}
-  Social      : {s_score:.1f}/100 — {s_reasoning}
-  Governance  : {g_score:.1f}/100 — {g_reasoning}
+  Environment : {e_score:.1f}/100{e_review_flag}{e_route_flag} — {e_reasoning}
+{e_evidence_block}
+  Social      : {s_score:.1f}/100{s_review_flag}{s_route_flag} — {s_reasoning}
+{s_evidence_block}
+  Governance  : {g_score:.1f}/100{g_review_flag}{g_route_flag} — {g_reasoning}
+{g_evidence_block}
 
 Write ONLY the paragraph. No headings, no bullet points, no JSON, no preamble."""
+
+_MAX_EVIDENCE_ITEMS_PER_PILLAR = 8
 
 
 @dataclass
@@ -69,13 +81,48 @@ class ESGSummary:
     g_score: float
 
 
+def _format_evidence_block(pillar_label: str, items: Optional[list]) -> str:
+    """Renders this pillar's cited evidence (Contribution.claim_reasoning
+    strings, one per factor that actually contributed to the score) as an
+    indented bullet list under the pillar's score line. None/empty -> a
+    single "(no cited evidence...)" line rather than an empty gap, so the
+    prompt's line count/shape stays stable whether or not evidence was
+    passed (keeps every existing caller's un-evidenced summaries looking
+    the same as before this was added)."""
+    if not items:
+        return "      (no cited evidence available for this pillar)"
+    shown = items[:_MAX_EVIDENCE_ITEMS_PER_PILLAR]
+    lines = [f"      - {text}" for text in shown if text]
+    if not lines:
+        return "      (no cited evidence available for this pillar)"
+    if len(items) > len(shown):
+        lines.append(f"      - (+{len(items) - len(shown)} more, omitted for length)")
+    return "\n".join(lines)
+
+
 def explain_company_sync(
     score,  # ESGScore dataclass from scoring_agent
     industry: str = "",
+    evidence_by_pillar: Optional[dict] = None,
+    routing_by_pillar: Optional[dict] = None,
 ) -> Optional[ESGSummary]:
     """
     Generate a plain-English ESG summary from an ESGScore object.
     No DB interaction — pure LLM call.
+
+    evidence_by_pillar: optional {"E"|"S"|"G": [claim_reasoning, ...]} --
+    the actual cited-evidence text behind each pillar's score (e.g. each
+    Contribution.claim_reasoning from formula_scores), so the summary is
+    grounded in what was actually found rather than only the compressed
+    vote-breakdown string already in e/s/g_reasoning. None (default, every
+    caller before 2026-09-21) omits the evidence block entirely -- same
+    prompt shape as before this was added.
+
+    routing_by_pillar: optional {"E"|"S"|"G": "rich"|"thin"} (see
+    graph.py's pillar_routing / EVIDENCE_ROUTE_PLAN.md) -- tells the LLM
+    which pillars are backed by real evidence vs. an industry/country
+    estimate, so it hedges a thin pillar's language even when its number
+    alone wouldn't signal that. None (default) omits the route tag.
     """
     from zen_client import call_with_prompt
 
@@ -83,6 +130,24 @@ def explain_company_sync(
                company=score.company,
                country=score.country or "Unknown",
                scores=f"E={score.e_score:.0f} S={score.s_score:.0f} G={score.g_score:.0f}")
+
+    evidence_by_pillar = evidence_by_pillar or {}
+    routing_by_pillar = routing_by_pillar or {}
+
+    # getattr-with-default: callers may pass an ESGScore-shaped object
+    # predating the e/s/g_needs_review fields (added 2026-09-18), or any
+    # other object satisfying this "duck-typed" contract -- absence means
+    # "not flagged", never a crash.
+    def _review_flag(pillar: str) -> str:
+        return " (UNRESOLVED, under review)" if getattr(score, f"{pillar}_needs_review", False) else ""
+
+    def _route_flag(pillar_key: str) -> str:
+        route = routing_by_pillar.get(pillar_key)
+        if route == "thin":
+            return " (THIN EVIDENCE)"
+        if route == "rich":
+            return " (RICH EVIDENCE)"
+        return ""  # unknown/not routed (e.g. formula/llm scorer callers) -- say nothing, not a guess
 
     prompt = _EXPLAIN_PROMPT.format(
         company=score.company,
@@ -94,6 +159,15 @@ def explain_company_sync(
         e_reasoning=score.e_reasoning,
         s_reasoning=score.s_reasoning,
         g_reasoning=score.g_reasoning,
+        e_review_flag=_review_flag("e"),
+        s_review_flag=_review_flag("s"),
+        g_review_flag=_review_flag("g"),
+        e_route_flag=_route_flag("E"),
+        s_route_flag=_route_flag("S"),
+        g_route_flag=_route_flag("G"),
+        e_evidence_block=_format_evidence_block("Environment", evidence_by_pillar.get("E")),
+        s_evidence_block=_format_evidence_block("Social", evidence_by_pillar.get("S")),
+        g_evidence_block=_format_evidence_block("Governance", evidence_by_pillar.get("G")),
     )
 
     log.info("[%s] calling LLM for summary...", score.company)
@@ -163,11 +237,14 @@ async def explain_company(
     score,
     company_id: UUID,
     industry: str = "",
+    evidence_by_pillar: Optional[dict] = None,
+    routing_by_pillar: Optional[dict] = None,
 ) -> Optional[ESGSummary]:
     """
     Generate ESG summary and persist to company_metric_values.
     """
-    result = explain_company_sync(score, industry=industry)
+    result = explain_company_sync(score, industry=industry, evidence_by_pillar=evidence_by_pillar,
+                                   routing_by_pillar=routing_by_pillar)
     if result is None:
         return None
 
@@ -241,21 +318,13 @@ def _cli():
 
     elif mode == "explain":
         async def _run():
-            db_url = os.environ.get("ASYNC_DB_URL", "").replace("postgresql+asyncpg://", "postgresql://")
-            if not db_url:
-                raise RuntimeError("ASYNC_DB_URL not set")
-            conn = await asyncpg.connect(db_url)
-            try:
-                row = await conn.fetchrow(
-                    "SELECT id, name FROM companies WHERE name ILIKE $1 LIMIT 1",
-                    f"%{company}%",
-                )
-                if not row:
-                    print(f"ERROR: company '{company}' not found in DB")
-                    sys.exit(1)
-                company_id = UUID(str(row["id"]))
-            finally:
-                await conn.close()
+            from agentic_estimation.shared.db_company_lookup import resolve_company_id_standalone
+
+            match = await resolve_company_id_standalone(company)
+            if match is None:
+                print(f"ERROR: company '{company}' not found in DB")
+                sys.exit(1)
+            company_id, _actual_name = match
 
             result = await explain_company(score, company_id=company_id, industry=industry)
             if result:

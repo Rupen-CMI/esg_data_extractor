@@ -20,8 +20,14 @@ import requests
 ZEN_BASE_URL = "https://opencode.ai/zen/v1"
 
 # Free model IDs available on Zen (from GET /v1/models).
+#
+# deepseek-v4-flash-free DELIBERATELY REMOVED from this list 2026-10-06 (user
+# instruction) -- opencode.ai's free tier was intermittently 429-throttling
+# and the model was implicated in at least one unexplained 400 Bad Request
+# on a real production call (pillar_extractors.py, Toyota E/S/G extraction,
+# all 3 pillars failed simultaneously). Do not re-add until explicitly told
+# to.
 FREE_MODELS = [
-    "deepseek-v4-flash-free",
     "qwen3.6-plus-free",
     "minimax-m3-free",
     "mimo-v2.5-free",
@@ -29,8 +35,10 @@ FREE_MODELS = [
     "north-mini-code-free",
 ]
 
-# Default model used by the pipeline (chosen by user after benchmarking).
-DEFAULT_MODEL = "deepseek-v4-flash-free"
+# Default model used by the pipeline. Ollama's gpt-oss:120b-cloud, not an
+# opencode.ai free model -- see "Ollama routing" below for why (separate
+# backend/quota from opencode.ai's throttled free tier).
+DEFAULT_MODEL = "gpt-oss:120b-cloud"
 
 # Models that are actually usable on the free tier (qwen/minimax promos ended;
 # nemotron is too slow/unstable). Ordered as a sensible fallback chain.
@@ -44,8 +52,9 @@ DEFAULT_MODEL = "deepseek-v4-flash-free"
 # reads it for fallback selection today -- pillar_extractors.py is pinned to
 # DEFAULT_MODEL only, per call_with_prompt's own no-cross-model-fallback
 # design. Fix if/when a real fallback-chain caller is built.
+#
+# deepseek-v4-flash-free REMOVED 2026-10-06, same reason as FREE_MODELS above.
 USABLE_FREE_MODELS = [
-    "deepseek-v4-flash-free",
     "north-mini-code-free",
     "mimo-v2.5-free",
 ]

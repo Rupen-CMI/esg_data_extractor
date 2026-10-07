@@ -2,6 +2,13 @@
 candidate_spans.py -- keyword-gated candidate-window extraction, run BEFORE
 evidence_classifier.predict() on long real signal text.
 
+NOT INTEGRATED INTO THE LIVE PIPELINE -- see evidence_classifier.py's own
+module docstring ("NOT INTEGRATED INTO THE LIVE PIPELINE -- DECIDED
+2026-09-18") for the full evaluation and reasoning. Same decision applies
+here: this module only exists to feed classify_with_gating() into a
+classifier that was decided not to be worth deploying. Keep on disk for
+reference; do not wire in on its own either.
+
 WHY THIS EXISTS: evidence_clf_v3 fixed the training/production length
 mismatch (median 96 -> 1,081 chars) but only by making the classifier tolerate
 long text, not by giving it a shorter, denser span to actually decide on. A

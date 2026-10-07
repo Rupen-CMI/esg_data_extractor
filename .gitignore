@@ -31,6 +31,7 @@ Thumbs.db
 raw_esg_data/
 downloaded_reports/
 calibration/cache/
+external_data/
 
 # not needed for pipeline
 demo_ui/
@@ -44,3 +45,4 @@ PROBLEMS.md
 ruff-report.json*
 ruff-report.txt*
 *.json
+List of reports - 1.xlsx

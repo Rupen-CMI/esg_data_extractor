@@ -210,24 +210,28 @@ class CalculatorInput(BaseModel):
     )
     anti_corruption_policy: Optional[bool] = Field(
         None, description="Written policy against bribery/corruption. "
-        "Zero-weight in the registry -- nearly everyone answers yes, so this "
-        "carries almost no scoring signal by design."
+        "Zero-weight in the real registry -- nearly everyone answers yes, "
+        "so this carries almost no scoring signal by design -- but MANDATORY "
+        "here with a small +/-3pt calculator-only nudge (2026-09-21 product "
+        "decision, see scoring.py's badge-factor nudge comment)."
     )
     whistleblower_mechanism: Optional[bool] = Field(
         None, description="Any reporting channel beyond 'tell your manager'. "
-        "Zero-weight -- same reasoning."
+        "Zero-weight in the real registry; MANDATORY here with the same "
+        "+/-3pt calculator-only nudge as anti_corruption_policy."
     )
     esg_report_published: Optional[bool] = Field(
         None, description="Has published a standalone ESG/sustainability "
-        "report. Zero-weight."
+        "report. Zero-weight -- stays optional, no calculator-only nudge."
     )
     third_party_esg_audit: Optional[bool] = Field(
         None, description="Independently assured/audited ESG disclosure. "
-        "Zero-weight."
+        "Zero-weight -- stays optional, no calculator-only nudge."
     )
     compliance_certification: Optional[bool] = Field(
         None, description="Anti-corruption/compliance certification or "
-        "formal program. Zero-weight."
+        "formal program. Zero-weight in the real registry; MANDATORY here "
+        "with the same +/-3pt calculator-only nudge as anti_corruption_policy."
     )
     regulatory_fines: Optional[bool] = Field(
         None, description="Any regulatory fine or sanction in the last 3 "
@@ -311,10 +315,21 @@ class PillarResult(BaseModel):
                               "notes on what drove this pillar's score.")
 
 
+class OverallResult(BaseModel):
+    score: float = Field(..., description="0-100, higher is better -- a "
+        "fixed-weight E/S/G blend (see scoring.py's _OVERALL_PILLAR_WEIGHTS, "
+        "35/35/30 -- a calculator-only choice, NOT the same split "
+        "build_esg_json.py uses for the live pipeline's report), NOT a "
+        "separate estimate of its own.")
+    low: float
+    high: float
+
+
 class CalculatorResult(BaseModel):
     E: PillarResult
     S: PillarResult
     G: PillarResult
+    overall: OverallResult
     claims: list[ClaimSummary] = Field(default_factory=list)
     narrative: Optional[str] = Field(
         None, description="LLM-generated explanation of the ALREADY-COMPUTED "

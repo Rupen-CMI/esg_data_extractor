@@ -127,7 +127,15 @@ _INHERENTLY_NEGATIVE_FACTORS = {
 }
 
 # ── Rule (d): corroboration floor ────────────────────────────────────────────
-_CORROBORATION_WEIGHT_FLOOR = 9.0  # factor weight at/above which a single-source claim gets capped
+# Was a bare weight>=9.0 check, which the same rule's factors didn't actually
+# all clear: litigation (w=7) and governance_controversy (w=8) sit just under
+# the line, so they never got the single-source confidence cap that
+# environmental_controversy/labor_controversy/human_rights_incident/
+# regulatory_fines (w=8-12) all get, despite belonging to the exact same
+# "real adjudicated negative event" class defined by _INHERENTLY_NEGATIVE_
+# FACTORS above. Found + fixed 2026-09-18: gate on that set directly instead
+# of a weight threshold that happened to miss two of its own members.
+_CORROBORATION_FACTORS = _INHERENTLY_NEGATIVE_FACTORS
 
 # ── Rule (e): known-failure shape (short text + high confidence) ────────────
 _SHORT_TEXT_CHARS = 200
@@ -274,7 +282,7 @@ def _check_corroboration(claims: list[ExtractedClaim]) -> list[ValidationFlag]:
 
     for factor_key, factor_claims in by_factor.items():
         factor = get_factor(factor_key)
-        if factor is None or factor.weight < _CORROBORATION_WEIGHT_FLOOR:
+        if factor is None or factor_key not in _CORROBORATION_FACTORS:
             continue
         negative = [c for c in factor_claims if c.polarity == -1]
         if not negative:

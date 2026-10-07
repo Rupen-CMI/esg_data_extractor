@@ -41,6 +41,8 @@ from agentic_estimation.shared.pipeline_logger import get_logger, log_header
 from agentic_estimation.shared.llm_json import extract_json_object
 from agentic_estimation.layer_2.factor_registry import factors_for_pillar, get_factor
 from agentic_estimation.shared.claim_types import ExtractedClaim
+from agentic_estimation.layer_1.signal_agent import RateLimitTripped
+from zen_client import OllamaRateLimitTripped
 
 log = get_logger("pillar_extractors")
 
@@ -99,6 +101,18 @@ For that factor, either (a) correct the claim so it accurately reflects what the
 actually says, (b) keep it only if you can point to the exact supporting sentence verbatim in \
 "reasoning", or (c) omit it entirely if the objection is valid and no real support exists. \
 Do not simply repeat the original claim unchanged without addressing the objection.
+{corrected_excerpt_block}"""
+
+_CORRECTED_EXCERPT_BLOCK = """
+The reviewer also quoted this passage from the SAME signal text as what they believe actually \
+supports or contradicts the "{flagged_factor}" claim:
+    "{corrected_excerpt}"
+Do NOT accept this passage automatically -- triple-check it against the original signal text \
+yourself, the same way you would check any other claim. Confirm the quoted passage genuinely \
+appears in the signal and genuinely supports what the reviewer says before using it. If it \
+checks out, build the corrected claim from it. If it does NOT hold up on your own re-reading \
+(misquoted, taken out of context, or doesn't actually say what the reviewer claims), disregard \
+it and decide the factor on the original text alone.
 """
 
 _PROMPT_TEMPLATE = """You are an evidence tagger reviewing signals about a company for the {pillar} \
@@ -107,7 +121,7 @@ you never invent facts, never convert a value into a 0-100 score, and never gues
 a factor's presence without a specific piece of supporting text.
 
 COMPANY: {company}
-
+{context_block}
 SIGNALS (each tagged with its source):
 {signals_block}
 {objection_block}
@@ -115,6 +129,17 @@ STEP 1 -- RELEVANCE CHECK: for each signal above, decide whether it actually dis
 something relevant to {topics} for THIS company. Some signals may be off-topic, generic, \
 or about an unrelated company/subject that happened to match a search query -- extract \
 NOTHING from those. Only proceed to Step 2 for signals that are genuinely on-topic.
+
+STEP 1B -- DUPLICATE CHECK: multiple signals can report the SAME underlying event, worded \
+differently by different outlets (e.g. "Toyota and IVECO join forces on hydrogen trucks" vs \
+"IVECO and Toyota join forces on hydrogen trucks" -- same partnership, same event). Do NOT \
+extract the same claim twice from what is really one event reported twice. But be careful: \
+headlines that LOOK similar can still be genuinely DIFFERENT events -- "Toyota recalls \
+500,000 vehicles" and "Toyota recalls 8,000 vehicles" are two separate recalls even though \
+they share the same template, because the number, date, or specific defect differs. Only \
+treat two signals as the same event if the SPECIFIC facts (numbers, dates, named parties) \
+genuinely match, not just the general topic or sentence shape. When you do merge duplicate \
+signals into one claim, cite whichever source_tag has the most complete/specific information.
 
 STEP 2 -- EXTRACT CLAIMS: for each relevant signal, extract claims strictly from this \
 closed factor list (do not invent new factor names):
@@ -139,6 +164,50 @@ Respond with ONLY this JSON object (no markdown fences), after your reasoning:
 "reasoning": "<one short sentence>"}}, ...]}}"""
 
 
+# sector_emissions_intensity is the one non-zero-weight factor that is,
+# same as the weight==0 badges below, never meant to be LLM-extracted --
+# its only real claim source is climate_trace_anchor.py's deterministic
+# Climate TRACE sector-percentile lookup (confidence 0.25 by design, see
+# that module's docstring), not text evidence. Found + fixed 2026-09-18:
+# weight=4 (not 0) meant _factor_list_block's weight==0 filter let it
+# through into the live prompt anyway, worded as "(Climate TRACE anchor)"
+# -- text the LLM has no actual Climate TRACE data to check against, so it
+# can only skip the factor or hallucinate a guess. Worse, formula_estimator.
+# _pick_best_claim() ranks claims by confidence FIRST or method-trust
+# second (see that module) -- any hallucinated LLM guess with confidence
+# above 0.25 would silently outrank and discard the real dataset-grounded
+# claim for this exact factor. Excluding it from the prompt removes the
+# hallucination risk at the source instead of trying to out-rank it later.
+_LLM_EXCLUDED_FACTORS = {"sector_emissions_intensity"}
+
+# Fields worth surfacing to the LLM as company context: country/industry help
+# it judge plausibility (a claim about deep-sea drilling is implausible for a
+# software company), employees/revenue give a rough size/scale anchor. Every
+# other metadata field (qid, lei, sec_cik, website, subsidiary_count, ...) is
+# either an identifier with no bearing on evidence judgement or too sparse to
+# rely on. Deliberately excludes anything that could be a scoring answer --
+# metadata never carries a benchmark/ESG score (see company_metadata.py's own
+# return shape), so there is no has_ground_truth_leakage-style risk here.
+_CONTEXT_FIELDS = ("country", "industry", "employees", "revenue")
+
+
+def _context_block(metadata: Optional[dict]) -> str:
+    """Renders `metadata` (see company_metadata.get_company_metadata) as a
+    short CONTEXT line for the prompt. Was accepted-but-unused in this
+    module until 2026-09-18 -- see module history: ~15 real callers across
+    the codebase already gather and pass this in, it just never reached the
+    prompt. Degrades to "" (an extra blank line, harmless) when metadata is
+    None/{}/unmatched or every field is empty, so every existing caller that
+    passes no metadata is completely unaffected."""
+    if not metadata or not metadata.get("matched"):
+        return ""
+    parts = [f"{field}: {metadata[field]}" for field in _CONTEXT_FIELDS if metadata.get(field)]
+    if not parts:
+        return ""
+    return "CONTEXT (from public company records, not evidence -- background only): " \
+           + "; ".join(parts) + "\n"
+
+
 def _factor_list_block(pillar: str) -> str:
     """Closed factor list injected into the LLM prompt.
 
@@ -153,10 +222,13 @@ def _factor_list_block(pillar: str) -> str:
     score regardless of what's extracted. Confirmed live 2026-09-12: every
     one of these factors was still being actively searched for and
     extracted with no effect on any score.
+
+    _LLM_EXCLUDED_FACTORS (see above) are excluded for a different reason --
+    not zero-weight, but never meant to be text-extracted at all.
     """
     lines = []
     for f in factors_for_pillar(pillar):
-        if f.weight == 0:
+        if f.weight == 0 or f.key in _LLM_EXCLUDED_FACTORS:
             continue
         lines.append(f"  - {f.key} ({f.description}) [{f.delta_shape}]")
     return "\n".join(lines)
@@ -201,14 +273,32 @@ def extract_pillar_claims(
 ) -> list[ExtractedClaim]:
     """Pure: no DB access. One LLM call for one pillar.
 
-    objection: optional {"flagged_factor": str, "objection_text": str} --
-    the Phase 4 critic-panel retry channel (see estimate_verifier.py). When
-    set, a "REVIEWER OBJECTION" section is injected into the prompt asking
-    the model to specifically re-examine that one factor against the
-    reviewer's stated concern. This is the explicit correction channel --
-    NOT a signals-dict piggyback, which would fabricate a citable
-    source_tag that was never a real gathered signal. None (the default)
-    is a no-op -- identical prompt/behavior to every existing caller.
+    metadata: company context from company_metadata.get_company_metadata()
+    (country, industry, employees, revenue, etc.) -- ~15 call sites across
+    graph.py, calibration_harness.py, formula_estimator.py, reconcile.py,
+    and several calibration/ scripts already gather and pass this in.
+    Confirmed 2026-09-18 it was accepted but never read (dead parameter,
+    every claim extracted identically with or without it); fixed the same
+    day by rendering the size/plausibility-relevant fields (see
+    _context_block()) into a CONTEXT line in the prompt, explicitly marked
+    "not evidence -- background only" so the model can't cite it as a
+    source_tag or treat it as a claim.
+
+    objection: optional {"flagged_factor": str, "objection_text": str,
+    "corrected_excerpt": Optional[str]} -- the Phase 4 critic-panel retry
+    channel (see estimate_verifier.py). When set, a "REVIEWER OBJECTION"
+    section is injected into the prompt asking the model to specifically
+    re-examine that one factor against the reviewer's stated concern. This
+    is the explicit correction channel -- NOT a signals-dict piggyback,
+    which would fabricate a citable source_tag that was never a real
+    gathered signal. corrected_excerpt (added 2026-09-18): an optional
+    verbatim passage the evidence_support critic quoted from the SAME
+    signal text (critic_panel.py now shows it the full, untruncated
+    signal specifically so it can quote real text instead of guessing) --
+    when present, the model is told to verify the quote against the
+    original text itself before trusting it, never to accept it blindly.
+    None (the default) is a no-op -- identical prompt/behavior to every
+    existing caller.
 
     model: optional override, passed straight to zen_client.call_with_prompt.
     None (default) uses zen_client's own DEFAULT_MODEL (opencode.ai). Pass
@@ -224,15 +314,24 @@ def extract_pillar_claims(
 
     objection_block = ""
     if objection:
+        flagged_factor = objection.get("flagged_factor", "(unspecified)")
+        corrected_excerpt = objection.get("corrected_excerpt")
+        corrected_excerpt_block = ""
+        if corrected_excerpt:
+            corrected_excerpt_block = _CORRECTED_EXCERPT_BLOCK.format(
+                flagged_factor=flagged_factor, corrected_excerpt=corrected_excerpt,
+            )
         objection_block = _OBJECTION_TEMPLATE.format(
-            flagged_factor=objection.get("flagged_factor", "(unspecified)"),
+            flagged_factor=flagged_factor,
             objection_text=objection.get("objection_text", "(no detail provided)"),
+            corrected_excerpt_block=corrected_excerpt_block,
         )
 
     prompt = _PROMPT_TEMPLATE.format(
         pillar=pillar,
         topics=_PILLAR_TOPICS[pillar],
         company=company,
+        context_block=_context_block(metadata),
         signals_block=_signals_block(signals),
         objection_block=objection_block,
         factor_list=_factor_list_block(pillar),
@@ -321,7 +420,7 @@ a value into a 0-100 score, and never guess a factor's presence without a specif
 of supporting text.
 
 COMPANY: {company}
-
+{context_block}
 SIGNALS (each tagged with its source):
 {signals_block}
 
@@ -387,6 +486,7 @@ def extract_all_claims_merged(company: str, signals: dict[str, str],
 
     prompt = _MERGED_PROMPT_TEMPLATE.format(
         company=company,
+        context_block=_context_block(metadata),
         signals_block=_signals_block(signals),
         topics_e=_PILLAR_TOPICS["E"], factors_e=_factor_list_block("E"),
         topics_s=_PILLAR_TOPICS["S"], factors_s=_factor_list_block("S"),
@@ -453,6 +553,8 @@ def extract_all_claims(company: str, signals: dict[str, str], metadata: Optional
         for fut in futures:
             try:
                 results.extend(fut.result())
+            except (RateLimitTripped, OllamaRateLimitTripped):
+                raise   # never swallow the abort signal -- must stop the run
             except Exception as exc:
                 log.warning("[%s/%s] extraction raised: %s", company, futures[fut], exc)
     return results

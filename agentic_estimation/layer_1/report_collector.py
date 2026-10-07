@@ -635,28 +635,31 @@ def fetch_report_signals(company: str, max_reports: int = 2,
     company elsewhere (e.g. "Humana" the US insurer vs. "Humana AB", a
     Swedish care-services company) -- see _fetch_via_search's docstring.
     None (default) preserves prior behavior exactly.
-    """
-    paths = find_reports(company)
-    if not paths and fetch_missing:
-        # Nothing on disk -- but this company may be in the SRN index, in which
-        # case its report is one download away. Without this the collector was
-        # limited to whatever a previous bulk run happened to fetch: Kering,
-        # Covestro and Balder all sat in the SRN index with 2 reports each and
-        # still returned {} because nobody ever pulled them.
-        #
-        # On-demand by design: one company, at most one PDF, only when it is
-        # actually being scored.
-        if _fetch_from_srn(company):
-            paths = find_reports(company)
 
-    if not paths and fetch_missing and _SEARCH_FALLBACK:
-        # SRN has nothing -- fall back to real web search (see
-        # _fetch_via_search docstring). This is what catches the companies
-        # SRN structurally cannot: non-EU, private, or otherwise unlisted
-        # ones that still publish a real, findable report (confirmed
-        # concretely 2026-08-18: AVZ Minerals, an Australian mining company,
-        # has a real ESG/financial report hosted on Squarespace -- SRN will
-        # never index it, search finds it directly).
+    ORDER FLIPPED 2026-10-06 (user instruction): SEARCH FIRST, disk cache
+    is now a FALLBACK, not the primary source. Confirmed live on a real
+    company (Toyota): the old disk-first order returned a 2009
+    sustainability report every single run -- 17 years stale -- because
+    find_reports() found SOMETHING on disk and the code never looked
+    further. There is no staleness check anywhere in this pipeline, and
+    adding one (e.g. parsing a year out of the filename) is a weaker fix
+    than just not trusting old cached files as the default path. The
+    search call itself now uses year-qualified queries (see
+    discover_reports._year_qualified_templates) that try the current year
+    first, so a correct, CURRENT document is what gets found and cached
+    going forward -- the disk cache still exists (fetch results are still
+    written to the same directory find_reports() indexes), it is just no
+    longer checked BEFORE a fresh search is attempted.
+
+    Real cost accepted knowingly: every company now pays a live web-search
+    round-trip on every call, not just companies with nothing cached
+    before. fetch_missing=False (or ESG_REPORT_FETCH=0) skips search
+    entirely and falls back to whatever is on disk, same as before, for a
+    strictly offline run.
+    """
+    paths: list[str] = []
+    if fetch_missing and _SEARCH_FALLBACK:
+        # SEARCH FIRST, not last resort -- see docstring above for why.
         found_path = _fetch_via_search(company, country=country)
         if found_path:
             global _index_cache
@@ -669,6 +672,24 @@ def fetch_report_signals(company: str, max_reports: int = 2,
                 # fall back to using the search hit directly rather than
                 # losing a real, entity-verified document to an index miss.
                 paths = [found_path]
+
+    if not paths and fetch_missing:
+        # Search found nothing live -- try SRN's own index (exact LEI/ISIN
+        # match, zero network cost beyond the initial download). Kept as
+        # the SECOND source now, not the first, since a live search result
+        # is more likely to be current than SRN's periodically-refreshed
+        # index.
+        if _fetch_from_srn(company):
+            paths = find_reports(company)
+
+    if not paths:
+        # LAST RESORT: whatever is already on disk from a prior run,
+        # however old. Only reached when search is disabled
+        # (fetch_missing=False / ESG_REPORT_FETCH=0) or both search and
+        # SRN genuinely found nothing live -- a real report, even a stale
+        # one, is still better evidence than none for a company search
+        # engines can't find anything current for.
+        paths = find_reports(company)
 
     if not paths:
         return {}

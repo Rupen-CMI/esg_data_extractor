@@ -124,11 +124,22 @@ _SEED_KEYWORDS: dict[str, list[str]] = {
 
 
 def _claim_text(c: dict) -> str:
-    """The text a claim is clustered/matched on: extractor reasoning + source
-    note. Factor key is deliberately NOT included, so clusters are driven by
-    evidence content, not by tag identity."""
-    parts = [str(c.get("reasoning") or ""), str(c.get("source_note") or "")]
-    return " ".join(p for p in parts if p).strip()
+    """The text a claim is clustered/matched on: extractor reasoning. Factor
+    key is deliberately NOT included, so clusters are driven by evidence
+    content, not by tag identity.
+
+    Was "reasoning + source_note" -- found 2026-09-18 that source_note has
+    never existed anywhere: not on ExtractedClaim (shared/claim_types.py),
+    not in the tune corpus this was fit on (calibration/abl_final_tune400.json,
+    checked all 610 claims, key absent on every one). Both build() (below,
+    reading from the corpus dict) and apply_cluster_severity() (reading
+    ExtractedClaim attributes) always silently fell back to "" for it via
+    .get()/getattr() defaults -- NOT a train/production mismatch (both sides
+    only ever saw reasoning), just a reference to a field that was never
+    wired up on either end. Removed rather than added, since inventing a
+    source_note value now would change what the 9 already-fit-and-labeled
+    clusters were actually trained on."""
+    return str(c.get("reasoning") or "").strip()
 
 
 # ── Offline: build ───────────────────────────────────────────────────────────
@@ -299,7 +310,8 @@ def apply_cluster_severity(claims: list) -> list[dict]:
     Claims below MIN_MEMBERSHIP (or in pillars without artifacts) are left
     untouched. Returns a list of adjustment dicts for logging/explainability.
     Accepts ExtractedClaim objects (attribute access) — the claim's text is
-    rebuilt exactly like training's _claim_text."""
+    rebuilt exactly like training's _claim_text (reasoning only -- see that
+    function's docstring for why source_note was removed 2026-09-18)."""
     runtime = _load_runtime()
     if not runtime:
         return []
@@ -310,11 +322,7 @@ def apply_cluster_severity(claims: list) -> list[dict]:
         pr = runtime.get(getattr(claim, "pillar", None))
         if pr is None:
             continue
-        text = " ".join(
-            p for p in (getattr(claim, "reasoning", "") or "",
-                        getattr(claim, "source_note", "") or "")
-            if p
-        ).strip()
+        text = (getattr(claim, "reasoning", "") or "").strip()
         if len(text) < 30:
             continue
         X = normalize(pr["vectorizer"].transform([text]))

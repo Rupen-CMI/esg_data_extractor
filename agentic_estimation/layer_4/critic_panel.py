@@ -36,7 +36,14 @@ from agentic_estimation.shared.llm_json import extract_json_object
 
 log = get_logger("critic_panel")
 
-_MAX_EXCERPT_CHARS = 800
+# No excerpt truncation constant here on purpose -- removed 2026-09-18.
+# Critic A (evidence_support) used to see only the first 800 chars of the
+# cited signal, which could cause it to refute a claim purely because the
+# real supporting sentence sat past that cutoff, never having actually been
+# wrong about the evidence. It now sees the FULL text the original
+# extraction was shown (same signal, no re-truncation) -- see
+# _critic_a_prompt. _CRITIC_MAX_TOKENS only bounds the critic's OWN
+# response length, not how much cited text it reads.
 _CRITIC_MAX_TOKENS = 800
 _CRITIC_TIMEOUT = 120
 
@@ -53,6 +60,12 @@ class CriticVerdict:
     verdict: str                     # 'pass' | 'refute' | 'abstain'
     flagged_factor: Optional[str]
     objection: str
+    corrected_excerpt: Optional[str] = None   # only 'evidence_support' populates this on refute --
+                                               # the exact text the critic found that actually
+                                               # supports/contradicts the claim, quoted verbatim
+                                               # from the SAME full signal it was shown (see
+                                               # _critic_a_prompt). None for the other two lenses
+                                               # (they never see cited signal text) and for pass/abstain.
 
 
 @dataclass
@@ -62,6 +75,19 @@ class CriticPanelResult:
     refuted: bool = False
     flagged_factor: Optional[str] = None            # set only on convergence (>=2 agree)
     objections: list = field(default_factory=list)  # objection texts from refuting critics
+    corrected_excerpt: Optional[str] = None         # from the converged refuter that supplied one
+                                                     # (evidence_support), for estimate_verifier.py
+                                                     # to feed into the retry's extraction prompt
+    inconclusive: bool = False                      # True when <2 critics responded (LLM calls
+                                                     # failed/timed out, not a real disagreement) --
+                                                     # refuted is always False in this case (the
+                                                     # fail-open safety behavior is unchanged), but
+                                                     # this flag lets callers tell "nobody actually
+                                                     # checked" apart from "checked and it passed".
+                                                     # Added 2026-09-19 -- previously both cases
+                                                     # produced an identical refuted=False result,
+                                                     # so an infra outage was indistinguishable from
+                                                     # a real, majority "pass" verdict downstream.
 
 
 def _valid_factors(formula_score) -> set:
@@ -110,7 +136,18 @@ def _parse_critic_response(raw_text: str, critic_name: str, valid_factors: set) 
         flagged = None
 
     objection = str(parsed.get("objection", ""))[:500]
-    return CriticVerdict(critic=critic_name, verdict=verdict, flagged_factor=flagged, objection=objection)
+
+    # Only meaningful on refute, and only evidence_support ever asks for it
+    # (the other two lenses aren't shown cited signal text at all) -- a
+    # stray value from another critic or on a pass verdict is discarded.
+    corrected_excerpt = None
+    if verdict == "refute" and critic_name == "evidence_support":
+        raw_excerpt = parsed.get("corrected_excerpt")
+        if raw_excerpt:
+            corrected_excerpt = str(raw_excerpt).strip() or None
+
+    return CriticVerdict(critic=critic_name, verdict=verdict, flagged_factor=flagged,
+                          objection=objection, corrected_excerpt=corrected_excerpt)
 
 
 def _run_one_critic(critic_name: str, prompt: str, valid_factors: set,
@@ -134,9 +171,36 @@ def _run_one_critic(critic_name: str, prompt: str, valid_factors: set,
     return _parse_critic_response(raw_text, critic_name, valid_factors)
 
 
+def _prior_round_block(prior_round: Optional[dict]) -> str:
+    """Renders round-1's objections + corrected_excerpt as a short context
+    block for round-2 critic prompts. Round 2 re-runs on genuinely NEW
+    evidence (new_claims from the retry's re-extraction), so this is not a
+    cache of round-1's verdict -- it's telling round-2 what was contested
+    and how it was supposedly fixed, so it can check that specific concern
+    instead of re-deriving it blind. None (default) reproduces round-1's
+    exact prompt text, unchanged."""
+    if not prior_round:
+        return ""
+    objections = prior_round.get("objections") or []
+    corrected_excerpt = prior_round.get("corrected_excerpt")
+    lines = [
+        "",
+        "--- CONTEXT: this pillar was refuted on the first pass and has been "
+        "re-extracted. Check specifically whether that fix actually resolved "
+        "the original concern -- do not just re-run a generic check. ---",
+    ]
+    if objections:
+        lines.append("Original objection(s): " + " | ".join(objections))
+    if corrected_excerpt:
+        lines.append(f"Evidence was re-extracted using this corrected excerpt: {corrected_excerpt!r}")
+    lines.append("---")
+    return "\n".join(lines)
+
+
 # ── Critic A: evidence-support ───────────────────────────────────────────────
 
-def _critic_a_prompt(pillar: str, company: str, formula_score, signals: dict, claims) -> str:
+def _critic_a_prompt(pillar: str, company: str, formula_score, signals: dict, claims,
+                      prior_round: Optional[dict] = None) -> str:
     winning_tags = _winning_claim_source_tags(formula_score, claims)
     lines = [
         f"Review the {pillar} pillar's evidence-based contributions for {company}. "
@@ -144,32 +208,44 @@ def _critic_a_prompt(pillar: str, company: str, formula_score, signals: dict, cl
         f"the claim says? A claim can look on-topic (right vocabulary) while asserting "
         f"nothing of the sort -- e.g. text about a sustainability report's emissions "
         f"methodology is NOT evidence of an environmental controversy. Quote the exact "
-        f"mismatch if you refute.",
+        f"mismatch if you refute.\n"
+        f"If you refute AND the full signal text below actually contains a passage that "
+        f"correctly supports or contradicts the claim (just not the one the original "
+        f"extraction cited), quote that passage verbatim in \"corrected_excerpt\" -- it "
+        f"will be handed to a re-extraction pass so a real correction doesn't require "
+        f"searching the same text blind a second time. Leave it null if no such passage "
+        f"exists (i.e. the claim should simply be dropped, not corrected).",
         "",
     ]
     for c in (formula_score.contributions or []):
         lines.append(f"- factor: {c.factor} | claim_reasoning: {c.claim_reasoning!r} | "
                      f"confidence: {c.confidence:.2f} | method: {c.method}")
     lines.append("")
-    lines.append("CITED SIGNAL EXCERPTS (only for extracted claims -- dataset/peer-derived "
-                  "contributions have no signal text to check):")
+    lines.append("CITED SIGNAL EXCERPTS -- the FULL text each claim was extracted from (only for "
+                  "extracted claims -- dataset/peer-derived contributions have no signal text to "
+                  "check). Not truncated: this is exactly what the original extraction saw, so a "
+                  "refute here means the text genuinely doesn't support the claim, not that "
+                  "relevant text was cut off before you could see it.")
     for c in (formula_score.contributions or []):
         if c.method != "extracted" or not signals:
             continue
         source_tag = winning_tags.get(c.factor)
         text = signals.get(source_tag) if source_tag else None
         if text:
-            lines.append(f"[{c.factor} / {source_tag}]\n{text[:_MAX_EXCERPT_CHARS]}")
+            lines.append(f"[{c.factor} / {source_tag}]\n{text}")
     lines.append("")
+    lines.append(_prior_round_block(prior_round))
     lines.append('Respond with ONLY this JSON object after your reasoning:\n'
                   '{"verdict": "pass"|"refute", "flagged_factor": "<exact factor key>"|null, '
-                  '"objection": "<one sentence, quote the mismatch if refuting>"}')
+                  '"objection": "<one sentence, quote the mismatch if refuting>", '
+                  '"corrected_excerpt": "<verbatim supporting passage>"|null}')
     return "\n".join(lines)
 
 
 # ── Critic B: peer-plausibility ──────────────────────────────────────────────
 
-def _critic_b_prompt(pillar: str, company: str, reconciled, formula_score) -> str:
+def _critic_b_prompt(pillar: str, company: str, reconciled, formula_score,
+                      prior_round: Optional[dict] = None) -> str:
     breakdown = getattr(formula_score, "breakdown", None)
     breakdown_lines = ""
     if breakdown is not None:
@@ -196,7 +272,8 @@ def _critic_b_prompt(pillar: str, company: str, reconciled, formula_score) -> st
         f"confidence={reconciled.confidence})\n\n"
         f"Is this final score plausible given the baseline, the real peer statistic (if any), "
         f"and how much evidence actually supports it? A large swing on thin/weak evidence is "
-        f"implausible -- show the arithmetic if you refute.\n\n"
+        f"implausible -- show the arithmetic if you refute.\n"
+        f"{_prior_round_block(prior_round)}\n\n"
         f'Respond with ONLY this JSON object after your reasoning:\n'
         f'{{"verdict": "pass"|"refute", "flagged_factor": "<exact factor key>"|null, '
         f'"objection": "<one sentence, show the arithmetic if refuting>"}}'
@@ -205,7 +282,8 @@ def _critic_b_prompt(pillar: str, company: str, reconciled, formula_score) -> st
 
 # ── Critic C: internal-consistency ───────────────────────────────────────────
 
-def _critic_c_prompt(pillar: str, company: str, reconciled, formula_score, holistic) -> str:
+def _critic_c_prompt(pillar: str, company: str, reconciled, formula_score, holistic,
+                      prior_round: Optional[dict] = None) -> str:
     formula_narrative = "\n".join(
         f"  - {c.factor}: {c.claim_reasoning}"
         for c in (formula_score.contributions or [])
@@ -225,7 +303,8 @@ def _critic_c_prompt(pillar: str, company: str, reconciled, formula_score, holis
         f"Reconciled: {reconciled.score:.1f} (spread={reconciled.spread})\n\n"
         f"Do the two estimators' narratives CONTRADICT each other (e.g. Formula credits strong "
         f"positive evidence while Holistic's reasoning says none was found, or vice versa)? "
-        f"A contradiction is a refute.\n\n"
+        f"A contradiction is a refute.\n"
+        f"{_prior_round_block(prior_round)}\n\n"
         f'Respond with ONLY this JSON object after your reasoning:\n'
         f'{{"verdict": "pass"|"refute", "flagged_factor": "<exact factor key>"|null, '
         f'"objection": "<one sentence describing the contradiction if refuting>"}}'
@@ -242,6 +321,7 @@ def run_critic_panel(
     signals: dict,
     metadata: Optional[dict] = None,
     model: Optional[str] = None,
+    prior_round: Optional[dict] = None,
 ) -> CriticPanelResult:
     """Runs all 3 critics sequentially (each call serializes through
     zen_client's process-wide rate limiter regardless of call order, so
@@ -249,23 +329,55 @@ def run_critic_panel(
     simpler and keeps critic call order deterministic for logging).
 
     model: optional override forwarded to every critic's call_with_prompt.
-    None (default) preserves today's exact behavior."""
+    None (default) preserves today's exact behavior.
+
+    prior_round: optional {"objections": [...], "corrected_excerpt": str|None}
+    from round 1's CriticPanelResult. Only meaningful for a round-2 call
+    (estimate_verifier.py passes this after a retry) -- tells the fresh
+    panel what was previously contested and how the evidence was corrected,
+    so it checks that specific concern instead of re-deriving it blind.
+    None (default) preserves round-1's exact prompt text."""
     valid_factors = _valid_factors(formula_score)
 
     prompts = {
-        "evidence_support": _critic_a_prompt(pillar, company, formula_score, signals, claims),
-        "peer_plausibility": _critic_b_prompt(pillar, company, reconciled, formula_score),
-        "internal_consistency": _critic_c_prompt(pillar, company, reconciled, formula_score, holistic),
+        "evidence_support": _critic_a_prompt(pillar, company, formula_score, signals, claims,
+                                              prior_round=prior_round),
+        "peer_plausibility": _critic_b_prompt(pillar, company, reconciled, formula_score,
+                                               prior_round=prior_round),
+        "internal_consistency": _critic_c_prompt(pillar, company, reconciled, formula_score, holistic,
+                                                  prior_round=prior_round),
     }
 
-    verdicts = [_run_one_critic(name, prompt, valid_factors, model=model) for name, prompt in prompts.items()]
+    # Early exit after 2 calls when their verdicts already mathematically
+    # decide `refuted` no matter what the 3rd critic says -- found 2026-09-18:
+    # this ran all 3 unconditionally before. With 3 critics and refuted
+    # requiring >=2 refuters, the FIRST TWO agreeing (both refute, or both
+    # pass) already locks the outcome: two refutes can't drop below 2; two
+    # passes leave only 1 remaining critic, who alone can never reach the
+    # 2-refuter threshold. Only a 1-1 split (or an abstain in the first two)
+    # is genuinely undecided and needs the 3rd call. Order stays deterministic
+    # (evidence_support, peer_plausibility, internal_consistency) -- this
+    # only skips calls that were already sequential and never reorders them.
+    verdicts: list[CriticVerdict] = []
+    names = list(prompts.keys())
+    for i, name in enumerate(names):
+        verdicts.append(_run_one_critic(name, prompts[name], valid_factors, model=model))
+        if i == 1:  # just ran the 2nd of 3 -- check for an early, decided outcome
+            responded_so_far = [v for v in verdicts if v.verdict != "abstain"]
+            if len(responded_so_far) == 2:
+                votes = {v.verdict for v in responded_so_far}
+                if len(votes) == 1:   # both refute, or both pass -- 3rd can't change it
+                    log.info("[%s/%s] critic panel: %s agree (%s) after 2 of 3 -- skipping 3rd call",
+                              company, pillar, "/".join(v.critic for v in responded_so_far),
+                              responded_so_far[0].verdict)
+                    break
 
     responders = [v for v in verdicts if v.verdict != "abstain"]
     if len(responders) < 2:
-        log.warning("[%s/%s] fewer than 2 critics responded (%d abstained) -- fail-open, refuted=False",
-                    company, pillar, len(verdicts) - len(responders))
+        log.warning("[%s/%s] fewer than 2 critics responded (%d abstained) -- fail-open, "
+                    "refuted=False, inconclusive=True", company, pillar, len(verdicts) - len(responders))
         return CriticPanelResult(pillar=pillar, verdicts=verdicts, refuted=False,
-                                  flagged_factor=None, objections=[])
+                                  flagged_factor=None, objections=[], inconclusive=True)
 
     refuters = [v for v in responders if v.verdict == "refute"]
     refuted = len(refuters) >= 2
@@ -283,8 +395,24 @@ def run_critic_panel(
 
     objections = [v.objection for v in refuters] if refuted else []
 
-    log.info("[%s/%s] critic panel: %d/%d refute, converged_factor=%s",
-              company, pillar, len(refuters), len(responders), flagged_factor)
+    # corrected_excerpt only ever comes from evidence_support (the only lens
+    # shown cited signal text -- peer_plausibility/internal_consistency
+    # have nothing to quote from and never populate it, see CriticVerdict).
+    # No 2-of-3 convergence requirement here, unlike flagged_factor: the
+    # other two lenses structurally can't corroborate or contradict a
+    # quoted excerpt they were never shown, so requiring their agreement
+    # would make this field permanently unreachable rather than add rigor.
+    corrected_excerpt = None
+    if refuted:
+        for v in refuters:
+            if v.critic == "evidence_support" and v.corrected_excerpt:
+                corrected_excerpt = v.corrected_excerpt
+                break
+
+    log.info("[%s/%s] critic panel: %d/%d refute, converged_factor=%s, corrected_excerpt=%s",
+              company, pillar, len(refuters), len(responders), flagged_factor,
+              "yes" if corrected_excerpt else "no")
 
     return CriticPanelResult(pillar=pillar, verdicts=verdicts, refuted=refuted,
-                              flagged_factor=flagged_factor, objections=objections)
+                              flagged_factor=flagged_factor, objections=objections,
+                              corrected_excerpt=corrected_excerpt)

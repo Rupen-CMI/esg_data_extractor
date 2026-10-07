@@ -42,7 +42,10 @@ from agentic_estimation.shared.pipeline_logger import get_logger
 
 log = get_logger("report_extractor")
 
-_MODEL = "deepseek-v4-flash-free"
+# deepseek-v4-flash-free REMOVED 2026-10-06 (user instruction) -- opencode.ai's
+# free tier intermittently 429-throttles and this model was implicated in an
+# unexplained 400 on a real production call. Do not re-add until told to.
+_MODEL = "gpt-oss:120b-cloud"
 
 _PROMPT = """Extract ESG facts for the {pillar} pillar from this company report extract.
 

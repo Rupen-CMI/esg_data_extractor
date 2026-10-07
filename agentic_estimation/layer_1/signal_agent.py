@@ -59,7 +59,7 @@ from agentic_estimation.layer_1.evidence_filters import (
 )
 log = get_logger("signal_agent")
 
-_HEADERS = {"User-Agent": "ESG-Signal-Agent/1.0 (research@example.com)"}
+_HEADERS = {"User-Agent": "ESGDataExtractor-Research/1.0 (+https://esg-data-extractor.example.com; research@example.com)"}
 _TIMEOUT = 12
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")  # newsapi.org key (optional)
@@ -1034,19 +1034,171 @@ def _country_governance_signal(country: Optional[str], industry: str = "") -> st
     return text
 
 
-def _google_news_rss_signal(company: str) -> str:
-    """Google News RSS — latest headlines, no API key needed. Broadened to
-    the same ESG keyword breadth as news_api (was a single fixed phrase,
-    "ESG sustainability", missing most labor/governance/controversy coverage).
-    Query-targeted (the ESG OR-group is baked into the query string), so
-    fingerprint-dedup only, no keyword pre-gate."""
-    log.info("[%s] google_news_rss → fetching RSS feed", company)
+# ── LLM-generated multi-angle queries ────────────────────────────────────────
+#
+# Measured live (2026-09-16): the single static OR-keyword query (~60 terms,
+# batched to respect Google's overflow limit -- see _RSS_BATCH_SIZE) gives one
+# generic bag of terms competing for the same _MAX_RSS_ITEMS=20-item cap, so
+# whatever's most viral that week dominates the results -- a real comparison
+# on Toyota found the static query's 20-item sample was 8/19 duplicate
+# coverage of ONE renewable-fuel-trial story, with zero governance coverage.
+# 4 LLM-generated, pillar-angled queries (Climate/Labor/Governance/Safety),
+# each within Google's per-query term budget, returned 238 unique raw titles
+# covering distinct real events across all three pillars (a governance-buyout
+# dispute, an activist-investor stake, a federal court case) that the single
+# generic query's sample missed entirely -- 159 survived the same relevance
+# filter (matches_esg_relevance) used everywhere else in this pipeline.
+#
+# LLM-FIRST, STATIC-FALLBACK (not additive): if query generation fails for
+# any reason (Ollama unavailable, timeout, unparseable response, empty
+# result), fall through to the original single static query -- this source
+# never goes from "some coverage" to "no coverage" because of an LLM outage.
+_QUERY_GEN_MODEL = "gpt-oss:120b-cloud"  # routes to local Ollama, see zen_client.py
+_QUERY_GEN_TIMEOUT = 30
+_MAX_ANGLED_QUERIES = 4
+_MAX_TERMS_PER_ANGLED_QUERY = 12  # same overflow ceiling _RSS_BATCH_SIZE enforces elsewhere
+
+_QUERY_GEN_PROMPT = """You are constructing Google News RSS search queries to find ESG \
+(Environmental, Social, Governance) evidence about a company.
+
+CONSTRAINT (measured, not negotiable): Google News RSS silently DROPS the when:Nd \
+date-restriction operator once a query's OR-group exceeds about 12-15 terms. Each query you \
+generate must contain AT MOST {max_terms} OR-terms in its keyword group, or the recency \
+filter will silently fail. Syntax: "COMPANY" (term1 OR term2 OR term3 ...)
+
+Company: {company}
+Industry: {industry}
+
+Generate {n_queries} separate queries, each targeting DIFFERENT evidence (do not just split \
+one big list into chunks -- each query should have a clear, distinct investigative focus, \
+e.g. one for emissions/climate, one for labor practices, one for governance/compliance, one \
+for controversies specific to this industry).
+
+Respond with ONLY this JSON object (no markdown, no explanation):
+{{"queries": [{{"angle": "<short label>", "query": "<Google News RSS query body>"}}, ...]}}"""
+
+
+def _generate_angled_queries(company: str, industry: str = "") -> Optional[list[dict]]:
+    """Ask an LLM for 3-4 pillar-angled Google News RSS query strings.
+    Returns [{"angle": str, "query": str}, ...] or None on ANY failure
+    (unavailable model, timeout, unparseable/empty response) -- callers
+    MUST treat None as "fall back to the static query", never as "no
+    queries wanted".
+
+    NOTE: this used to also generate WordPress-search-safe "wp_terms" for
+    _esg_press_signal, in the same call. Removed 2026-09-17 after measuring
+    that query-angling doesn't help that source at all -- WordPress's ?s=
+    search is a strict AND filter over a small fixed set of "articles
+    mentioning this company"; adding ANY second term (LLM-narrow or simple-
+    broad, both tested live) can only narrow that set further, never surface
+    anything the plain company-name search didn't already return. Kept this
+    function Google-only rather than paying for wp_terms tokens nothing
+    downstream consumes."""
+    from agentic_estimation.shared.llm_json import extract_json_object
+
+    try:
+        from zen_client import call_with_prompt
+    except Exception:
+        log.warning("[%s] angled query generation: zen_client unavailable -- falling back to static query", company)
+        return None
+
+    prompt = _QUERY_GEN_PROMPT.format(
+        max_terms=_MAX_TERMS_PER_ANGLED_QUERY, company=company,
+        industry=industry or "Unknown", n_queries=_MAX_ANGLED_QUERIES,
+    )
+    try:
+        resp = call_with_prompt(prompt, model=_QUERY_GEN_MODEL, max_tokens=800, timeout=_QUERY_GEN_TIMEOUT)
+    except Exception as exc:
+        log.warning("[%s] angled query generation call raised %s -- falling back to static query", company, exc)
+        return None
+
+    if not resp.get("ok"):
+        log.warning("[%s] angled query generation call failed: %s -- falling back to static query",
+                    company, resp.get("error"))
+        return None
+
+    parsed = extract_json_object(resp.get("raw", ""))
+    if not parsed or not isinstance(parsed.get("queries"), list):
+        log.warning("[%s] angled query generation: unparseable response -- falling back to static query", company)
+        return None
+
+    out = []
+    for item in parsed["queries"][:_MAX_ANGLED_QUERIES]:
+        if not isinstance(item, dict):
+            continue
+        q = item.get("query")
+        angle = str(item.get("angle") or "unlabeled")
+        if isinstance(q, str) and q.strip() and '"' in q:
+            out.append({"angle": angle, "query": q.strip()})
+
+    if not out:
+        log.warning("[%s] angled query generation: response had no usable queries -- falling back to static query",
+                    company)
+        return None
+    return out
+
+
+def _google_news_rss_signal(company: str, industry: str = "",
+                             angled: Optional[list[dict]] = None) -> str:
+    """Google News RSS — latest headlines, no API key needed.
+
+    LLM-first: tries _generate_angled_queries() for pillar-targeted coverage
+    (see the module comment above this function for the measured comparison
+    against the static query). Falls back to the original single static
+    OR-keyword query on any failure -- this source degrades to its prior
+    behavior, never to nothing.
+
+    angled: pass a pre-computed result (from ONE shared _generate_angled_
+    queries() call in fetch_company_signals) to avoid a second LLM
+    round-trip -- _esg_today_search/_esgnews_search consume the SAME
+    result's "wp_terms" field. None (default) generates it here, so direct
+    callers/tests are unaffected."""
+    if angled is None:
+        angled = _generate_angled_queries(company, industry)
+    if angled:
+        log.info("[%s] google_news_rss → using %d LLM-generated angled queries", company, len(angled))
+        all_hits: list[str] = []
+        seen_links: set[str] = set()
+        for entry in angled:
+            q = entry["query"]
+            # q is already a complete "COMPANY" (terms) query body -- fetch it
+            # directly rather than routing through _rss_fetch_items (which
+            # would wrap it in ANOTHER "company" (keywords) shell).
+            url = f"https://news.google.com/rss/search?q={quote_plus(q + ' when:730d')}&hl=en-US&gl=US&ceid=US:en"
+            _GOOGLE_NEWS_LIMITER.wait()
+            r = _get(url) if not _GOOGLE_NEWS_DISABLED else None
+            if not r:
+                continue
+            try:
+                parsed_items = ET.fromstring(r.content).findall(".//item")
+            except Exception:
+                continue
+            for it in _filter_items_by_recency(parsed_items, 730):
+                link = (it.findtext("link") or "").strip()
+                key = link or (it.findtext("title") or "").strip()
+                if key and key in seen_links:
+                    continue
+                if key:
+                    seen_links.add(key)
+                title = (it.findtext("title") or "").strip()
+                pub = (it.findtext("pubDate") or "")[:16]
+                if title.lower().startswith("home - ") and title.count(" - ") >= 2:
+                    continue
+                all_hits.append(f"[{pub}] {title}" + (f" <{link}>" if link else ""))
+        if all_hits:
+            hits = dedup_and_filter_lines("\n".join(all_hits), require_keyword=False)
+            log.info("[%s] google_news_rss → %d headlines (LLM-angled)", company, len(hits.splitlines()))
+            return "Google News RSS:\n" + hits
+        log.warning("[%s] google_news_rss → LLM-angled queries returned zero items -- falling back to static query",
+                    company)
+
+    log.info("[%s] google_news_rss → fetching RSS feed (static query)", company)
     hits = _google_news_rss_query(company)
     if hits is None:
         log.warning("[%s] google_news_rss → no response or parse error", company)
         return ""
     hits = dedup_and_filter_lines(hits, require_keyword=False)
-    log.info("[%s] google_news_rss → %d headlines", company, len(hits.splitlines()))
+    log.info("[%s] google_news_rss → %d headlines (static)", company, len(hits.splitlines()))
     return "Google News RSS:\n" + hits
 
 
@@ -1198,6 +1350,166 @@ def _direct_rss_signal(company: str, feed_url: str, label: str, search: bool = F
     mode = "search RSS" if search else "direct RSS"
     log.info("[%s] %s → %d matching headlines", company, label, len(hits.splitlines()))
     return f"{label} ({mode}):\n" + hits
+
+
+# ── ESG-dedicated press search: full article bodies, not headlines ──────────
+#
+# WHY THIS IS DIFFERENT FROM EVERY OTHER RSS SOURCE ABOVE: those are general
+# news feeds, so a headline alone is genuinely all we can trust -- fetching
+# the real article behind a Google News RSS <link> is not viable (that link
+# is an opaque, JS-only redirect token; confirmed live 2026-09-17, including
+# via Google's own News web app hitting the identical CAPTCHA block on its
+# internal decode API). ESG Today (esgtoday.com) and ESG News (esgnews.com)
+# are different on BOTH axes that made that unsafe: their RSS <link> is the
+# real, direct, immediately-fetchable article URL (no wrapper, confirmed
+# live), and every article on either site is already ESG-topical by
+# construction (editorial ESG trade press, not general news) -- so unlike
+# Google News RSS, there is no need to run the cheap relevance pre-filter
+# before trusting an item; the SOURCE itself already guarantees topicality.
+# What it does NOT guarantee is that a search hit is substantively ABOUT the
+# queried company (a real full-text match can be a passing mention in an
+# unrelated roundup -- confirmed live) -- that judgment is left to the
+# extractor's existing Step 1 relevance check, same as every other source.
+#
+# COVERAGE IS REAL BUT UNEVEN, measured live against 6 companies spanning a
+# size range: large/newsworthy companies (Google, Amazon, Toyota, Cardinal
+# Health) get real, substantive hits; smaller/quieter companies (a French
+# dairy co-op, a small Norwegian energy retailer, a small US urgent-care
+# chain) got ZERO hits on both feeds. This is additive-only by design --
+# empty is a normal, expected outcome for most of the company universe, not
+# a failure.
+# Separate, dedicated limiter (not shared with _DIRECT_RSS_LIMITER or any
+# Google-routed one) -- these are two more unrelated hosts, and this source
+# does MORE per item than any other RSS source here (a full extra HTTP fetch
+# + trafilatura parse per surviving article), so its total request volume
+# per company is higher even at a low item cap. Conservative gap, matching
+# the same log-normal/adaptive-backoff discipline as every other limiter.
+_ESG_PRESS_LIMITER = _RateLimiter(name="esg_press_search", min_gap=2.0, jitter=1.5)
+
+_ESG_PRESS_MAX_ITEMS = 6          # per source, per company -- search result cap
+_ESG_PRESS_MAX_ARTICLE_CHARS = 6000
+_ESG_PRESS_FETCH_TIMEOUT = 15
+
+
+def _esg_press_search_query(feed_url: str, term: str) -> Optional[list]:
+    """One search request against a WordPress ?s= endpoint. Returns raw
+    <item> elements or None on any failure -- never raises except
+    RateLimitTripped."""
+    from urllib.parse import quote_plus
+
+    url = f"{feed_url}?s={quote_plus(term)}"
+    _ESG_PRESS_LIMITER.wait()
+    try:
+        r = _get(url, timeout=_TIMEOUT)
+        if not r or not r.ok:
+            return None
+        return ET.fromstring(r.content).findall(".//item")
+    except RateLimitTripped:
+        raise
+    except Exception:
+        return None
+
+
+def _esg_press_signal(company: str, feed_url: str, tag_prefix: str,
+                       label: str) -> dict[str, str]:
+    """Search ESG Today / ESG News for `company`, verify each hit actually
+    mentions the company (WordPress search can match loosely), fetch the
+    FULL article body via trafilatura, then run it through the SAME
+    three-pillar judge report_collector.py already uses for PDF reports
+    (_select(), scored by _score_block()'s term-density heuristic) --
+    producing separate, budget-capped E/S/G signals per article instead of
+    one flat truncated blob.
+
+    Returns {tag: text}, e.g. {"esgnews_search_e": "...", "esgnews_search_s":
+    "..."} -- same MULTI-SIGNAL shape enforcement_collector/
+    sec_fulltext_collector already use, one signal per pillar that actually
+    had real content (an empty pillar contributes no key at all, not an
+    empty string -- matches _select()'s own "" for no matching blocks).
+
+    PLAIN SEARCH ONLY -- no LLM-angled query terms. MEASURED live 2026-09-17:
+    WordPress's ?s= search is a strict AND filter over a small, fixed set of
+    "articles mentioning this company" -- adding a second term (however
+    broad or LLM-chosen) can only ever narrow that set further, never
+    surface anything the plain company-name search didn't already return.
+    Tested both LLM-generated narrow phrases and simple broad single words
+    (sustainability, workers, board...) against a real company: every
+    narrowed search returned either the same articles or nothing, zero
+    genuinely new items found across 12 real terms tried. So this is
+    deliberately just the plain search, same discipline as choosing NOT to
+    add machinery that measurably does not earn its complexity.
+
+    Legal/formal name first, plain name as fallback: quoting the formal
+    name (e.g. '"Amazon.com"') was measured live to eliminate the
+    common-noun collision a bare company name can hit (e.g. "Amazon"
+    matching rainforest coverage)."""
+    legal_name = f'"{company}.com"' if " " not in company else f'"{company}"'
+    items = _esg_press_search_query(feed_url, legal_name)
+    if not items:
+        items = _esg_press_search_query(feed_url, company)
+    if not items:
+        log.info("[%s] %s → no search results", company, label)
+        return {}
+
+    name_lower = company.lower()
+    matched = [
+        it for it in items
+        if name_lower in (it.findtext("title") or "").lower()
+        or name_lower in _HTML_TAG_RE.sub(" ", it.findtext("description") or "").lower()
+    ][:_ESG_PRESS_MAX_ITEMS]
+    if not matched:
+        log.info("[%s] %s → 0/%d search results mention %s", company, label, len(items), company)
+        return {}
+
+    import trafilatura
+    from agentic_estimation.layer_1.report_collector import _select
+
+    # Accumulate per-pillar text across ALL matched articles (not one signal
+    # per article per pillar -- an unbounded number of articles would
+    # otherwise produce an unbounded number of signal keys). _select() is
+    # re-applied to the COMBINED text at the end so the per-pillar budget
+    # cap (_PER_TAG_CHARS, same as report_pdf_*) still holds regardless of
+    # how many articles contributed.
+    pillar_raw: dict[str, list[str]] = {"E": [], "S": [], "G": []}
+    n_fetched = 0
+    for it in matched:
+        title = (it.findtext("title") or "").strip()
+        link = (it.findtext("link") or "").strip()
+        if not link:
+            continue
+        _ESG_PRESS_LIMITER.wait()
+        try:
+            downloaded = trafilatura.fetch_url(link)
+            body = trafilatura.extract(downloaded) if downloaded else None
+        except Exception as exc:
+            log.debug("[%s] %s → article fetch/extract failed for %s: %s", company, label, link, exc)
+            body = None
+        if not body:
+            # Fail open: a failed full-text fetch is not evidence the
+            # article is irrelevant, just that we couldn't read it. Contribute
+            # the headline+link alone to E (arbitrary but harmless -- a bare
+            # title rarely scores above 0 on any pillar's _score_block, so
+            # this almost never actually survives into a returned signal).
+            pillar_raw["E"].append(f"[{title}] {link}")
+            continue
+        n_fetched += 1
+        for pillar in ("E", "S", "G"):
+            pillar_raw[pillar].append(f"[{title}]\n{body}")
+
+    if not n_fetched:
+        return {}
+
+    out: dict[str, str] = {}
+    for pillar, texts in pillar_raw.items():
+        if not texts:
+            continue
+        combined = "\n\n".join(texts)
+        selection = _select(combined, pillar)
+        if selection:
+            out[f"{tag_prefix}_{pillar.lower()}"] = f"{label} (full article search, {pillar}):\n{selection}"
+
+    log.info("[%s] %s → %d articles fetched, pillar signals: %s",
+              company, label, n_fetched, sorted(out.keys()))
+    return out
 
 
 # ── Tier 2: Specialist ESG & corporate databases ─────────────────────────────
@@ -1733,6 +2045,13 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
     # Industry context tightens sector-specific searches where relevant
     sector_hint = f" {industry}" if industry else ""
 
+    # LLM-generated pillar-angled Google News queries -- see
+    # _generate_angled_queries' docstring. Generated up front (not inside
+    # the lambda) purely for readability; only google_news_rss consumes
+    # this (esg_today_search/esgnews_search do NOT -- measured live that
+    # query-angling doesn't help those sources, see _esg_press_signal).
+    _angled = _generate_angled_queries(company, industry)
+
     tasks: dict[str, callable] = {
         # Tier 1 — real-time news
         # news_api REMOVED: NewsAPI's free tier is a 100-request DAILY QUOTA and
@@ -1741,7 +2060,7 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         # run at 1/150 when 5 workers each got 429 on their first company.
         # Re-enable only with a paid key or a per-run budget smaller than the
         # remaining daily allowance.
-        "google_news_rss":  lambda: _google_news_rss_signal(company),
+        "google_news_rss":  lambda: _google_news_rss_signal(company, industry, angled=_angled),
         "reuters":          lambda: _reuters_signal(company),
         "bloomberg":        lambda: _outlet_signal(company, *_OUTLET_SOURCES["bloomberg"]),
         "financial_times":  lambda: _outlet_signal(company, *_OUTLET_SOURCES["financial_times"]),
@@ -1816,6 +2135,7 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
     # THIS file (_get, RateLimitTripped, _RateLimiter), so a top-level import
     # here would be circular.
     from agentic_estimation.layer_1.enforcement_collector import fetch_enforcement_signals
+    from agentic_estimation.layer_1.public_records_collector import fetch_public_records_signals
     from agentic_estimation.layer_1.sec_fulltext_collector import fetch_sec_fulltext_signals
     from agentic_estimation.layer_1.report_collector import fetch_report_signals
     from agentic_estimation.layer_1.esg_press_collector import fetch_esg_press_signals
@@ -1834,6 +2154,16 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
     # unreachable publisher host is a missing signal, not a failed run).
     multi_tasks: dict[str, callable] = {
         "enforcement": lambda: fetch_enforcement_signals(company),
+        # public_records_collector: CPSC recalls / USAspending / OFAC SDN /
+        # EPA Envirofacts TRI / Taiwan TWSE ESG KPIs -- live-verified
+        # 2026-09-22/23 (research/ESG_SOURCES_READY_TO_BUILD.md). Same
+        # fetch_*_signals(company) -> {tag: text} shape as enforcement_
+        # collector; kept as its own module rather than folded into
+        # enforcement_collector.py since that module's own docstring frames
+        # itself around ONE curated enforcement-only set, and these sources
+        # are more varied in shape (a neutral scale signal, a positive-
+        # capable structured KPI filing, not just adjudicated-fact records).
+        "public_records": lambda: fetch_public_records_signals(company),
         "sec_fulltext": lambda: fetch_sec_fulltext_signals(company),
         "report_pdf": lambda: fetch_report_signals(company, country=country),
         # esg_press_collector: full-article-body ESG trade-press coverage
@@ -1850,6 +2180,18 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
         # module's own docstring is candid that most will get {} (low yield
         # by design, not a bug).
         "esg_press": lambda: fetch_esg_press_signals(company),
+        # ESG-dedicated press search, full article body -- distinct from
+        # "esg_today" in `tasks` above (which routes through Google News'
+        # site: trick and stays headline-only) and from "esg_press" right
+        # above (a corpus-wide feed cache scan, not a per-company search).
+        # Returns {tag_prefix}_e/_s/_g -- three-pillar-judged text, same
+        # shape as report_pdf_e/_s/_g. See _esg_press_signal's own
+        # docstring for why plain company-name search (no query angling)
+        # is deliberate here.
+        "esg_today_search": lambda: _esg_press_signal(company, "https://www.esgtoday.com/feed/",
+                                                        "esg_today_search", "ESG Today"),
+        "esgnews_search":   lambda: _esg_press_signal(company, "https://esgnews.com/feed/",
+                                                        "esgnews_search", "ESG News"),
     }
 
     signals: dict[str, str] = {}
@@ -1858,8 +2200,33 @@ def fetch_company_signals(company: str, industry: str = "", country: Optional[st
                sources=len(tasks) + len(multi_tasks))
     log.info("[%s] starting signal fetch (%d sources)", company, len(tasks) + len(multi_tasks))
 
-    with ThreadPoolExecutor(max_workers=18) as pool:
-        futures = {pool.submit(fn): name for name, fn in tasks.items()}
+    # Google News RSS family (google_news_rss, reuters, bloomberg,
+    # financial_times, esg_today, greenbiz, localized_esg) all funnel through
+    # _google_news_rss_query -> _rss_fetch_items, sharing _GOOGLE_NEWS_LIMITER
+    # for pacing (log-normal jitter, periodic long pauses, adaptive backoff --
+    # see _RateLimiter's own docstring). The limiter bounds the request RATE
+    # either way, but running all 7 of these on the SAME large pool as every
+    # other source meant up to 18 threads could simultaneously be queued
+    # against that one limiter at once -- wasteful, and a burstier arrival
+    # pattern than a dedicated small pool produces. A separate, small
+    # (3-worker) pool for just this family keeps concurrency low and
+    # deliberate specifically for the host most sensitive to traffic shape
+    # (see netpolite discussion, 2026-09-17 -- Google News' own abuse
+    # detection). Every other source here (country_governance, bhrrc,
+    # hr_dive/hr_grapevine/personnel_today, DDG-backed sustainability_report/
+    # net_zero/sbti/controversies, plus every multi_task) hits different
+    # hosts entirely and keeps the original, larger worker pool.
+    _GOOGLE_NEWS_FAMILY = {
+        "google_news_rss", "reuters", "bloomberg", "financial_times",
+        "esg_today", "greenbiz", "localized_esg",
+    }
+    gnews_tasks = {k: v for k, v in tasks.items() if k in _GOOGLE_NEWS_FAMILY}
+    other_tasks = {k: v for k, v in tasks.items() if k not in _GOOGLE_NEWS_FAMILY}
+
+    with ThreadPoolExecutor(max_workers=3) as gnews_pool, \
+         ThreadPoolExecutor(max_workers=18) as pool:
+        futures = {gnews_pool.submit(fn): name for name, fn in gnews_tasks.items()}
+        futures.update({pool.submit(fn): name for name, fn in other_tasks.items()})
         multi_futures = {pool.submit(fn): name for name, fn in multi_tasks.items()}
 
         for fut in as_completed(futures):

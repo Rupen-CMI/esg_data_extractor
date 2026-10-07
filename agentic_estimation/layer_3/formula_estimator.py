@@ -103,19 +103,61 @@ def _pick_best_claim(claims: list[ExtractedClaim]) -> ExtractedClaim:
     return max(claims, key=_claim_sort_key)
 
 
-def _benchmark_delta(claim: ExtractedClaim, revenue_musd: Optional[float]) -> tuple[float, float]:
+def _benchmark_delta(claim: ExtractedClaim, revenue_musd: Optional[float],
+                      country: Optional[str] = None) -> tuple[float, float]:
     """Returns (delta, confidence) -- confidence may be halved if intensity
     normalisation was required but no revenue was available."""
-    factor = get_factor(claim.factor)
+    factor = get_factor(factor_key := claim.factor)
     metric = factor.metric
     v100, v0 = metric["benchmark"]
 
     value = claim.value
     if value is not None and metric.get("intensity") == "annual_revenue":
         if not revenue_musd or revenue_musd <= 0:
-            # Can't normalise a per-revenue intensity metric without revenue --
-            # real evidence, just not placeable on the band. Degrade to event
-            # shape rather than discard it entirely.
+            # No revenue to intensity-normalise with. The generic event
+            # fallback (claim.polarity * claim.strength) assumes a
+            # DIRECTIONAL/qualitative claim -- wrong for dataset_lookup
+            # claims like Climate TRACE's, which deliberately carry
+            # polarity=0, strength=0.0 ("magnitude carries the signal via
+            # value, not a directional guess" -- climate_trace_anchor.py).
+            # Falling through to the generic fallback zeroed those out
+            # completely (0 * 0.0 = 0), silently discarding a real,
+            # 0.85-confidence measured emissions figure whenever a company's
+            # revenue wasn't resolved. Found + fixed 2026-09-18.
+            #
+            # Fix: for dataset_lookup claims on scope_1_emissions specifically
+            # (the only benchmark_band factor Climate TRACE populates today),
+            # normalise the ABSOLUTE value against the country's own total
+            # harvested emissions instead of revenue -- a real ceiling
+            # already trusted elsewhere in this codebase for this exact
+            # claim type (claim_validators.py's numeric-bounds sanity check
+            # uses the same function). A company representing a larger
+            # share of its country's total emissions is doing WORSE on this
+            # factor (direction="lower"), same polarity as the intensity
+            # band this is standing in for.
+            #
+            # Gated on method == "dataset_lookup", NOT just the factor key:
+            # an LLM-extracted scope_1_emissions claim carries a real,
+            # meaningful polarity/strength (the model's own directional
+            # read of the text), and country-share is the WRONG substitute
+            # for that -- it would silently override the model's judgement
+            # with an unrelated absolute-scale number. Only Climate TRACE's
+            # claims deliberately carry polarity=0/strength=0.0, the exact
+            # signal that the event fallback has nothing to work with.
+            if factor_key == "scope_1_emissions" and claim.method == "dataset_lookup" and country:
+                from agentic_estimation.layer_2.climate_trace_anchor import get_country_total_emissions
+                country_total = get_country_total_emissions(country)
+                if country_total and country_total > 0:
+                    share = max(0.0, min(1.0, value / country_total))
+                    delta = 1 - 2 * share   # larger share of country total -> more negative delta
+                    log.info("[%s] no revenue -- normalised %.0f tCO2e against country total "
+                             "%.0f (share=%.4f) instead of the revenue band",
+                             claim.factor, value, country_total, share)
+                    return delta, claim.confidence
+            # Non-Climate-TRACE benchmark_band claims (LLM-extracted, so
+            # polarity/strength ARE meaningful) keep the original event
+            # fallback -- still real evidence, just not placeable on the
+            # revenue band, softened rather than discarded.
             log.info("[%s] no revenue available to normalise -- degrading to event shape", claim.factor)
             return claim.polarity * claim.strength, claim.confidence * 0.5
         value = value / revenue_musd
@@ -135,13 +177,13 @@ def _event_delta(claim: ExtractedClaim) -> tuple[float, float]:
 
 def _contribution_for_factor(
     factor_key: str, claims: list[ExtractedClaim], revenue_musd: Optional[float],
-    signals: Optional[dict] = None,
+    signals: Optional[dict] = None, country: Optional[str] = None,
 ) -> Contribution:
     factor = get_factor(factor_key)
     best = _pick_best_claim(claims)
 
     if factor.delta_shape == "benchmark_band":
-        delta, confidence = _benchmark_delta(best, revenue_musd)
+        delta, confidence = _benchmark_delta(best, revenue_musd, country)
     else:
         delta, confidence = _event_delta(best)
 
@@ -271,7 +313,7 @@ def compute_formula_scores(
             if baseline else _DEFAULT_BASELINE
 
         contributions = [
-            _contribution_for_factor(factor_key, factor_claims, revenue_musd, signals)
+            _contribution_for_factor(factor_key, factor_claims, revenue_musd, signals, country)
             for factor_key, factor_claims in by_factor.items()
             if FACTORS[factor_key].pillar == pillar
         ]

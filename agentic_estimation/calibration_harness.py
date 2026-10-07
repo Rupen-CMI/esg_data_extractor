@@ -370,8 +370,9 @@ class BacktestRow:
     evidence_mass_s: Optional[float] = None
     evidence_mass_g: Optional[float] = None
     # Phase 4 --verify outputs (estimate_verifier.py; ensemble scorer only).
-    # verdict_*: 'skipped'|'passed'|'passed_after_retry'|'refuted'. None when
-    # --verify wasn't used -- distinguishes "not verified" from any real verdict.
+    # verdict_*: 'skipped'|'passed'|'passed_after_retry'|'refuted'|'inconclusive'.
+    # None when --verify wasn't used -- distinguishes "not verified" from any
+    # real verdict.
     verdict_e: Optional[str] = None
     verdict_s: Optional[str] = None
     verdict_g: Optional[str] = None

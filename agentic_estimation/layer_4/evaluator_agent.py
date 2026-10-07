@@ -248,14 +248,8 @@ async def evaluate_company(
 
     conn = await asyncpg.connect(db_url)
     try:
-        keys = list(_METRIC_KEYS.values())
-        rows = await conn.fetch(
-            "SELECT id, key FROM esg_metric_definitions WHERE key = ANY($1::text[])", keys
-        )
-        metric_ids = {row["key"]: UUID(str(row["id"])) for row in rows}
-        missing = set(keys) - set(metric_ids.keys())
-        if missing:
-            raise RuntimeError(f"Missing metric definitions: {missing}")
+        from agentic_estimation.shared.metric_id_cache import get_metric_ids
+        metric_ids = await get_metric_ids(conn, _METRIC_KEYS.values())
 
         source = "agentic_evaluator_v1"
         pillar_map = [
@@ -362,21 +356,13 @@ def _cli() -> None:
 
     elif mode == "eval":
         async def _run():
-            db_url = os.environ.get("ASYNC_DB_URL", "").replace("postgresql+asyncpg://", "postgresql://")
-            if not db_url:
-                raise RuntimeError("ASYNC_DB_URL not set")
-            conn = await asyncpg.connect(db_url)
-            try:
-                row = await conn.fetchrow(
-                    "SELECT id FROM companies WHERE name ILIKE $1 LIMIT 1",
-                    f"%{company}%",
-                )
-                if not row:
-                    print(f"ERROR: company '{company}' not found in DB")
-                    sys.exit(1)
-                company_id = UUID(str(row["id"]))
-            finally:
-                await conn.close()
+            from agentic_estimation.shared.db_company_lookup import resolve_company_id_standalone
+
+            match = await resolve_company_id_standalone(company)
+            if match is None:
+                print(f"ERROR: company '{company}' not found in DB")
+                sys.exit(1)
+            company_id, _actual_name = match
 
             result = await evaluate_company(
                 score, company_id, signals, industry=industry

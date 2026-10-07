@@ -244,7 +244,20 @@ _NO_PEER_ANCHOR = {
 }
 
 from api.v1.esg_calculator_v2.data.industry_baselines import industry_baseline_for
-from api.v1.esg_calculator_v2.schema import CalculatorResult, ClaimSummary, PillarResult
+from api.v1.esg_calculator_v2.schema import CalculatorResult, ClaimSummary, OverallResult, PillarResult
+
+# Calculator-only overall-ESG weights (2026-09, deliberate product choice --
+# NOT a mirror of build_esg_json.py:57's live-pipeline weights, which stay
+# at {"E": 0.40, "S": 0.35, "G": 0.25} for the real per-market report).
+# build_esg_json.py's build_all() is the only OTHER place in the codebase
+# that ever collapses E/S/G into one score -- the core agentic pipeline
+# itself (orchestrator/evaluator/scoring_agent/reconcile) keeps
+# e_score/s_score/g_score permanently separate, so there's no shared
+# constant to import here even if the two were meant to match.
+# NOTE: reconcile.py separately defines a dict ALSO named _PILLAR_WEIGHTS --
+# that one blends formula-vs-holistic WITHIN a single pillar and is
+# unrelated; do not confuse the two.
+_OVERALL_PILLAR_WEIGHTS = {"E": 0.35, "S": 0.35, "G": 0.30}
 
 # reconcile_all() expects a "holistic" object shaped like
 # scoring_agent.ESGScore (attributes .e_score/.s_score/.g_score) -- NOT that
@@ -715,6 +728,35 @@ def score(inp: CalculatorInput, use_llm: bool = False, llm_model: Optional[str] 
                 f"any value past the edge identically)."
             )
 
+    # Governance badge-factor nudge -- CALCULATOR-ONLY (2026-09-21, deliberate
+    # product choice, NOT a change to the shared registry): anti_corruption_
+    # policy, compliance_certification, and whistleblower_mechanism are
+    # weight=0 in factor_registry.py by design (measured 90-99% positive
+    # skew across 138 real evidence files -- a near-unanimous "yes" doesn't
+    # discriminate between companies, see that file's BADGE-FACTOR ZEROING
+    # note). compute_formula_scores() always reads weight from that shared
+    # registry (formula_estimator.py: `points = factor.weight * confidence *
+    # delta`), so there is no way to give these calculator-only weight
+    # THROUGH a claim -- these three are mandatory in this calculator (see
+    # schema.py/frontend), so applied directly as a small fixed nudge here:
+    # +3 pts if answered yes, -3 if no (bumped from +/-2, 2026-09-21 follow-
+    # up), entirely independent of compute_formula_scores' own (zero)
+    # treatment of the same fields.
+    _BADGE_NUDGE_FACTORS = ("anti_corruption_policy", "compliance_certification", "whistleblower_mechanism")
+    _BADGE_NUDGE_POINTS = 3.0
+    badge_notes: list[str] = []
+    badge_total = 0.0
+    for factor_key in _BADGE_NUDGE_FACTORS:
+        value = getattr(inp, factor_key)
+        if value is None:
+            continue
+        delta = _BADGE_NUDGE_POINTS if value else -_BADGE_NUDGE_POINTS
+        badge_total += delta
+        badge_notes.append(f"{factor_key}: {'yes' if value else 'no'} ({delta:+.0f}pt, calculator-only weight).")
+    if badge_total != 0.0:
+        pfs = formula_scores["G"]
+        pfs.score = max(0.0, min(100.0, pfs.score + badge_total))
+
     review: Optional[_ReviewScore] = None
     if use_llm:
         review = llm_review(inp, claims, formula_scores, model=llm_model)
@@ -749,6 +791,8 @@ def score(inp: CalculatorInput, use_llm: bool = False, llm_model: Optional[str] 
                 f"LLM review: {review_reasoning[p]}",
             ]
             basis.extend(overflow_notes[p])
+            if p == "G":
+                basis.extend(badge_notes)
             if g.mode == "range":
                 basis.append(f"Wide range: {g.reason}.")
             basis.append(_PILLAR_LOCKED_NOTE[p])
@@ -770,6 +814,8 @@ def score(inp: CalculatorInput, use_llm: bool = False, llm_model: Optional[str] 
                 f"{len(pfs.contributions)} of your inputs contributed to this pillar.",
             ]
             basis.extend(overflow_notes[p])
+            if p == "G":
+                basis.extend(badge_notes)
             if use_llm:
                 basis.append("LLM review was unavailable for this run -- score reflects the "
                               "formula estimator alone.")
@@ -780,8 +826,18 @@ def score(inp: CalculatorInput, use_llm: bool = False, llm_model: Optional[str] 
                 basis=basis,
             )
 
+    # Overall ESG-PI: the same fixed-weight E/S/G blend build_esg_json.py
+    # uses for its own "total ESG score" (see _OVERALL_PILLAR_WEIGHTS'
+    # comment above) -- applied to score/low/high identically, not a
+    # separate estimate of its own.
+    overall = OverallResult(
+        score=round(sum(pillars[p].score * _OVERALL_PILLAR_WEIGHTS[p] for p in ("E", "S", "G")), 1),
+        low=round(sum(pillars[p].low * _OVERALL_PILLAR_WEIGHTS[p] for p in ("E", "S", "G")), 1),
+        high=round(sum(pillars[p].high * _OVERALL_PILLAR_WEIGHTS[p] for p in ("E", "S", "G")), 1),
+    )
+
     return CalculatorResult(
-        E=pillars["E"], S=pillars["S"], G=pillars["G"],
+        E=pillars["E"], S=pillars["S"], G=pillars["G"], overall=overall,
         claims=[_claim_summary(c) for c in claims],
         narrative=None,  # Phase 5
     )

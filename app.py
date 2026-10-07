@@ -41,16 +41,34 @@ def _prewarm_exio_cache() -> None:
         log.warning("EXIOBASE pre-warm failed (non-fatal, lazy-loads on first use)", exc_info=True)
 
 
+# Same shape of problem as the two caches above, different resource: MiniLM's
+# weights, not a DB row set. evidence_classifier._get_embedder() lazy-loads a
+# module-level SentenceTransformer singleton the first time anything calls
+# it, and that first load is genuinely expensive -- measured live (2026-09-16)
+# at ~14s, vs. ~0.1s per encode call once loaded. That singleton is reused by
+# EVERY caller across the pipeline (evidence_classifier.py's factor/entity
+# heads, candidate_spans.py's windowing, and the blob-relevance filter in
+# evidence_filters.py) -- one prewarm here covers all of them, same as the
+# country-baseline/EXIOBASE caches above already cover every caller of theirs.
+def _prewarm_embedder() -> None:
+    try:
+        from agentic_estimation.layer_2.evidence_classifier import _get_embedder
+        _get_embedder()
+    except Exception:
+        log.warning("MiniLM embedder pre-warm failed (non-fatal, lazy-loads on first use)", exc_info=True)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     import anyio
-    # Both loads are blocking DB calls (psycopg2, not asyncpg) -- run off
-    # the event loop thread so they don't block it, and in parallel with
-    # each other rather than serially (each is ~2.6-2.8s; run together
-    # startup only pays the slower of the two, not the sum).
+    # All three loads are blocking (psycopg2 DB calls, or loading model
+    # weights from disk/HF hub) -- run off the event loop thread so they
+    # don't block it, and in parallel with each other rather than serially
+    # (startup only pays the slowest one, not the sum).
     async with anyio.create_task_group() as tg:
         tg.start_soon(anyio.to_thread.run_sync, _prewarm_country_baseline_cache)
         tg.start_soon(anyio.to_thread.run_sync, _prewarm_exio_cache)
+        tg.start_soon(anyio.to_thread.run_sync, _prewarm_embedder)
     yield
 
 

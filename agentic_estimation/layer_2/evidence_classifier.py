@@ -1,6 +1,67 @@
 """
 evidence_classifier.py -- deterministic evidence tagger (factor / polarity / strength).
 
+NOT INTEGRATED INTO THE LIVE PIPELINE -- DECIDED 2026-09-18, KEEP OUT.
+    Evaluated this module (as a pre-LLM junk/wrong-entity filter, trained as
+    calibration/evidence_clf_v6.joblib -- see calibration/build_trainset_v6_
+    frozen_only.py) against real, freshly-collected signals for 10 companies
+    (Nike, Siemens, Unilever, Samsung, Deutsche Bank, Rio Tinto, Delta,
+    Nestle, T-Mobile, Enel). Findings, in order of how much they matter:
+
+    1. Real-world value proposition doesn't hold up. The two upstream
+       filters this would sit behind -- evidence_filters.filter_search_
+       results() (entity + leakage gating, per search result, before
+       joining) and evidence_filters.matches_esg_relevance() (keyword OR
+       embedding topic relevance) -- already do entity-check and topic-
+       relevance filtering, earlier (per-result, not per-joined-blob) and
+       cheaper (no MiniLM load, no logreg inference), and their entity
+       check is exact-token, not a trained approximation of one. This
+       module's only real remaining niche is "on-topic AND about the right
+       company, but asserts no checkable claim" -- and it does not fill
+       that niche well (see finding 3).
+    2. No cost problem exists to justify the recall risk. Measured 300
+       real companies from the frozen corpus: median total per-company
+       signal volume is ~14,700 chars against pillar_extractors.py's
+       60,000-char prompt cap -- 0% of companies ever approach the cap.
+       There is no prompt-bloat problem this would be solving.
+    3. Real positive recall (~30-40% across every retrain attempted this
+       session, several architectures, several training-data strategies)
+       means a pre-LLM gate built on this model WOULD silently drop real
+       evidence before the LLM ever sees it, in a pipeline whose own
+       accuracy ceiling is already evidence coverage (see memory: "ESG
+       accuracy ceiling is evidence coverage"). Confirmed live: BHRRC
+       (business & human rights incident tracking, the single largest
+       real source for human_rights_incident, the highest-weighted S
+       factor) produces a real claim 38% of the time in the frozen
+       corpus, but this classifier rejected 8/8 real BHRRC signals in the
+       live 10-company test, both before and after fixing a separate
+       label-space bug (below). That is not a tunable-threshold problem;
+       it is this model failing at exactly the case it would be trusted
+       to get right.
+    4. A real bug was found and fixed in the training data (build_
+       trainset_v6_frozen_only.py now excludes the 8 weight==0 badge
+       factors -- net_zero_pledge, sbti_commitment, cdp_disclosure, anti_
+       corruption_policy, whistleblower_mechanism, esg_report_published,
+       third_party_esg_audit, compliance_certification -- which pillar_
+       extractors._factor_list_block() has excluded from the live LLM
+       prompt since 2026-09-12): the model was confidently "keeping"
+       signals specifically BECAUSE it recognized language for factors
+       the live pipeline no longer scores at all. Fixing this changed the
+       model's behavior (no more false-keeps on net_zero/sustainability_
+       report text) but did NOT raise real classification accuracy --
+       positive-factor accuracy stayed at ~34% on the corrected test set.
+       This is documented so nobody mistakes "we fixed a validity bug" for
+       "we improved the model" in a future session.
+
+    Net: keep the code and the trained models (evidence_clf.joblib,
+    evidence_clf_v5/v6/v7/v8.joblib, all calibration/trainset_*.jsonl) on
+    disk for reference/future reopening, but do NOT wire this into
+    pillar_extractors.py or any other live call site. If revisited, the
+    open question to answer first is not "can we tune this further" but
+    "does the pipeline's real bottleneck (evidence coverage, per the
+    memory note above) tolerate ANY filter with ~30-40% real positive
+    recall sitting in front of it" -- the answer today was no.
+
 WHY THIS EXISTS
     The extraction LLM is not reproducible. Measured 2026-08-08 against the
     free-tier endpoint with temperature=0 in the payload: the same prompt

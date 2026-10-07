@@ -136,9 +136,10 @@ def _run_evaluator(score, signals: dict, industry: str):
     return evaluate_company_sync(score, signals, industry=industry)
 
 
-def _run_explainability(score, industry: str):
+def _run_explainability(score, industry: str, evidence_by_pillar=None, routing_by_pillar=None):
     from agentic_estimation.layer_4.explainability_agent import explain_company_sync
-    return explain_company_sync(score, industry=industry)
+    return explain_company_sync(score, industry=industry, evidence_by_pillar=evidence_by_pillar,
+                                 routing_by_pillar=routing_by_pillar)
 
 
 def _resolve_baseline(country: Optional[str]):
@@ -484,22 +485,12 @@ async def run_for_company_name(
         from agentic_estimation.orchestrator import run_for_company_name
         result = await run_for_company_name("Bosch", industry="Industrial Machinery")
     """
-    db_url = os.environ.get("ASYNC_DB_URL", "").replace("postgresql+asyncpg://", "postgresql://")
-    if not db_url:
-        raise RuntimeError("ASYNC_DB_URL not set")
+    from agentic_estimation.shared.db_company_lookup import resolve_company_id_standalone
 
-    conn = await asyncpg.connect(db_url)
-    try:
-        row = await conn.fetchrow(
-            "SELECT id, name FROM companies WHERE name ILIKE $1 LIMIT 1",
-            f"%{company_name}%",
-        )
-        if not row:
-            raise RuntimeError(f"Company '{company_name}' not found in DB")
-        company_id = UUID(str(row["id"]))
-        actual_name = row["name"]
-    finally:
-        await conn.close()
+    match = await resolve_company_id_standalone(company_name)
+    if match is None:
+        raise RuntimeError(f"Company '{company_name}' not found in DB")
+    company_id, actual_name = match
 
     return await run_company(actual_name, company_id, industry=industry, country=country)
 

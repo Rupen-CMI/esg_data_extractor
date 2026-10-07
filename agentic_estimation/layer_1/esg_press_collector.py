@@ -52,7 +52,7 @@ from agentic_estimation.shared.pipeline_logger import get_logger, log_header
 from agentic_estimation.layer_1.evidence_filters import (
     _company_tokens,
     has_ground_truth_leakage,
-    matches_esg_keywords,
+    matches_esg_relevance,
 )
 from agentic_estimation.layer_1.signal_agent import _RateLimiter, _get
 
@@ -284,8 +284,9 @@ def fetch_esg_press_signals(company: str) -> dict[str, str]:
         start = max(0, idx - _CONTEXT_CHARS // 3)
         window = body[start:start + _CONTEXT_CHARS]
         # The company can be named in passing in an article about something
-        # else entirely; require ESG vocabulary in the extracted window.
-        if not matches_esg_keywords(window):
+        # else entirely; require ESG relevance (keyword OR embedding match --
+        # see evidence_filters.matches_esg_relevance) in the extracted window.
+        if not matches_esg_relevance(window):
             continue
         chunks.append(f"[{art['source']} {art['date']}] {art['title']}. {window} <{art['link']}>")
         if len(chunks) >= _MAX_ARTICLES_PER_COMPANY:

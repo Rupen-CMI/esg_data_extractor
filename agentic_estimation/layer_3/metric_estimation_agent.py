@@ -335,15 +335,22 @@ def estimate_metrics_sync(
 
 
 async def _get_core_metric_ids(conn: asyncpg.Connection) -> dict[str, UUID]:
-    rows = await conn.fetch(
-        "SELECT id, key FROM esg_metric_definitions WHERE key = ANY($1::text[])",
-        CORE_METRIC_KEYS,
-    )
-    mapping = {row["key"]: UUID(str(row["id"])) for row in rows}
-    missing = set(CORE_METRIC_KEYS) - set(mapping.keys())
-    if missing:
+    """UUIDs for CORE_METRIC_KEYS (process-wide cached -- see
+    shared/metric_id_cache.py). Unlike that helper's normal contract, a
+    missing key here is tolerated (logged, not raised) -- gap-fill estimation
+    is expected to run against a DB that may not yet have every core metric
+    seeded, and should just skip those rather than abort the whole run."""
+    from agentic_estimation.shared.metric_id_cache import get_metric_ids
+    try:
+        return await get_metric_ids(conn, CORE_METRIC_KEYS)
+    except RuntimeError:
+        # Fall back to whatever subset IS cached/seeded rather than raising --
+        # get_metric_ids already populated the cache for every key it found.
+        from agentic_estimation.shared.metric_id_cache import _cache
+        mapping = {k: _cache[k] for k in CORE_METRIC_KEYS if k in _cache}
+        missing = set(CORE_METRIC_KEYS) - set(mapping.keys())
         log.warning("Core metric definitions missing from DB (will skip): %s", missing)
-    return mapping
+        return mapping
 
 
 async def _upsert_estimate(conn, company_id, metric_id, low, high, value_low, value_high, confidence, reasoning, source):

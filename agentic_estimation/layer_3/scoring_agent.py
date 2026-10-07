@@ -95,6 +95,18 @@ class ESGScore:
     g_reasoning: str
     country: Optional[str] = None
     signals_used: int = 0
+    # Per-pillar "don't treat this as a settled number" flag. Defaults False
+    # for every existing constructor call (legacy 'llm' scorer, evaluator_agent's
+    # corrected score) -- only graph.py's ensemble path currently has real
+    # data to set these from (confidence_gate.py's needs_review / Phase 4's
+    # VerifiedScore.needs_review). Added 2026-09-18 so explainability_agent
+    # can be told structurally that a pillar is unresolved/refuted, instead
+    # of relying on the model to notice "VERIFIED: refuted... needs review"
+    # inside the free-text reasoning string -- see explainability_agent.py's
+    # _EXPLAIN_PROMPT for how this is used.
+    e_needs_review: bool = False
+    s_needs_review: bool = False
+    g_needs_review: bool = False
 
 
 def _build_signals_block(signals: dict[str, str], max_chars_per_source: int = 4000) -> str:
@@ -282,20 +294,10 @@ def score_company_sync(
 
 
 async def _get_metric_ids(conn: asyncpg.Connection) -> dict[str, UUID]:
-    """Fetch UUIDs for the three ESG pillar metric definitions."""
-    keys = list(_METRIC_KEYS.values())
-    rows = await conn.fetch(
-        "SELECT id, key FROM esg_metric_definitions WHERE key = ANY($1::text[])",
-        keys,
-    )
-    mapping = {row["key"]: UUID(str(row["id"])) for row in rows}
-    missing = set(keys) - set(mapping.keys())
-    if missing:
-        raise RuntimeError(
-            f"Missing metric definitions in DB: {missing}. "
-            "Run the SQL seed to insert esg_e_score, esg_s_score, esg_g_score."
-        )
-    return mapping
+    """UUIDs for the three ESG pillar metric definitions (process-wide cached
+    -- see shared/metric_id_cache.py)."""
+    from agentic_estimation.shared.metric_id_cache import get_metric_ids
+    return await get_metric_ids(conn, _METRIC_KEYS.values())
 
 
 async def _upsert_score(
@@ -424,25 +426,13 @@ def _cli() -> None:
     elif mode == "score":
         # Need company_id from DB
         async def _run():
-            db_url = os.environ.get("ASYNC_DB_URL", "")
-            if not db_url:
-                raise RuntimeError("ASYNC_DB_URL not set")
-            db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
-            conn = await asyncpg.connect(db_url)
-            try:
-                row = await conn.fetchrow(
-                    "SELECT id FROM companies WHERE name ILIKE $1 LIMIT 1",
-                    f"%{company}%",
-                )
-                if not row:
-                    print(f"ERROR: company '{company}' not found in DB")
-                    sys.exit(1)
-                company_id = UUID(str(row["id"]))
-                # Get actual name from DB
-                name_row = await conn.fetchrow("SELECT name FROM companies WHERE id=$1", str(company_id))
-                actual_name = name_row["name"] if name_row else company
-            finally:
-                await conn.close()
+            from agentic_estimation.shared.db_company_lookup import resolve_company_id_standalone
+
+            match = await resolve_company_id_standalone(company)
+            if match is None:
+                print(f"ERROR: company '{company}' not found in DB")
+                sys.exit(1)
+            company_id, actual_name = match
 
             result = await score_company(
                 company_name=actual_name,

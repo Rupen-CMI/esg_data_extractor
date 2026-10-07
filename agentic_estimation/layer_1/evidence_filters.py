@@ -35,6 +35,8 @@ import hashlib
 import re
 from typing import Optional
 
+import numpy as np
+
 from agentic_estimation.shared.pipeline_logger import get_logger
 
 log = get_logger("evidence_filters")
@@ -124,11 +126,46 @@ _ESG_RELEVANCE_TERMS = (
     "modern slavery", "forced labor", "forced labour", "child labor",
     "child labour", "living wage", "layoffs", "whistleblower", "grievance",
     "collective bargaining", "product recall", "worker",
+    # S — extend again: found live against calibration/trainset_evidence.jsonl
+    # (194/669 real-evidence rows had zero keyword hit at all -- see
+    # matches_esg_keywords's own miss analysis, 2026-09-16). "attrition" and
+    # "gender" are safe bare -- checked against the full RSS frozen corpus
+    # (4,709 real headlines), no false-positive collisions found (every
+    # "gender" hit was a real Bloomberg Gender-Equality Index story). "ltifr"
+    # (the actual industry acronym for lost-time injury frequency rate) has no
+    # competing everyday meaning. "employee turnover"/"staff turnover" kept as
+    # PHRASES, not bare "turnover" -- bare "turnover" hit exactly once in the
+    # same corpus and it was revenue turnover ("Dufry sees hike in 2022
+    # turnover"), not an HR signal; the phrase form avoids that collision
+    # entirely since revenue turnover is essentially never phrased that way.
+    # "female employees"/"female board" kept as phrases rather than bare
+    # "female" for the same reason -- bare "female" collided with lifestyle/
+    # marketing coverage ("Bumble... Isn't Female, It's Female Marketing") in
+    # the same corpus check.
+    "attrition", "gender", "ltifr", "employee turnover", "staff turnover",
+    "female employees", "female board",
     # G — extend: compliance/ethics/board specifics
     "independent director", "board independence", "proxy statement",
     "executive pay", "shareholder", "bribery", "antitrust", "money laundering",
     "sanctions", "tax", "settlement", "sec ", "litigation", "misconduct",
     "conflict of interest", "code of conduct", "ethics", "privacy",
+    # G — extend again: same miss analysis as the S block above. "certified"
+    # and "gri" (the GRI reporting standard) are safe bare -- checked against
+    # the RSS corpus, no false-positive collisions found. Kept as PHRASES
+    # rather than bare words: "b corp" (a specific credential, not just any
+    # "corp"), "impact report"/"disclosure report"/"non-financial statement"
+    # (report-naming conventions, not generic "report"), "global compact" (the
+    # UN initiative, not generic "compact"), "class action"/"legal
+    # proceedings"/"material claim"/"related-party" (formal litigation
+    # phrasing, distinct from casual "lawsuit" already in the list above),
+    # "proxy advisers" (kept alongside the existing "proxy statement" --
+    # bare "proxy" rejected: real corpus hits were a mix of governance signal
+    # and generic finance/tech-proxy usage, e.g. "proxy fight"/"proxy server"
+    # risk, too ambiguous to add unqualified).
+    "certified", "gri", "remuneration", "b corp", "impact report",
+    "disclosure report", "non-financial statement", "global compact",
+    "class action", "legal proceedings", "material claim", "related-party",
+    "proxy advisers",
 )
 
 _compiled_cache: dict[tuple, list[re.Pattern]] = {}
@@ -154,6 +191,127 @@ def matches_esg_keywords(text: str, extra_terms: tuple = ()) -> bool:
     terms = _ESG_RELEVANCE_TERMS + tuple(extra_terms)
     patterns = _compiled_patterns(terms)
     return any(p.search(text) for p in patterns)
+
+
+# ── Embedding-based relevance (MiniLM, multi-part/max design) ───────────────
+#
+# Reuses evidence_classifier._get_embedder()'s module-level SentenceTransformer
+# singleton (MiniLM, sentence-transformers/all-MiniLM-L6-v2) -- pre-warmed once
+# at app startup (see app.py's _prewarm_embedder), not loaded here.
+#
+# DESIGN HISTORY (measured 2026-09-16, three candidate designs compared on a
+# TEMPLATE-level train/test split of calibration/trainset_evidence.jsonl --
+# a row-level split was tried first and rejected: 68% of "test" rows were the
+# same synthetic sentence template as a train row with only the company name
+# swapped, which silently inflated every score):
+#   1. One averaged positive vector (mean of all seed terms) minus one
+#      averaged negative vector: F1 0.794 on the held-out template split.
+#      Blending ~30 seed terms into a single vector dilutes sharp single-word
+#      matches -- a real "whistleblowing hotline" claim scored only +0.02 net
+#      (barely above zero) because averaging in 10 unrelated S-pillar seeds
+#      pulled the vector away from the one seed ("whistleblower") that
+#      actually matched at 0.38 on its own.
+#   2. Max-of-individual-terms on the positive side only (no negative
+#      anchors): rejected earlier, even noisier -- a single incidental word
+#      match (e.g. "employees" in "office snack menu for employees") spiked
+#      the score with nothing to counterbalance it.
+#   3. MULTI-PART (this one): max similarity across each INDIVIDUAL positive
+#      seed term, minus max similarity across each INDIVIDUAL negative
+#      (confounder) seed term. F1 0.874 on the same held-out split -- best of
+#      the three, and the only one that gets both the "whistleblowing" case
+#      (best positive term dominates, isn't diluted by averaging) AND the
+#      "Labor Day" case (the negative anchor's own best match, "Labor Day
+#      holiday celebration", outscores the positive "labor" match) right.
+#
+# NOT a replacement for matches_esg_keywords -- same "cheap pre-filter, not
+# the LLM's real relevance check" role, just a second, differently-shaped net
+# to catch what static word-boundary matching structurally cannot (headlines
+# that are on-topic without using any of the listed words, e.g. "green AI
+# projects" or "comply with EU gatekeeper rules" -- neither contains
+# "environmental"/"compliance" verbatim). Callers should OR the two, not
+# choose one -- each catches real cases the other misses.
+_EMBED_POSITIVE_TERMS = (
+    # E
+    "carbon", "climate", "emissions", "environmental", "pollution",
+    "renewable", "sustainability", "waste", "energy",
+    # S -- "whistleblower" included here (not just G) since whistleblowing
+    # mechanisms are as much a labor/workplace-conduct signal as a board one.
+    "labor", "workers", "employees", "safety", "discrimination", "harassment",
+    "wages", "diversity", "workforce", "human rights", "whistleblower",
+    # G -- "board"/"director"/"oversight" given equal footing with the
+    # misconduct terms (fraud/corruption/bribery/antitrust/ethics) rather than
+    # averaged together, so a governance-STRUCTURE headline (e.g. "board
+    # approves executive compensation plan") isn't drowned out by the
+    # misconduct cluster's mutual similarity the way it was in an earlier,
+    # unbalanced version of this list (measured: 0.165 vs 0.270 net after
+    # rebalancing).
+    "governance", "board", "executive compensation", "oversight", "director",
+    "fraud", "corruption", "bribery", "antitrust", "ethics",
+)
+
+# Confounders: real headline patterns that share surface vocabulary with the
+# positive terms above but are NOT ESG evidence -- calendar/holiday language
+# ("Labor Day"), HR-marketing puff (snacks/perks/hiring announcements), and
+# product-spec/routine-business text that happens to contain an E/G-flavored
+# word (carbon fiber, energy efficiency spec, board game/leaderboard,
+# quarterly earnings). Each subtracts from whichever positive term it
+# happens to share vocabulary with, which is what correctly rejects "Labor
+# Day" (negative anchor "Labor Day holiday celebration" scores 0.605 against
+# it, beating the positive "labor" match at 0.406) without needing a
+# hardcoded blocklist of exact phrases.
+_EMBED_NEGATIVE_TERMS = (
+    "Labor Day holiday celebration", "company holiday and office celebration",
+    "new employee hire announcement", "office perks and free snacks",
+    "product energy efficiency spec sheet", "carbon fiber material product design",
+    "skateboard surfboard sports equipment", "video game leaderboard ranking",
+    "quarterly earnings call routine update", "new product launch announcement",
+)
+
+_embed_pos_matrix = None
+_embed_neg_matrix = None
+
+
+def _embed_term_matrices():
+    """Lazily encode the fixed positive/negative term lists once per process
+    and cache the resulting matrices -- these never change at runtime, so
+    there is no reason to re-encode them on every call. Uses the SAME
+    embedder singleton evidence_classifier.py already loads (pre-warmed at
+    app startup), not a second model instance."""
+    global _embed_pos_matrix, _embed_neg_matrix
+    if _embed_pos_matrix is None:
+        from agentic_estimation.layer_2.evidence_classifier import _get_embedder
+        embedder = _get_embedder()
+        _embed_pos_matrix = embedder.encode(list(_EMBED_POSITIVE_TERMS), normalize_embeddings=True)
+        _embed_neg_matrix = embedder.encode(list(_EMBED_NEGATIVE_TERMS), normalize_embeddings=True)
+    return _embed_pos_matrix, _embed_neg_matrix
+
+
+def matches_esg_embedding(text: str, threshold: float = 0.0) -> bool:
+    """True if `text`'s best single-term match among _EMBED_POSITIVE_TERMS
+    beats its best single-term match among _EMBED_NEGATIVE_TERMS by more
+    than `threshold`. See the module comment above for why max-of-terms
+    (not one averaged vector) is the design that was actually measured to
+    work. threshold=0.0 (both maxes compete on equal footing) is the value
+    validated in the template-split measurement above -- not yet re-tuned
+    beyond that one measurement."""
+    from agentic_estimation.layer_2.evidence_classifier import _get_embedder
+    pos_matrix, neg_matrix = _embed_term_matrices()
+    embedder = _get_embedder()
+    emb = embedder.encode([text], normalize_embeddings=True)[0]
+    pos_score = float(np.max(pos_matrix @ emb))
+    neg_score = float(np.max(neg_matrix @ emb))
+    return (pos_score - neg_score) > threshold
+
+
+def matches_esg_relevance(text: str, extra_terms: tuple = ()) -> bool:
+    """OR of the two independent relevance checks -- keyword match (cheap,
+    exact, zero-cost) and embedding match (catches on-topic phrasing that
+    uses none of the listed words). Each catches real cases the other
+    misses (measured on a held-out template split, 2026-09-16); neither
+    alone is a safe replacement for the other. Prefer this over calling
+    matches_esg_keywords alone for any NEW call site -- existing call sites
+    are migrated separately so each can be verified independently."""
+    return matches_esg_keywords(text, extra_terms) or matches_esg_embedding(text)
 
 
 def filter_search_results(
@@ -242,7 +400,11 @@ def dedup_and_filter_lines(text: str, extra_terms: tuple = (), require_keyword: 
             dropped_dupes += 1
             continue
 
-        if require_keyword and not matches_esg_keywords(stripped, extra_terms):
+        # OR of keyword + embedding relevance (see matches_esg_relevance's own
+        # comment) -- catches on-topic headlines that use none of the listed
+        # words (e.g. "green AI projects", "comply with EU gatekeeper rules"),
+        # measured to matter on real RSS headlines this exact gate sees.
+        if require_keyword and not matches_esg_relevance(stripped, extra_terms):
             dropped_irrelevant += 1
             continue
 
